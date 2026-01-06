@@ -162,28 +162,46 @@ type Team struct {
 	Domain string `json:"domain"`
 }
 
-// ListChannels returns all channels
+// ListChannels returns all channels (handles pagination automatically)
 func (c *Client) ListChannels(types string, excludeArchived bool, limit int) ([]Channel, error) {
-	params := url.Values{}
-	params.Set("exclude_archived", fmt.Sprintf("%t", excludeArchived))
-	params.Set("limit", fmt.Sprintf("%d", limit))
-	if types != "" {
-		params.Set("types", types)
+	var allChannels []Channel
+	cursor := ""
+
+	for {
+		params := url.Values{}
+		params.Set("exclude_archived", fmt.Sprintf("%t", excludeArchived))
+		params.Set("limit", fmt.Sprintf("%d", limit))
+		if types != "" {
+			params.Set("types", types)
+		}
+		if cursor != "" {
+			params.Set("cursor", cursor)
+		}
+
+		body, err := c.get("conversations.list", params)
+		if err != nil {
+			return nil, err
+		}
+
+		var result struct {
+			Channels         []Channel `json:"channels"`
+			ResponseMetadata struct {
+				NextCursor string `json:"next_cursor"`
+			} `json:"response_metadata"`
+		}
+		if err := json.Unmarshal(body, &result); err != nil {
+			return nil, err
+		}
+
+		allChannels = append(allChannels, result.Channels...)
+
+		if result.ResponseMetadata.NextCursor == "" {
+			break
+		}
+		cursor = result.ResponseMetadata.NextCursor
 	}
 
-	body, err := c.get("conversations.list", params)
-	if err != nil {
-		return nil, err
-	}
-
-	var result struct {
-		Channels []Channel `json:"channels"`
-	}
-	if err := json.Unmarshal(body, &result); err != nil {
-		return nil, err
-	}
-
-	return result.Channels, nil
+	return allChannels, nil
 }
 
 // GetChannelInfo returns channel details
