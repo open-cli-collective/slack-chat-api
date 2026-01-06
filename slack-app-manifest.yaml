@@ -4,8 +4,6 @@ display_information:
   background_color: "#4A154B"
 
 oauth_config:
-  redirect_urls:
-    - http://localhost:8085/callback
   scopes:
     bot:
       - channels:read

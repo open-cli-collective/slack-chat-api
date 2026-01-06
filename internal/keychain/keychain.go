@@ -8,10 +8,8 @@ import (
 )
 
 const (
-	serviceName     = "slack-cli"
-	apiTokenKey     = "api_token"
-	clientIDKey     = "client_id"
-	clientSecretKey = "client_secret"
+	serviceName = "slack-cli"
+	apiTokenKey = "api_token"
 )
 
 // GetAPIToken retrieves the Slack API token from keychain or environment
@@ -39,36 +37,6 @@ func SetAPIToken(token string) error {
 // DeleteAPIToken removes the Slack API token from keychain
 func DeleteAPIToken() error {
 	return deleteFromKeychain(apiTokenKey)
-}
-
-// GetClientID retrieves the Slack app Client ID from keychain
-func GetClientID() (string, error) {
-	return getFromKeychain(clientIDKey)
-}
-
-// SetClientID stores the Slack app Client ID in keychain
-func SetClientID(clientID string) error {
-	return setInKeychain(clientIDKey, clientID)
-}
-
-// DeleteClientID removes the Client ID from keychain
-func DeleteClientID() error {
-	return deleteFromKeychain(clientIDKey)
-}
-
-// GetClientSecret retrieves the Slack app Client Secret from keychain
-func GetClientSecret() (string, error) {
-	return getFromKeychain(clientSecretKey)
-}
-
-// SetClientSecret stores the Slack app Client Secret in keychain
-func SetClientSecret(secret string) error {
-	return setInKeychain(clientSecretKey, secret)
-}
-
-// DeleteClientSecret removes the Client Secret from keychain
-func DeleteClientSecret() error {
-	return deleteFromKeychain(clientSecretKey)
 }
 
 func getFromKeychain(account string) (string, error) {
