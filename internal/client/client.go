@@ -283,13 +283,16 @@ func (c *Client) GetUserInfo(userID string) (*User, error) {
 }
 
 // SendMessage sends a message to a channel
-func (c *Client) SendMessage(channel, text, threadTS string) (*Message, error) {
+func (c *Client) SendMessage(channel, text, threadTS string, blocks []interface{}) (*Message, error) {
 	data := map[string]interface{}{
 		"channel": channel,
 		"text":    text,
 	}
 	if threadTS != "" {
 		data["thread_ts"] = threadTS
+	}
+	if len(blocks) > 0 {
+		data["blocks"] = blocks
 	}
 
 	body, err := c.post("chat.postMessage", data)
@@ -311,11 +314,14 @@ func (c *Client) SendMessage(channel, text, threadTS string) (*Message, error) {
 }
 
 // UpdateMessage updates an existing message
-func (c *Client) UpdateMessage(channel, ts, text string) error {
+func (c *Client) UpdateMessage(channel, ts, text string, blocks []interface{}) error {
 	data := map[string]interface{}{
 		"channel": channel,
 		"ts":      ts,
 		"text":    text,
+	}
+	if len(blocks) > 0 {
+		data["blocks"] = blocks
 	}
 
 	_, err := c.post("chat.update", data)

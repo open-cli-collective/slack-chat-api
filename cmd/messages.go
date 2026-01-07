@@ -27,8 +27,16 @@ var sendCmd = &cobra.Command{
 		}
 
 		threadTS, _ := cmd.Flags().GetString("thread")
+		blocksJSON, _ := cmd.Flags().GetString("blocks")
 
-		msg, err := c.SendMessage(args[0], args[1], threadTS)
+		var blocks []interface{}
+		if blocksJSON != "" {
+			if err := json.Unmarshal([]byte(blocksJSON), &blocks); err != nil {
+				return fmt.Errorf("invalid blocks JSON: %w", err)
+			}
+		}
+
+		msg, err := c.SendMessage(args[0], args[1], threadTS, blocks)
 		if err != nil {
 			return err
 		}
@@ -54,7 +62,16 @@ var updateCmd = &cobra.Command{
 			return err
 		}
 
-		if err := c.UpdateMessage(args[0], args[1], args[2]); err != nil {
+		blocksJSON, _ := cmd.Flags().GetString("blocks")
+
+		var blocks []interface{}
+		if blocksJSON != "" {
+			if err := json.Unmarshal([]byte(blocksJSON), &blocks); err != nil {
+				return fmt.Errorf("invalid blocks JSON: %w", err)
+			}
+		}
+
+		if err := c.UpdateMessage(args[0], args[1], args[2], blocks); err != nil {
 			return err
 		}
 
@@ -209,8 +226,10 @@ func init() {
 
 	messagesCmd.AddCommand(sendCmd)
 	sendCmd.Flags().String("thread", "", "Thread timestamp for reply")
+	sendCmd.Flags().String("blocks", "", "Block Kit blocks as JSON array")
 
 	messagesCmd.AddCommand(updateCmd)
+	updateCmd.Flags().String("blocks", "", "Block Kit blocks as JSON array")
 	messagesCmd.AddCommand(deleteCmd)
 
 	messagesCmd.AddCommand(historyCmd)
