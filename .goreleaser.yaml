@@ -5,13 +5,15 @@ project_name: slack-cli
 before:
   hooks:
     - go mod tidy
+    - go test ./...
 
 builds:
   - main: ./cmd/slack-cli
     env:
-      - CGO_ENABLED=1
+      - CGO_ENABLED=0
     goos:
       - darwin
+      - linux
     goarch:
       - amd64
       - arm64
@@ -25,17 +27,32 @@ archives:
   - format: tar.gz
     name_template: >-
       {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    files:
+      - LICENSE
+      - README.md
 
 checksum:
   name_template: "checksums.txt"
 
 changelog:
   sort: asc
+  use: github
   filters:
     exclude:
       - "^docs:"
       - "^test:"
       - "^ci:"
+      - "^chore:"
+      - "Merge pull request"
+  groups:
+    - title: Features
+      regexp: '^feat:'
+      order: 0
+    - title: Bug Fixes
+      regexp: '^fix:'
+      order: 1
+    - title: Other
+      order: 999
 
 brews:
   - name: slack-cli
