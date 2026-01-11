@@ -9,15 +9,21 @@ import (
 	"github.com/piekstra/slack-cli/internal/keychain"
 )
 
+type showOptions struct{}
+
 func newShowCmd() *cobra.Command {
+	opts := &showOptions{}
+
 	return &cobra.Command{
 		Use:   "show",
 		Short: "Show current configuration status",
-		RunE:  runShow,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runShow(opts)
+		},
 	}
 }
 
-func runShow(cmd *cobra.Command, args []string) error {
+func runShow(opts *showOptions) error {
 	token, err := keychain.GetAPIToken()
 	if err != nil {
 		fmt.Println("API Token: Not configured")

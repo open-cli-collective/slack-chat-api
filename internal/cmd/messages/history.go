@@ -10,32 +10,41 @@ import (
 	"github.com/piekstra/slack-cli/internal/output"
 )
 
+type historyOptions struct {
+	limit  int
+	oldest string
+	latest string
+}
+
 func newHistoryCmd() *cobra.Command {
+	opts := &historyOptions{}
+
 	cmd := &cobra.Command{
 		Use:   "history <channel>",
 		Short: "Get channel message history",
 		Args:  cobra.ExactArgs(1),
-		RunE:  runHistory,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runHistory(args[0], opts, nil)
+		},
 	}
 
-	cmd.Flags().Int("limit", 20, "Maximum messages to return")
-	cmd.Flags().String("oldest", "", "Only messages after this timestamp")
-	cmd.Flags().String("latest", "", "Only messages before this timestamp")
+	cmd.Flags().IntVar(&opts.limit, "limit", 20, "Maximum messages to return")
+	cmd.Flags().StringVar(&opts.oldest, "oldest", "", "Only messages after this timestamp")
+	cmd.Flags().StringVar(&opts.latest, "latest", "", "Only messages before this timestamp")
 
 	return cmd
 }
 
-func runHistory(cmd *cobra.Command, args []string) error {
-	c, err := client.New()
-	if err != nil {
-		return err
+func runHistory(channel string, opts *historyOptions, c *client.Client) error {
+	if c == nil {
+		var err error
+		c, err = client.New()
+		if err != nil {
+			return err
+		}
 	}
 
-	limit, _ := cmd.Flags().GetInt("limit")
-	oldest, _ := cmd.Flags().GetString("oldest")
-	latest, _ := cmd.Flags().GetString("latest")
-
-	messages, err := c.GetChannelHistory(args[0], limit, oldest, latest)
+	messages, err := c.GetChannelHistory(channel, opts.limit, opts.oldest, opts.latest)
 	if err != nil {
 		return err
 	}

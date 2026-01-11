@@ -11,31 +11,40 @@ import (
 	"github.com/piekstra/slack-cli/internal/output"
 )
 
+type listOptions struct {
+	types           string
+	excludeArchived bool
+	limit           int
+}
+
 func newListCmd() *cobra.Command {
+	opts := &listOptions{}
+
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List all channels",
-		RunE:  runList,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runList(opts, nil)
+		},
 	}
 
-	cmd.Flags().String("types", "", "Channel types (public_channel,private_channel,mpim,im)")
-	cmd.Flags().Bool("exclude-archived", true, "Exclude archived channels")
-	cmd.Flags().Int("limit", 100, "Maximum channels to return")
+	cmd.Flags().StringVar(&opts.types, "types", "", "Channel types (public_channel,private_channel,mpim,im)")
+	cmd.Flags().BoolVar(&opts.excludeArchived, "exclude-archived", true, "Exclude archived channels")
+	cmd.Flags().IntVar(&opts.limit, "limit", 100, "Maximum channels to return")
 
 	return cmd
 }
 
-func runList(cmd *cobra.Command, args []string) error {
-	c, err := client.New()
-	if err != nil {
-		return err
+func runList(opts *listOptions, c *client.Client) error {
+	if c == nil {
+		var err error
+		c, err = client.New()
+		if err != nil {
+			return err
+		}
 	}
 
-	types, _ := cmd.Flags().GetString("types")
-	excludeArchived, _ := cmd.Flags().GetBool("exclude-archived")
-	limit, _ := cmd.Flags().GetInt("limit")
-
-	channels, err := c.ListChannels(types, excludeArchived, limit)
+	channels, err := c.ListChannels(opts.types, opts.excludeArchived, opts.limit)
 	if err != nil {
 		return err
 	}

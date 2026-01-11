@@ -8,22 +8,31 @@ import (
 	"github.com/piekstra/slack-cli/internal/client"
 )
 
+type deleteOptions struct{}
+
 func newDeleteCmd() *cobra.Command {
+	opts := &deleteOptions{}
+
 	return &cobra.Command{
 		Use:   "delete <channel> <timestamp>",
 		Short: "Delete a message",
 		Args:  cobra.ExactArgs(2),
-		RunE:  runDelete,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runDelete(args[0], args[1], opts, nil)
+		},
 	}
 }
 
-func runDelete(cmd *cobra.Command, args []string) error {
-	c, err := client.New()
-	if err != nil {
-		return err
+func runDelete(channel, timestamp string, opts *deleteOptions, c *client.Client) error {
+	if c == nil {
+		var err error
+		c, err = client.New()
+		if err != nil {
+			return err
+		}
 	}
 
-	if err := c.DeleteMessage(args[0], args[1]); err != nil {
+	if err := c.DeleteMessage(channel, timestamp); err != nil {
 		return err
 	}
 

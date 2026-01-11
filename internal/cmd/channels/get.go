@@ -10,22 +10,31 @@ import (
 	"github.com/piekstra/slack-cli/internal/output"
 )
 
+type getOptions struct{}
+
 func newGetCmd() *cobra.Command {
+	opts := &getOptions{}
+
 	return &cobra.Command{
 		Use:   "get <channel-id>",
 		Short: "Get channel information",
 		Args:  cobra.ExactArgs(1),
-		RunE:  runGet,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runGet(args[0], opts, nil)
+		},
 	}
 }
 
-func runGet(cmd *cobra.Command, args []string) error {
-	c, err := client.New()
-	if err != nil {
-		return err
+func runGet(channelID string, opts *getOptions, c *client.Client) error {
+	if c == nil {
+		var err error
+		c, err = client.New()
+		if err != nil {
+			return err
+		}
 	}
 
-	channel, err := c.GetChannelInfo(args[0])
+	channel, err := c.GetChannelInfo(channelID)
 	if err != nil {
 		return err
 	}

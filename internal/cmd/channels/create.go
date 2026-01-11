@@ -10,28 +10,37 @@ import (
 	"github.com/piekstra/slack-cli/internal/output"
 )
 
+type createOptions struct {
+	private bool
+}
+
 func newCreateCmd() *cobra.Command {
+	opts := &createOptions{}
+
 	cmd := &cobra.Command{
 		Use:   "create <name>",
 		Short: "Create a new channel",
 		Args:  cobra.ExactArgs(1),
-		RunE:  runCreate,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runCreate(args[0], opts, nil)
+		},
 	}
 
-	cmd.Flags().Bool("private", false, "Create as private channel")
+	cmd.Flags().BoolVar(&opts.private, "private", false, "Create as private channel")
 
 	return cmd
 }
 
-func runCreate(cmd *cobra.Command, args []string) error {
-	c, err := client.New()
-	if err != nil {
-		return err
+func runCreate(name string, opts *createOptions, c *client.Client) error {
+	if c == nil {
+		var err error
+		c, err = client.New()
+		if err != nil {
+			return err
+		}
 	}
 
-	isPrivate, _ := cmd.Flags().GetBool("private")
-
-	channel, err := c.CreateChannel(args[0], isPrivate)
+	channel, err := c.CreateChannel(name, opts.private)
 	if err != nil {
 		return err
 	}

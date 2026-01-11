@@ -10,18 +10,27 @@ import (
 	"github.com/piekstra/slack-cli/internal/output"
 )
 
+type infoOptions struct{}
+
 func newInfoCmd() *cobra.Command {
+	opts := &infoOptions{}
+
 	return &cobra.Command{
 		Use:   "info",
 		Short: "Get workspace/team information",
-		RunE:  runInfo,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runInfo(opts, nil)
+		},
 	}
 }
 
-func runInfo(cmd *cobra.Command, args []string) error {
-	c, err := client.New()
-	if err != nil {
-		return err
+func runInfo(opts *infoOptions, c *client.Client) error {
+	if c == nil {
+		var err error
+		c, err = client.New()
+		if err != nil {
+			return err
+		}
 	}
 
 	team, err := c.GetTeamInfo()

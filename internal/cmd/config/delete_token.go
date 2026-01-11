@@ -8,15 +8,21 @@ import (
 	"github.com/piekstra/slack-cli/internal/keychain"
 )
 
+type deleteTokenOptions struct{}
+
 func newDeleteTokenCmd() *cobra.Command {
+	opts := &deleteTokenOptions{}
+
 	return &cobra.Command{
 		Use:   "delete-token",
 		Short: "Delete the stored Slack API token",
-		RunE:  runDeleteToken,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runDeleteToken(opts)
+		},
 	}
 }
 
-func runDeleteToken(cmd *cobra.Command, args []string) error {
+func runDeleteToken(opts *deleteTokenOptions) error {
 	if err := keychain.DeleteAPIToken(); err != nil {
 		return fmt.Errorf("failed to delete token: %w", err)
 	}

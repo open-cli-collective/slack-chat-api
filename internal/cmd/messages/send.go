@@ -10,7 +10,15 @@ import (
 	"github.com/piekstra/slack-cli/internal/output"
 )
 
+type sendOptions struct {
+	threadTS   string
+	blocksJSON string
+	simple     bool
+}
+
 func newSendCmd() *cobra.Command {
+	opts := &sendOptions{}
+
 	cmd := &cobra.Command{
 		Use:   "send <channel> <text>",
 		Short: "Send a message to a channel",
@@ -19,37 +27,38 @@ func newSendCmd() *cobra.Command {
 By default, messages are sent using Slack Block Kit formatting for a more
 refined appearance. Use --simple to send plain text messages instead.`,
 		Args: cobra.ExactArgs(2),
-		RunE: runSend,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runSend(args[0], args[1], opts, nil)
+		},
 	}
 
-	cmd.Flags().String("thread", "", "Thread timestamp for reply")
-	cmd.Flags().String("blocks", "", "Block Kit blocks as JSON array (overrides default block formatting)")
-	cmd.Flags().Bool("simple", false, "Send as plain text without block formatting")
+	cmd.Flags().StringVar(&opts.threadTS, "thread", "", "Thread timestamp for reply")
+	cmd.Flags().StringVar(&opts.blocksJSON, "blocks", "", "Block Kit blocks as JSON array (overrides default block formatting)")
+	cmd.Flags().BoolVar(&opts.simple, "simple", false, "Send as plain text without block formatting")
 
 	return cmd
 }
 
-func runSend(cmd *cobra.Command, args []string) error {
-	c, err := client.New()
-	if err != nil {
-		return err
+func runSend(channel, text string, opts *sendOptions, c *client.Client) error {
+	if c == nil {
+		var err error
+		c, err = client.New()
+		if err != nil {
+			return err
+		}
 	}
-
-	threadTS, _ := cmd.Flags().GetString("thread")
-	blocksJSON, _ := cmd.Flags().GetString("blocks")
-	simple, _ := cmd.Flags().GetBool("simple")
 
 	var blocks []interface{}
-	if blocksJSON != "" {
-		if err := json.Unmarshal([]byte(blocksJSON), &blocks); err != nil {
+	if opts.blocksJSON != "" {
+		if err := json.Unmarshal([]byte(opts.blocksJSON), &blocks); err != nil {
 			return fmt.Errorf("invalid blocks JSON: %w", err)
 		}
-	} else if !simple {
+	} else if !opts.simple {
 		// Default to block style for a more refined appearance
-		blocks = buildDefaultBlocks(args[1])
+		blocks = buildDefaultBlocks(text)
 	}
 
-	msg, err := c.SendMessage(args[0], args[1], threadTS, blocks)
+	msg, err := c.SendMessage(channel, text, opts.threadTS, blocks)
 	if err != nil {
 		return err
 	}

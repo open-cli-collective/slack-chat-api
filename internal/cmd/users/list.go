@@ -11,27 +11,36 @@ import (
 	"github.com/piekstra/slack-cli/internal/output"
 )
 
+type listOptions struct {
+	limit int
+}
+
 func newListCmd() *cobra.Command {
+	opts := &listOptions{}
+
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List all users",
-		RunE:  runList,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runList(opts, nil)
+		},
 	}
 
-	cmd.Flags().Int("limit", 100, "Maximum users to return")
+	cmd.Flags().IntVar(&opts.limit, "limit", 100, "Maximum users to return")
 
 	return cmd
 }
 
-func runList(cmd *cobra.Command, args []string) error {
-	c, err := client.New()
-	if err != nil {
-		return err
+func runList(opts *listOptions, c *client.Client) error {
+	if c == nil {
+		var err error
+		c, err = client.New()
+		if err != nil {
+			return err
+		}
 	}
 
-	limit, _ := cmd.Flags().GetInt("limit")
-
-	users, err := c.ListUsers(limit)
+	users, err := c.ListUsers(opts.limit)
 	if err != nil {
 		return err
 	}

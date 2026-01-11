@@ -10,28 +10,37 @@ import (
 	"github.com/piekstra/slack-cli/internal/output"
 )
 
+type threadOptions struct {
+	limit int
+}
+
 func newThreadCmd() *cobra.Command {
+	opts := &threadOptions{}
+
 	cmd := &cobra.Command{
 		Use:   "thread <channel> <thread-ts>",
 		Short: "Get thread replies",
 		Args:  cobra.ExactArgs(2),
-		RunE:  runThread,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runThread(args[0], args[1], opts, nil)
+		},
 	}
 
-	cmd.Flags().Int("limit", 100, "Maximum replies to return")
+	cmd.Flags().IntVar(&opts.limit, "limit", 100, "Maximum replies to return")
 
 	return cmd
 }
 
-func runThread(cmd *cobra.Command, args []string) error {
-	c, err := client.New()
-	if err != nil {
-		return err
+func runThread(channel, threadTS string, opts *threadOptions, c *client.Client) error {
+	if c == nil {
+		var err error
+		c, err = client.New()
+		if err != nil {
+			return err
+		}
 	}
 
-	limit, _ := cmd.Flags().GetInt("limit")
-
-	messages, err := c.GetThreadReplies(args[0], args[1], limit)
+	messages, err := c.GetThreadReplies(channel, threadTS, opts.limit)
 	if err != nil {
 		return err
 	}
