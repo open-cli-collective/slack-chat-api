@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(go:*)",
+      "Bash(golangci-lint:*)",
+      "Bash(goimports:*)",
+      "Bash(make:*)",
+      "Bash(git:*)",
+      "Bash(gh:*)",
+      "Bash(rm -rf bin/:*)",
+      "Bash(rm -rf dist/:*)",
+      "Bash(rm -rf coverage.*:*)",
+      "WebFetch(domain:go.dev)",
+      "WebFetch(domain:pkg.go.dev)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:api.slack.com)",
+      "WebSearch"
+    ],
+    "deny": [
+      "Bash(git rebase:*)",
+      "Bash(git filter-branch:*)",
+      "Bash(git push --force:*)",
+      "Bash(rm -rf /:*)",
+      "Bash(rm -rf ~:*)",
+      "Bash(rm -rf .*:*)"
+    ]
+  }
+}
