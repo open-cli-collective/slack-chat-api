@@ -1,7 +1,6 @@
 package users
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -39,21 +38,19 @@ func runGet(userID string, opts *getOptions, c *client.Client) error {
 		return err
 	}
 
-	if output.JSON {
-		data, _ := json.MarshalIndent(user, "", "  ")
-		fmt.Println(string(data))
-		return nil
+	if output.IsJSON() {
+		return output.PrintJSON(user)
 	}
 
-	fmt.Printf("ID:           %s\n", user.ID)
-	fmt.Printf("Username:     %s\n", user.Name)
-	fmt.Printf("Real Name:    %s\n", user.RealName)
-	fmt.Printf("Display Name: %s\n", user.Profile.DisplayName)
-	fmt.Printf("Email:        %s\n", user.Profile.Email)
-	fmt.Printf("Admin:        %t\n", user.IsAdmin)
-	fmt.Printf("Bot:          %t\n", user.IsBot)
+	output.KeyValue("ID", user.ID)
+	output.KeyValue("Username", user.Name)
+	output.KeyValue("Real Name", user.RealName)
+	output.KeyValue("Display Name", user.Profile.DisplayName)
+	output.KeyValue("Email", user.Profile.Email)
+	output.KeyValue("Admin", user.IsAdmin)
+	output.KeyValue("Bot", user.IsBot)
 	if user.Profile.StatusText != "" {
-		fmt.Printf("Status:       %s %s\n", user.Profile.StatusEmoji, user.Profile.StatusText)
+		output.KeyValue("Status", fmt.Sprintf("%s %s", user.Profile.StatusEmoji, user.Profile.StatusText))
 	}
 
 	return nil

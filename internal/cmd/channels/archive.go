@@ -1,11 +1,10 @@
 package channels
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 
 	"github.com/piekstra/slack-cli/internal/client"
+	"github.com/piekstra/slack-cli/internal/output"
 )
 
 type archiveOptions struct{}
@@ -36,6 +35,6 @@ func runArchive(channelID string, opts *archiveOptions, c *client.Client) error 
 		return err
 	}
 
-	fmt.Printf("Archived channel: %s\n", channelID)
+	output.Printf("Archived channel: %s\n", channelID)
 	return nil
 }

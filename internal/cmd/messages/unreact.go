@@ -1,12 +1,12 @@
 package messages
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/piekstra/slack-cli/internal/client"
+	"github.com/piekstra/slack-cli/internal/output"
 )
 
 type unreactOptions struct{}
@@ -40,6 +40,6 @@ func runUnreact(channel, timestamp, emoji string, opts *unreactOptions, c *clien
 		return err
 	}
 
-	fmt.Printf("Removed :%s: reaction\n", emoji)
+	output.Printf("Removed :%s: reaction\n", emoji)
 	return nil
 }

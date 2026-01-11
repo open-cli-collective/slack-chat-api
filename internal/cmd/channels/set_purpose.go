@@ -1,11 +1,10 @@
 package channels
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 
 	"github.com/piekstra/slack-cli/internal/client"
+	"github.com/piekstra/slack-cli/internal/output"
 )
 
 type setPurposeOptions struct{}
@@ -36,6 +35,6 @@ func runSetPurpose(channelID, purpose string, opts *setPurposeOptions, c *client
 		return err
 	}
 
-	fmt.Printf("Set purpose for channel %s\n", channelID)
+	output.Printf("Set purpose for channel %s\n", channelID)
 	return nil
 }

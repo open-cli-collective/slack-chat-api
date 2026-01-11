@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/piekstra/slack-cli/internal/client"
+	"github.com/piekstra/slack-cli/internal/output"
 )
 
 type updateOptions struct {
@@ -59,6 +60,6 @@ func runUpdate(channel, timestamp, text string, opts *updateOptions, c *client.C
 		return err
 	}
 
-	fmt.Println("Message updated")
+	output.Println("Message updated")
 	return nil
 }

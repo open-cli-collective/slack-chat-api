@@ -1,12 +1,12 @@
 package messages
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/piekstra/slack-cli/internal/client"
+	"github.com/piekstra/slack-cli/internal/output"
 )
 
 type reactOptions struct{}
@@ -40,6 +40,6 @@ func runReact(channel, timestamp, emoji string, opts *reactOptions, c *client.Cl
 		return err
 	}
 
-	fmt.Printf("Added :%s: reaction\n", emoji)
+	output.Printf("Added :%s: reaction\n", emoji)
 	return nil
 }

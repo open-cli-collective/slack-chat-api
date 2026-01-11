@@ -8,6 +8,20 @@ linters:
     - staticcheck
     - unused
     - misspell
+  settings:
+    errcheck:
+      exclude-functions:
+        - io.Closer.Close
+        - (*net/http.Response).Body.Close
+        - (net/http.ResponseWriter).Write
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - errcheck
+      - linters:
+          - errcheck
+        source: "defer.*\\.Close\\(\\)"
 
 formatters:
   enable:
@@ -17,22 +31,6 @@ formatters:
     goimports:
       local-prefixes:
         - github.com/piekstra/slack-cli
-
-linters-settings:
-  errcheck:
-    exclude-functions:
-      - io.Closer.Close
-      - (*net/http.Response).Body.Close
-      - (net/http.ResponseWriter).Write
-
-issues:
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - errcheck
-    - linters:
-        - errcheck
-      source: "defer.*\\.Close\\(\\)"
 
 run:
   timeout: 5m

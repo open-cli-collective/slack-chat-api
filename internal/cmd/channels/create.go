@@ -1,9 +1,6 @@
 package channels
 
 import (
-	"encoding/json"
-	"fmt"
-
 	"github.com/spf13/cobra"
 
 	"github.com/piekstra/slack-cli/internal/client"
@@ -45,12 +42,10 @@ func runCreate(name string, opts *createOptions, c *client.Client) error {
 		return err
 	}
 
-	if output.JSON {
-		data, _ := json.MarshalIndent(channel, "", "  ")
-		fmt.Println(string(data))
-		return nil
+	if output.IsJSON() {
+		return output.PrintJSON(channel)
 	}
 
-	fmt.Printf("Created channel: %s (%s)\n", channel.Name, channel.ID)
+	output.Printf("Created channel: %s (%s)\n", channel.Name, channel.ID)
 	return nil
 }

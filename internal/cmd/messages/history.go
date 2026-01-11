@@ -1,9 +1,6 @@
 package messages
 
 import (
-	"encoding/json"
-	"fmt"
-
 	"github.com/spf13/cobra"
 
 	"github.com/piekstra/slack-cli/internal/client"
@@ -49,21 +46,19 @@ func runHistory(channel string, opts *historyOptions, c *client.Client) error {
 		return err
 	}
 
-	if output.JSON {
-		data, _ := json.MarshalIndent(messages, "", "  ")
-		fmt.Println(string(data))
-		return nil
+	if output.IsJSON() {
+		return output.PrintJSON(messages)
 	}
 
 	if len(messages) == 0 {
-		fmt.Println("No messages found")
+		output.Println("No messages found")
 		return nil
 	}
 
 	for _, m := range messages {
 		ts := formatTimestamp(m.TS)
 		text := truncate(m.Text, 80)
-		fmt.Printf("[%s] %s: %s\n", ts, m.User, text)
+		output.Printf("[%s] %s: %s\n", ts, m.User, text)
 	}
 
 	return nil

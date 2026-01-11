@@ -15,6 +15,8 @@ import (
 	"github.com/piekstra/slack-cli/internal/version"
 )
 
+var outputFormat string
+
 var rootCmd = &cobra.Command{
 	Use:   "slack-cli",
 	Short: "A CLI tool for interacting with Slack",
@@ -28,6 +30,15 @@ Configure your API token with:
 
 Or set the SLACK_API_TOKEN environment variable.`,
 	Version: version.Version,
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		// Parse and validate output format
+		format, err := output.ParseFormat(outputFormat)
+		if err != nil {
+			return err
+		}
+		output.OutputFormat = format
+		return nil
+	},
 }
 
 // Execute runs the root command
@@ -39,7 +50,8 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.PersistentFlags().BoolVar(&output.JSON, "json", false, "Output in JSON format")
+	rootCmd.PersistentFlags().StringVarP(&outputFormat, "output", "o", "text", "Output format: text, json, or table")
+	rootCmd.PersistentFlags().BoolVar(&output.NoColor, "no-color", false, "Disable colored output")
 
 	// Set custom version template to include commit and build date
 	rootCmd.SetVersionTemplate("slack-cli " + version.Info() + "\n")

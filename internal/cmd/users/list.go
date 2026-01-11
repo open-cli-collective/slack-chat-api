@@ -1,10 +1,6 @@
 package users
 
 import (
-	"encoding/json"
-	"fmt"
-	"strings"
-
 	"github.com/spf13/cobra"
 
 	"github.com/piekstra/slack-cli/internal/client"
@@ -45,25 +41,24 @@ func runList(opts *listOptions, c *client.Client) error {
 		return err
 	}
 
-	if output.JSON {
-		data, _ := json.MarshalIndent(users, "", "  ")
-		fmt.Println(string(data))
-		return nil
+	if output.IsJSON() {
+		return output.PrintJSON(users)
 	}
 
 	if len(users) == 0 {
-		fmt.Println("No users found")
+		output.Println("No users found")
 		return nil
 	}
 
-	fmt.Printf("%-12s %-20s %-30s %s\n", "ID", "USERNAME", "REAL NAME", "EMAIL")
-	fmt.Println(strings.Repeat("-", 90))
+	headers := []string{"ID", "USERNAME", "REAL NAME", "EMAIL"}
+	rows := make([][]string, 0, len(users))
 	for _, u := range users {
 		if u.IsBot {
 			continue
 		}
-		fmt.Printf("%-12s %-20s %-30s %s\n", u.ID, u.Name, u.RealName, u.Profile.Email)
+		rows = append(rows, []string{u.ID, u.Name, u.RealName, u.Profile.Email})
 	}
+	output.Table(headers, rows)
 
 	return nil
 }

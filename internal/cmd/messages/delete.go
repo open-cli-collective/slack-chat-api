@@ -1,11 +1,10 @@
 package messages
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 
 	"github.com/piekstra/slack-cli/internal/client"
+	"github.com/piekstra/slack-cli/internal/output"
 )
 
 type deleteOptions struct{}
@@ -36,6 +35,6 @@ func runDelete(channel, timestamp string, opts *deleteOptions, c *client.Client)
 		return err
 	}
 
-	fmt.Println("Message deleted")
+	output.Println("Message deleted")
 	return nil
 }
