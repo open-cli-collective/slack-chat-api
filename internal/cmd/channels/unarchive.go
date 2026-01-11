@@ -1,11 +1,10 @@
 package channels
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 
 	"github.com/piekstra/slack-cli/internal/client"
+	"github.com/piekstra/slack-cli/internal/output"
 )
 
 type unarchiveOptions struct{}
@@ -36,6 +35,6 @@ func runUnarchive(channelID string, opts *unarchiveOptions, c *client.Client) er
 		return err
 	}
 
-	fmt.Printf("Unarchived channel: %s\n", channelID)
+	output.Printf("Unarchived channel: %s\n", channelID)
 	return nil
 }

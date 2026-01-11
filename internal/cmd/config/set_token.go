@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/piekstra/slack-cli/internal/keychain"
+	"github.com/piekstra/slack-cli/internal/output"
 )
 
 type setTokenOptions struct{}
@@ -39,10 +40,10 @@ If no token is provided as an argument, you will be prompted to enter it.`,
 func runSetToken(token string, opts *setTokenOptions) error {
 	// Warn Linux users about file-based storage
 	if !keychain.IsSecureStorage() {
-		fmt.Println("Warning: On Linux, your token will be stored in a config file")
-		fmt.Println("         (~/.config/slack-cli/credentials) with restricted permissions (0600).")
-		fmt.Println("         This is less secure than macOS Keychain storage.")
-		fmt.Println()
+		output.Println("Warning: On Linux, your token will be stored in a config file")
+		output.Println("         (~/.config/slack-cli/credentials) with restricted permissions (0600).")
+		output.Println("         This is less secure than macOS Keychain storage.")
+		output.Println()
 	}
 
 	if token == "" {
@@ -64,9 +65,9 @@ func runSetToken(token string, opts *setTokenOptions) error {
 	}
 
 	if keychain.IsSecureStorage() {
-		fmt.Println("API token stored securely in Keychain")
+		output.Println("API token stored securely in Keychain")
 	} else {
-		fmt.Println("API token stored in ~/.config/slack-cli/credentials")
+		output.Println("API token stored in ~/.config/slack-cli/credentials")
 	}
 	return nil
 }

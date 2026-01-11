@@ -1,11 +1,10 @@
 package channels
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 
 	"github.com/piekstra/slack-cli/internal/client"
+	"github.com/piekstra/slack-cli/internal/output"
 )
 
 type inviteOptions struct{}
@@ -36,6 +35,6 @@ func runInvite(channelID string, userIDs []string, opts *inviteOptions, c *clien
 		return err
 	}
 
-	fmt.Printf("Invited %d user(s) to channel %s\n", len(userIDs), channelID)
+	output.Printf("Invited %d user(s) to channel %s\n", len(userIDs), channelID)
 	return nil
 }

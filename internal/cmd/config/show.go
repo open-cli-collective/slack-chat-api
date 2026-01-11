@@ -1,12 +1,12 @@
 package config
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/piekstra/slack-cli/internal/keychain"
+	"github.com/piekstra/slack-cli/internal/output"
 )
 
 type showOptions struct{}
@@ -26,8 +26,8 @@ func newShowCmd() *cobra.Command {
 func runShow(opts *showOptions) error {
 	token, err := keychain.GetAPIToken()
 	if err != nil {
-		fmt.Println("API Token: Not configured")
-		fmt.Println("\nRun 'slack-cli config set-token' to configure")
+		output.Println("API Token: Not configured")
+		output.Println("\nRun 'slack-cli config set-token' to configure")
 		return nil
 	}
 
@@ -35,9 +35,9 @@ func runShow(opts *showOptions) error {
 	masked := token[:8] + strings.Repeat("*", len(token)-12) + token[len(token)-4:]
 
 	if keychain.IsSecureStorage() {
-		fmt.Printf("API Token: %s (from Keychain)\n", masked)
+		output.Printf("API Token: %s (from Keychain)\n", masked)
 	} else {
-		fmt.Printf("API Token: %s (from config file)\n", masked)
+		output.Printf("API Token: %s (from config file)\n", masked)
 	}
 
 	return nil

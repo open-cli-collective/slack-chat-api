@@ -63,12 +63,10 @@ func runSend(channel, text string, opts *sendOptions, c *client.Client) error {
 		return err
 	}
 
-	if output.JSON {
-		data, _ := json.MarshalIndent(msg, "", "  ")
-		fmt.Println(string(data))
-		return nil
+	if output.IsJSON() {
+		return output.PrintJSON(msg)
 	}
 
-	fmt.Printf("Message sent (ts: %s)\n", msg.TS)
+	output.Printf("Message sent (ts: %s)\n", msg.TS)
 	return nil
 }

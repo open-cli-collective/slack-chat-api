@@ -1,9 +1,7 @@
 package channels
 
 import (
-	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -49,26 +47,25 @@ func runList(opts *listOptions, c *client.Client) error {
 		return err
 	}
 
-	if output.JSON {
-		data, _ := json.MarshalIndent(channels, "", "  ")
-		fmt.Println(string(data))
-		return nil
+	if output.IsJSON() {
+		return output.PrintJSON(channels)
 	}
 
 	if len(channels) == 0 {
-		fmt.Println("No channels found")
+		output.Println("No channels found")
 		return nil
 	}
 
-	fmt.Printf("%-12s %-30s %s\n", "ID", "NAME", "MEMBERS")
-	fmt.Println(strings.Repeat("-", 60))
+	headers := []string{"ID", "NAME", "MEMBERS"}
+	rows := make([][]string, 0, len(channels))
 	for _, ch := range channels {
-		private := ""
+		members := fmt.Sprintf("%d", ch.NumMembers)
 		if ch.IsPrivate {
-			private = " (private)"
+			members += " (private)"
 		}
-		fmt.Printf("%-12s %-30s %d%s\n", ch.ID, ch.Name, ch.NumMembers, private)
+		rows = append(rows, []string{ch.ID, ch.Name, members})
 	}
+	output.Table(headers, rows)
 
 	return nil
 }

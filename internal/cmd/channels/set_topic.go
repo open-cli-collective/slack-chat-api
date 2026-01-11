@@ -1,11 +1,10 @@
 package channels
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 
 	"github.com/piekstra/slack-cli/internal/client"
+	"github.com/piekstra/slack-cli/internal/output"
 )
 
 type setTopicOptions struct{}
@@ -36,6 +35,6 @@ func runSetTopic(channelID, topic string, opts *setTopicOptions, c *client.Clien
 		return err
 	}
 
-	fmt.Printf("Set topic for channel %s\n", channelID)
+	output.Printf("Set topic for channel %s\n", channelID)
 	return nil
 }

@@ -1,9 +1,6 @@
 package messages
 
 import (
-	"encoding/json"
-	"fmt"
-
 	"github.com/spf13/cobra"
 
 	"github.com/piekstra/slack-cli/internal/client"
@@ -45,21 +42,19 @@ func runThread(channel, threadTS string, opts *threadOptions, c *client.Client) 
 		return err
 	}
 
-	if output.JSON {
-		data, _ := json.MarshalIndent(messages, "", "  ")
-		fmt.Println(string(data))
-		return nil
+	if output.IsJSON() {
+		return output.PrintJSON(messages)
 	}
 
 	if len(messages) == 0 {
-		fmt.Println("No replies found")
+		output.Println("No replies found")
 		return nil
 	}
 
 	for _, m := range messages {
 		ts := formatTimestamp(m.TS)
 		text := truncate(m.Text, 80)
-		fmt.Printf("[%s] %s: %s\n", ts, m.User, text)
+		output.Printf("[%s] %s: %s\n", ts, m.User, text)
 	}
 
 	return nil

@@ -1,7 +1,6 @@
 package workspace
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -38,15 +37,13 @@ func runInfo(opts *infoOptions, c *client.Client) error {
 		return err
 	}
 
-	if output.JSON {
-		data, _ := json.MarshalIndent(team, "", "  ")
-		fmt.Println(string(data))
-		return nil
+	if output.IsJSON() {
+		return output.PrintJSON(team)
 	}
 
-	fmt.Printf("ID:     %s\n", team.ID)
-	fmt.Printf("Name:   %s\n", team.Name)
-	fmt.Printf("Domain: %s.slack.com\n", team.Domain)
+	output.KeyValue("ID", team.ID)
+	output.KeyValue("Name", team.Name)
+	output.KeyValue("Domain", fmt.Sprintf("%s.slack.com", team.Domain))
 
 	return nil
 }
