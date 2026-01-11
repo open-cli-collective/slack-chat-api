@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -455,4 +456,168 @@ func TestRunUnreact_Success(t *testing.T) {
 
 	err := runUnreact("C123", "1234567890.123456", ":thumbsup:", opts, c)
 	require.NoError(t, err)
+}
+
+// Confirmation prompt tests for delete command
+
+func TestRunDelete_Confirmation(t *testing.T) {
+	tests := []struct {
+		name          string
+		input         string
+		force         bool
+		expectAPICall bool
+	}{
+		{"force skips prompt", "", true, true},
+		{"y confirms", "y\n", false, true},
+		{"yes confirms", "yes\n", false, true},
+		{"YES confirms (case insensitive)", "YES\n", false, true},
+		{"n cancels", "n\n", false, false},
+		{"no cancels", "no\n", false, false},
+		{"empty input cancels", "\n", false, false},
+		{"other input cancels", "maybe\n", false, false},
+		{"whitespace y confirms", "  y  \n", false, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			apiCalled := false
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				apiCalled = true
+				_ = json.NewEncoder(w).Encode(map[string]interface{}{"ok": true})
+			}))
+			defer server.Close()
+
+			c := client.NewWithConfig(server.URL, "test-token", nil)
+			opts := &deleteOptions{
+				force: tt.force,
+				stdin: strings.NewReader(tt.input),
+			}
+
+			err := runDelete("C123456789", "1234567890.123456", opts, c)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expectAPICall, apiCalled, "API call expectation mismatch")
+		})
+	}
+}
+
+// Stdin support tests for send command
+
+func TestRunSend_Stdin(t *testing.T) {
+	tests := []struct {
+		name        string
+		input       string
+		expectText  string
+		expectError bool
+	}{
+		{
+			name:       "single line from stdin",
+			input:      "Hello from stdin",
+			expectText: "Hello from stdin",
+		},
+		{
+			name:       "multiline preserves newlines",
+			input:      "Line 1\nLine 2\nLine 3",
+			expectText: "Line 1\nLine 2\nLine 3",
+		},
+		{
+			name:       "unicode and emoji preserved",
+			input:      "Hello 👋 World 🌍",
+			expectText: "Hello 👋 World 🌍",
+		},
+		{
+			name:        "empty stdin fails",
+			input:       "",
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var receivedText string
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				var body map[string]interface{}
+				_ = json.NewDecoder(r.Body).Decode(&body)
+				receivedText = body["text"].(string)
+				_ = json.NewEncoder(w).Encode(map[string]interface{}{
+					"ok": true,
+					"ts": "1234567890.123456",
+				})
+			}))
+			defer server.Close()
+
+			c := client.NewWithConfig(server.URL, "test-token", nil)
+			opts := &sendOptions{
+				simple: true,
+				stdin:  strings.NewReader(tt.input),
+			}
+
+			err := runSend("C123456789", "-", opts, c)
+
+			if tt.expectError {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), "empty")
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.expectText, receivedText)
+			}
+		})
+	}
+}
+
+// Validation tests
+
+func TestRunSend_InvalidChannelID(t *testing.T) {
+	opts := &sendOptions{simple: true}
+	err := runSend("invalid", "Hello", opts, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid channel ID")
+}
+
+func TestRunSend_InvalidThreadTimestamp(t *testing.T) {
+	opts := &sendOptions{simple: true, threadTS: "not-a-timestamp"}
+	err := runSend("C123456789", "Hello", opts, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid timestamp")
+}
+
+func TestRunDelete_InvalidChannelID(t *testing.T) {
+	opts := &deleteOptions{force: true}
+	err := runDelete("invalid", "1234567890.123456", opts, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid channel ID")
+}
+
+func TestRunDelete_InvalidTimestamp(t *testing.T) {
+	opts := &deleteOptions{force: true}
+	err := runDelete("C123456789", "not-a-timestamp", opts, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid timestamp")
+}
+
+func TestRunReact_InvalidChannelID(t *testing.T) {
+	opts := &reactOptions{}
+	err := runReact("invalid", "1234567890.123456", "thumbsup", opts, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid channel ID")
+}
+
+func TestRunReact_InvalidTimestamp(t *testing.T) {
+	opts := &reactOptions{}
+	err := runReact("C123456789", "not-a-timestamp", "thumbsup", opts, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid timestamp")
+}
+
+func TestRunUnreact_InvalidChannelID(t *testing.T) {
+	opts := &unreactOptions{}
+	err := runUnreact("invalid", "1234567890.123456", "thumbsup", opts, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid channel ID")
+}
+
+func TestRunUnreact_InvalidTimestamp(t *testing.T) {
+	opts := &unreactOptions{}
+	err := runUnreact("C123456789", "not-a-timestamp", "thumbsup", opts, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid timestamp")
 }

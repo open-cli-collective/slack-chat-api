@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -295,4 +296,71 @@ func TestRunInvite_Success(t *testing.T) {
 
 	err := runInvite("C123", []string{"U001", "U002"}, opts, c)
 	require.NoError(t, err)
+}
+
+// Confirmation prompt tests for archive command
+
+func TestRunArchive_Confirmation(t *testing.T) {
+	tests := []struct {
+		name          string
+		input         string
+		force         bool
+		expectAPICall bool
+	}{
+		{"force skips prompt", "", true, true},
+		{"y confirms", "y\n", false, true},
+		{"yes confirms", "yes\n", false, true},
+		{"YES confirms (case insensitive)", "YES\n", false, true},
+		{"n cancels", "n\n", false, false},
+		{"no cancels", "no\n", false, false},
+		{"empty input cancels", "\n", false, false},
+		{"other input cancels", "maybe\n", false, false},
+		{"whitespace y confirms", "  y  \n", false, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			apiCalled := false
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				apiCalled = true
+				_ = json.NewEncoder(w).Encode(map[string]interface{}{"ok": true})
+			}))
+			defer server.Close()
+
+			c := client.NewWithConfig(server.URL, "test-token", nil)
+			opts := &archiveOptions{
+				force: tt.force,
+				stdin: strings.NewReader(tt.input),
+			}
+
+			err := runArchive("C123456789", opts, c)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expectAPICall, apiCalled, "API call expectation mismatch")
+		})
+	}
+}
+
+// Validation tests for archive command
+
+func TestRunArchive_InvalidChannelID(t *testing.T) {
+	tests := []struct {
+		name      string
+		channelID string
+		wantErr   string
+	}{
+		{"invalid prefix", "D123456789", "invalid channel ID"},
+		{"lowercase prefix", "c123456789", "invalid channel ID"},
+		{"empty string", "", "invalid channel ID"},
+		{"just prefix", "C", "invalid channel ID"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts := &archiveOptions{force: true}
+			// Pass nil client - validation should fail before client is needed
+			err := runArchive(tt.channelID, opts, nil)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tt.wantErr)
+		})
+	}
 }

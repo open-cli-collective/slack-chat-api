@@ -1,6 +1,7 @@
 package config
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -157,6 +158,64 @@ func TestRunSetToken_TokenFormats(t *testing.T) {
 				opts := &setTokenOptions{}
 				err := runSetToken(tt.token, opts)
 				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+// Confirmation prompt tests for delete-token command
+
+func TestRunDeleteToken_Confirmation(t *testing.T) {
+	tests := []struct {
+		name         string
+		input        string
+		force        bool
+		expectDelete bool
+	}{
+		{"force skips prompt", "", true, true},
+		{"y confirms", "y\n", false, true},
+		{"yes confirms", "yes\n", false, true},
+		{"YES confirms (case insensitive)", "YES\n", false, true},
+		{"n cancels", "n\n", false, false},
+		{"no cancels", "no\n", false, false},
+		{"empty input cancels", "\n", false, false},
+		{"other input cancels", "maybe\n", false, false},
+		{"whitespace y confirms", "  y  \n", false, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Use temp dir to avoid affecting real keychain
+			tempDir := t.TempDir()
+			t.Setenv("XDG_CONFIG_HOME", tempDir)
+
+			// Skip keychain tests on macOS since we can't easily mock it
+			if keychain.IsSecureStorage() {
+				t.Skip("Skipping on macOS - keychain can't be easily mocked")
+			}
+
+			// First set a token
+			setOpts := &setTokenOptions{}
+			err := runSetToken("xoxb-test-token-12345678", setOpts)
+			require.NoError(t, err)
+
+			// Now test delete with confirmation
+			deleteOpts := &deleteTokenOptions{
+				force: tt.force,
+				stdin: strings.NewReader(tt.input),
+			}
+
+			err = runDeleteToken(deleteOpts)
+			require.NoError(t, err)
+
+			// Check if token was actually deleted
+			_, tokenErr := keychain.GetAPIToken()
+			if tt.expectDelete {
+				assert.Error(t, tokenErr, "token should have been deleted")
+			} else {
+				assert.NoError(t, tokenErr, "token should still exist")
+				// Clean up for next test
+				_ = keychain.DeleteAPIToken()
 			}
 		})
 	}
