@@ -163,10 +163,28 @@ slack-cli workspace info
 
 ### Output Formats
 
+All commands support multiple output formats via the `--output` (or `-o`) flag:
+
 ```bash
-# JSON output for all commands
-slack-cli channels list --json
-slack-cli users get U1234567890 --json
+# Default text output
+slack-cli channels list
+
+# JSON output (for scripting)
+slack-cli channels list --output json
+slack-cli users get U1234567890 -o json
+
+# Table output (aligned columns)
+slack-cli channels list --output table
+```
+
+### Global Flags
+
+```bash
+# Disable colored output
+slack-cli channels list --no-color
+
+# Output format (text, json, table)
+slack-cli users list --output json
 ```
 
 ### Shell Completion
