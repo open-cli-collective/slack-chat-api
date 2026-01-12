@@ -9,7 +9,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/piekstra/slack-cli/internal/keychain"
+	"github.com/piekstra/slack-chat-api/internal/keychain"
 )
 
 const defaultBaseURL = "https://slack.com/api"

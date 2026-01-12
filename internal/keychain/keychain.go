@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	serviceName  = "slack-cli"
+	serviceName  = "slack-chat-api"
 	apiTokenKey  = "api_token"
 	userTokenKey = "user_token"
 )
@@ -29,7 +29,7 @@ func GetAPIToken() (string, error) {
 		return token, nil
 	}
 
-	return "", fmt.Errorf("no API token found - run 'slack-cli config set-token' or set SLACK_API_TOKEN")
+	return "", fmt.Errorf("no API token found - run 'slack-chat-api config set-token' or set SLACK_API_TOKEN")
 }
 
 // SetAPIToken stores the Slack API token
@@ -82,7 +82,7 @@ func GetUserToken() (string, error) {
 		return token, nil
 	}
 
-	return "", fmt.Errorf("no user token found - run 'slack-cli config set-token <xoxp-token>' or set SLACK_USER_TOKEN")
+	return "", fmt.Errorf("no user token found - run 'slack-chat-api config set-token <xoxp-token>' or set SLACK_USER_TOKEN")
 }
 
 // SetUserToken stores a user token
@@ -190,10 +190,10 @@ func deleteFromKeychain(account string) error {
 
 func getConfigDir() string {
 	if xdgConfig := os.Getenv("XDG_CONFIG_HOME"); xdgConfig != "" {
-		return filepath.Join(xdgConfig, "slack-cli")
+		return filepath.Join(xdgConfig, "slack-chat-api")
 	}
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".config", "slack-cli")
+	return filepath.Join(home, ".config", "slack-chat-api")
 }
 
 func getConfigFilePath() string {

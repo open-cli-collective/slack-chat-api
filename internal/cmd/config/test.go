@@ -3,8 +3,8 @@ package config
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/piekstra/slack-cli/internal/client"
-	"github.com/piekstra/slack-cli/internal/output"
+	"github.com/piekstra/slack-chat-api/internal/client"
+	"github.com/piekstra/slack-chat-api/internal/output"
 )
 
 type testOptions struct{}
@@ -79,7 +79,7 @@ func runTest(opts *testOptions, botClient *client.Client, userClient *client.Cli
 
 	if !anySuccess {
 		output.Println()
-		output.Println("No valid tokens configured. Run 'slack-cli config set-token' to configure.")
+		output.Println("No valid tokens configured. Run 'slack-chat-api config set-token' to configure.")
 	}
 
 	return nil

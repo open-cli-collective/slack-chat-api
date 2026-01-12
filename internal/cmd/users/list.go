@@ -3,8 +3,8 @@ package users
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/piekstra/slack-cli/internal/client"
-	"github.com/piekstra/slack-cli/internal/output"
+	"github.com/piekstra/slack-chat-api/internal/client"
+	"github.com/piekstra/slack-chat-api/internal/output"
 )
 
 type listOptions struct {

@@ -5,8 +5,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/piekstra/slack-cli/internal/client"
-	"github.com/piekstra/slack-cli/internal/output"
+	"github.com/piekstra/slack-chat-api/internal/client"
+	"github.com/piekstra/slack-chat-api/internal/output"
 )
 
 type filesOptions struct {
@@ -35,10 +35,10 @@ Search modifiers:
   after:date     Files after date (YYYY-MM-DD)
 
 Examples:
-  slack-cli search files "budget spreadsheet"
-  slack-cli search files "in:#finance quarterly report"
-  slack-cli search files "from:@alice type:pdf"
-  slack-cli search files "type:image logo"`,
+  slack-chat-api search files "budget spreadsheet"
+  slack-chat-api search files "in:#finance quarterly report"
+  slack-chat-api search files "from:@alice type:pdf"
+  slack-chat-api search files "type:image logo"`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runSearchFiles(args[0], opts, nil)

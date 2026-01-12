@@ -83,7 +83,7 @@ func TestGetConfigDir_Default(t *testing.T) {
 	_ = os.Unsetenv("XDG_CONFIG_HOME")
 
 	home, _ := os.UserHomeDir()
-	expected := filepath.Join(home, ".config", "slack-cli")
+	expected := filepath.Join(home, ".config", "slack-chat-api")
 	actual := getConfigDir()
 
 	if actual != expected {
@@ -95,7 +95,7 @@ func TestGetConfigDir_XDGConfigHome(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tmpDir)
 
-	expected := filepath.Join(tmpDir, "slack-cli")
+	expected := filepath.Join(tmpDir, "slack-chat-api")
 	actual := getConfigDir()
 
 	if actual != expected {
@@ -117,7 +117,7 @@ func TestConfigFile_SetAndGet(t *testing.T) {
 	}
 
 	// Verify config directory was created
-	configDir := filepath.Join(tmpDir, "slack-cli")
+	configDir := filepath.Join(tmpDir, "slack-chat-api")
 	info, err := os.Stat(configDir)
 	if err != nil {
 		t.Fatalf("config directory not created: %v", err)
@@ -266,7 +266,7 @@ func TestConfigFile_Permissions(t *testing.T) {
 	}
 
 	// Check file permissions (should be 0600)
-	configPath := filepath.Join(tmpDir, "slack-cli", "credentials")
+	configPath := filepath.Join(tmpDir, "slack-chat-api", "credentials")
 	info, err := os.Stat(configPath)
 	if err != nil {
 		t.Fatalf("stat failed: %v", err)
@@ -278,7 +278,7 @@ func TestConfigFile_Permissions(t *testing.T) {
 	}
 
 	// Check directory permissions (should be 0700)
-	dirInfo, err := os.Stat(filepath.Join(tmpDir, "slack-cli"))
+	dirInfo, err := os.Stat(filepath.Join(tmpDir, "slack-chat-api"))
 	if err != nil {
 		t.Fatalf("stat dir failed: %v", err)
 	}

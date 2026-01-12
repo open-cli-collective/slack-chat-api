@@ -1,6 +1,6 @@
 version: 2
 
-project_name: slack-cli
+project_name: slack-chat-api
 
 before:
   hooks:
@@ -8,7 +8,7 @@ before:
     - go test ./...
 
 builds:
-  - main: ./cmd/slack-cli
+  - main: ./cmd/slack-chat-api
     env:
       - CGO_ENABLED=0
     goos:
@@ -19,9 +19,9 @@ builds:
       - arm64
     ldflags:
       - -s -w
-      - -X github.com/piekstra/slack-cli/internal/version.Version={{.Version}}
-      - -X github.com/piekstra/slack-cli/internal/version.Commit={{.Commit}}
-      - -X github.com/piekstra/slack-cli/internal/version.Date={{.Date}}
+      - -X github.com/piekstra/slack-chat-api/internal/version.Version={{.Version}}
+      - -X github.com/piekstra/slack-chat-api/internal/version.Commit={{.Commit}}
+      - -X github.com/piekstra/slack-chat-api/internal/version.Date={{.Date}}
 
 archives:
   - format: tar.gz
@@ -55,20 +55,20 @@ changelog:
       order: 999
 
 brews:
-  - name: slack-cli
+  - name: slack-chat-api
     repository:
       owner: piekstra
       name: homebrew-tap
     directory: Formula
-    homepage: "https://github.com/piekstra/slack-cli"
+    homepage: "https://github.com/piekstra/slack-chat-api"
     description: "Command-line interface for Slack"
     license: "MIT"
     install: |
-      bin.install "slack-cli"
+      bin.install "slack-chat-api"
     caveats: |
-      To configure slack-cli, run:
-        slack-cli config set-token <your-slack-api-token>
+      To configure slack-chat-api, run:
+        slack-chat-api config set-token <your-slack-api-token>
 
       Or set the SLACK_API_TOKEN environment variable.
     test: |
-      assert_match "slack-cli", shell_output("#{bin}/slack-cli --help")
+      assert_match "slack-chat-api", shell_output("#{bin}/slack-chat-api --help")
