@@ -1,6 +1,6 @@
-# Contributing to slack-cli
+# Contributing to slack-chat-api
 
-Thank you for your interest in contributing to slack-cli!
+Thank you for your interest in contributing to slack-chat-api!
 
 ## Development Setup
 
@@ -14,8 +14,8 @@ Thank you for your interest in contributing to slack-cli!
 
 ```bash
 # Clone the repository
-git clone https://github.com/piekstra/slack-cli.git
-cd slack-cli
+git clone https://github.com/piekstra/slack-chat-api.git
+cd slack-chat-api
 
 # Install dependencies
 go mod download

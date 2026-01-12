@@ -1,6 +1,6 @@
 # Integration Tests
 
-Manual integration tests for verifying slack-cli against a live Slack workspace. Tests are organized from safe (read-only) to destructive, so you can stop at any section.
+Manual integration tests for verifying slack-chat-api against a live Slack workspace. Tests are organized from safe (read-only) to destructive, so you can stop at any section.
 
 ---
 
@@ -10,7 +10,7 @@ Manual integration tests for verifying slack-cli against a live Slack workspace.
 
 1. Go to https://api.slack.com/apps
 2. Click "Create New App" → "From scratch"
-3. Name it (e.g., "slack-cli-test") and select your workspace
+3. Name it (e.g., "slack-chat-api-test") and select your workspace
 
 ### Step 2: Configure Token Scopes
 
@@ -48,19 +48,19 @@ make build
 
 # Set up Bot Token (required for most commands)
 # Copy the "Bot User OAuth Token" (starts with xoxb-)
-./bin/slack-cli config set-token
+./bin/slack-chat-api config set-token
 # Paste your xoxb-... token when prompted
 
 # Verify bot token works
-./bin/slack-cli workspace info
+./bin/slack-chat-api workspace info
 
 # Set up User Token (required for search tests in Part 3B)
 # Copy the "User OAuth Token" (starts with xoxp-)
-./bin/slack-cli config set-token xoxp-your-user-token
+./bin/slack-chat-api config set-token xoxp-your-user-token
 
 # Verify both tokens are configured
-./bin/slack-cli config show
-./bin/slack-cli config test
+./bin/slack-chat-api config show
+./bin/slack-chat-api config test
 ```
 
 ### Step 4: Discover Test Inputs
@@ -70,7 +70,7 @@ Use the CLI to find the IDs you need (Slack IDs are opaque and not easily visibl
 ```bash
 # Find your test channel ID (bot must already be in the channel)
 # Look for your test channel name in the output
-slack-cli channels list
+slack-chat-api channels list
 
 # Example output:
 # ID            NAME              MEMBERS
@@ -78,7 +78,7 @@ slack-cli channels list
 # C07ABC123DE   general           42
 
 # Find a user ID (optional, for invite tests)
-slack-cli users list --limit 10
+slack-chat-api users list --limit 10
 ```
 
 Set these for easy reference during testing:
@@ -107,49 +107,49 @@ These tests don't modify anything. Safe to run anytime.
 
 | Step | Command | Expected |
 |------|---------|----------|
-| 1 | `slack-cli workspace info` | Shows workspace ID, name, domain |
-| 2 | `slack-cli workspace info -o json` | Valid JSON with `id`, `name`, `domain` |
-| 3 | `slack-cli workspace info -o table` | Formatted table output |
+| 1 | `slack-chat-api workspace info` | Shows workspace ID, name, domain |
+| 2 | `slack-chat-api workspace info -o json` | Valid JSON with `id`, `name`, `domain` |
+| 3 | `slack-chat-api workspace info -o table` | Formatted table output |
 
 ### 2.2 Users
 
 | Step | Command | Expected |
 |------|---------|----------|
-| 1 | `slack-cli users list` | Table with ID, USERNAME, REAL NAME |
-| 2 | `slack-cli users list --limit 3` | Exactly 3 users |
-| 3 | `slack-cli users list -o json` | Valid JSON array |
-| 4 | `slack-cli users get $TEST_USER_ID` | User details (ID, name, email, status) |
-| 5 | `slack-cli users get $TEST_USER_ID -o json` | Full user object with nested profile |
-| 6 | `slack-cli users get UINVALID999` | Error: `user_not_found` |
+| 1 | `slack-chat-api users list` | Table with ID, USERNAME, REAL NAME |
+| 2 | `slack-chat-api users list --limit 3` | Exactly 3 users |
+| 3 | `slack-chat-api users list -o json` | Valid JSON array |
+| 4 | `slack-chat-api users get $TEST_USER_ID` | User details (ID, name, email, status) |
+| 5 | `slack-chat-api users get $TEST_USER_ID -o json` | Full user object with nested profile |
+| 6 | `slack-chat-api users get UINVALID999` | Error: `user_not_found` |
 
 ### 2.3 Channels
 
 | Step | Command | Expected |
 |------|---------|----------|
-| 1 | `slack-cli channels list` | Table with ID, NAME, MEMBERS |
-| 2 | `slack-cli channels list --limit 5` | Exactly 5 channels |
-| 3 | `slack-cli channels list --types public_channel` | Only public channels |
-| 4 | `slack-cli channels list --exclude-archived=false` | Includes archived channels |
-| 5 | `slack-cli channels list -o json` | Valid JSON array |
-| 6 | `slack-cli channels get $TEST_CHANNEL_ID` | Channel details (ID, name, topic, purpose, members) |
-| 7 | `slack-cli channels get $TEST_CHANNEL_ID -o json` | Full channel object |
-| 8 | `slack-cli channels get CINVALID999` | Error: `channel_not_found` |
+| 1 | `slack-chat-api channels list` | Table with ID, NAME, MEMBERS |
+| 2 | `slack-chat-api channels list --limit 5` | Exactly 5 channels |
+| 3 | `slack-chat-api channels list --types public_channel` | Only public channels |
+| 4 | `slack-chat-api channels list --exclude-archived=false` | Includes archived channels |
+| 5 | `slack-chat-api channels list -o json` | Valid JSON array |
+| 6 | `slack-chat-api channels get $TEST_CHANNEL_ID` | Channel details (ID, name, topic, purpose, members) |
+| 7 | `slack-chat-api channels get $TEST_CHANNEL_ID -o json` | Full channel object |
+| 8 | `slack-chat-api channels get CINVALID999` | Error: `channel_not_found` |
 
 ### 2.4 Message History
 
 | Step | Command | Expected |
 |------|---------|----------|
-| 1 | `slack-cli messages history $TEST_CHANNEL_ID` | Table with timestamp, user, text |
-| 2 | `slack-cli messages history $TEST_CHANNEL_ID --limit 5` | Exactly 5 messages |
-| 3 | `slack-cli messages history $TEST_CHANNEL_ID -o json` | Valid JSON array of messages |
+| 1 | `slack-chat-api messages history $TEST_CHANNEL_ID` | Table with timestamp, user, text |
+| 2 | `slack-chat-api messages history $TEST_CHANNEL_ID --limit 5` | Exactly 5 messages |
+| 3 | `slack-chat-api messages history $TEST_CHANNEL_ID -o json` | Valid JSON array of messages |
 
 ### 2.5 Output Formats
 
 | Step | Command | Expected |
 |------|---------|----------|
-| 1 | `slack-cli channels list -o text` | Same as default (human-readable) |
-| 2 | `slack-cli channels list -o json \| jq '.[0].id'` | Works with jq |
-| 3 | `slack-cli channels list --no-color` | No ANSI escape codes in output |
+| 1 | `slack-chat-api channels list -o text` | Same as default (human-readable) |
+| 2 | `slack-chat-api channels list -o json \| jq '.[0].id'` | Works with jq |
+| 3 | `slack-chat-api channels list --no-color` | No ANSI escape codes in output |
 
 ---
 
@@ -163,16 +163,16 @@ These tests create messages, then clean them up at the end.
 
 | Step | Command | Expected | Capture |
 |------|---------|----------|---------|
-| 1 | `slack-cli messages send $TEST_CHANNEL_ID "Integration test message"` | "Message sent (ts: X)" | **Save TS₁** |
-| 2 | `slack-cli messages history $TEST_CHANNEL_ID --limit 1` | Shows your message |
-| 3 | `slack-cli messages send $TEST_CHANNEL_ID "JSON test" -o json` | JSON with `ts` field | (verify only) |
-| 4 | `slack-cli messages send $TEST_CHANNEL_ID "Plain text" --simple` | Message without Block Kit formatting |
+| 1 | `slack-chat-api messages send $TEST_CHANNEL_ID "Integration test message"` | "Message sent (ts: X)" | **Save TS₁** |
+| 2 | `slack-chat-api messages history $TEST_CHANNEL_ID --limit 1` | Shows your message |
+| 3 | `slack-chat-api messages send $TEST_CHANNEL_ID "JSON test" -o json` | JSON with `ts` field | (verify only) |
+| 4 | `slack-chat-api messages send $TEST_CHANNEL_ID "Plain text" --simple` | Message without Block Kit formatting |
 
 ### 3.2 Multiline Message (stdin)
 
 | Step | Command | Expected |
 |------|---------|----------|
-| 1 | `echo -e "Line 1\nLine 2\nLine 3" \| slack-cli messages send $TEST_CHANNEL_ID -` | Multiline message appears in Slack |
+| 1 | `echo -e "Line 1\nLine 2\nLine 3" \| slack-chat-api messages send $TEST_CHANNEL_ID -` | Multiline message appears in Slack |
 
 ### 3.3 Reactions
 
@@ -180,11 +180,11 @@ Using **TS₁** from step 3.1:
 
 | Step | Command | Expected |
 |------|---------|----------|
-| 1 | `slack-cli messages react $TEST_CHANNEL_ID <TS₁> thumbsup` | "Added :thumbsup: reaction" |
-| 2 | `slack-cli messages react $TEST_CHANNEL_ID <TS₁> :heart:` | "Added :heart: reaction" (colons stripped) |
-| 3 | `slack-cli messages react $TEST_CHANNEL_ID <TS₁> thumbsup` | Error: `already_reacted` |
-| 4 | `slack-cli messages unreact $TEST_CHANNEL_ID <TS₁> thumbsup` | "Removed :thumbsup: reaction" |
-| 5 | `slack-cli messages unreact $TEST_CHANNEL_ID <TS₁> heart` | "Removed :heart: reaction" |
+| 1 | `slack-chat-api messages react $TEST_CHANNEL_ID <TS₁> thumbsup` | "Added :thumbsup: reaction" |
+| 2 | `slack-chat-api messages react $TEST_CHANNEL_ID <TS₁> :heart:` | "Added :heart: reaction" (colons stripped) |
+| 3 | `slack-chat-api messages react $TEST_CHANNEL_ID <TS₁> thumbsup` | Error: `already_reacted` |
+| 4 | `slack-chat-api messages unreact $TEST_CHANNEL_ID <TS₁> thumbsup` | "Removed :thumbsup: reaction" |
+| 5 | `slack-chat-api messages unreact $TEST_CHANNEL_ID <TS₁> heart` | "Removed :heart: reaction" |
 
 ### 3.4 Threading
 
@@ -192,9 +192,9 @@ Using **TS₁** from step 3.1:
 
 | Step | Command | Expected | Capture |
 |------|---------|----------|---------|
-| 1 | `slack-cli messages send $TEST_CHANNEL_ID "Thread reply" --thread <TS₁>` | "Message sent" as thread reply | **Save TS₂** |
-| 2 | `slack-cli messages thread $TEST_CHANNEL_ID <TS₁>` | Shows parent + reply |
-| 3 | `slack-cli messages thread $TEST_CHANNEL_ID <TS₁> -o json` | JSON array of thread messages |
+| 1 | `slack-chat-api messages send $TEST_CHANNEL_ID "Thread reply" --thread <TS₁>` | "Message sent" as thread reply | **Save TS₂** |
+| 2 | `slack-chat-api messages thread $TEST_CHANNEL_ID <TS₁>` | Shows parent + reply |
+| 3 | `slack-chat-api messages thread $TEST_CHANNEL_ID <TS₁> -o json` | JSON array of thread messages |
 
 ### 3.5 Update Message
 
@@ -202,17 +202,17 @@ Using **TS₁** from step 3.1:
 
 | Step | Command | Expected |
 |------|---------|----------|
-| 1 | `slack-cli messages update $TEST_CHANNEL_ID <TS₁> "Updated message text"` | "Message updated" |
-| 2 | `slack-cli messages history $TEST_CHANNEL_ID --limit 1` | Shows updated text |
+| 1 | `slack-chat-api messages update $TEST_CHANNEL_ID <TS₁> "Updated message text"` | "Message updated" |
+| 2 | `slack-chat-api messages history $TEST_CHANNEL_ID --limit 1` | Shows updated text |
 
 ### 3.6 Cleanup: Delete Messages
 
 | Step | Command | Expected |
 |------|---------|----------|
-| 1 | `slack-cli messages delete $TEST_CHANNEL_ID <TS₂> --force` | "Message deleted" (thread reply) |
-| 2 | `slack-cli messages delete $TEST_CHANNEL_ID <TS₁> --force` | "Message deleted" (parent) |
+| 1 | `slack-chat-api messages delete $TEST_CHANNEL_ID <TS₂> --force` | "Message deleted" (thread reply) |
+| 2 | `slack-chat-api messages delete $TEST_CHANNEL_ID <TS₁> --force` | "Message deleted" (parent) |
 
-**Verify:** `slack-cli messages history $TEST_CHANNEL_ID --limit 3` should not show the deleted messages.
+**Verify:** `slack-chat-api messages history $TEST_CHANNEL_ID --limit 3` should not show the deleted messages.
 
 ---
 
@@ -228,7 +228,7 @@ Search requires a **user token** (`xoxp-*`), not a bot token. These tests verify
    ```bash
    # Get your user token from Slack app settings:
    # OAuth & Permissions → User OAuth Token (starts with xoxp-)
-   slack-cli config set-token xoxp-your-user-token
+   slack-chat-api config set-token xoxp-your-user-token
 
    # Or use environment variable:
    export SLACK_USER_TOKEN=xoxp-your-user-token
@@ -236,10 +236,10 @@ Search requires a **user token** (`xoxp-*`), not a bot token. These tests verify
 
 2. Verify both tokens are configured:
    ```bash
-   slack-cli config show
+   slack-chat-api config show
    # Should show both Bot Token and User Token
 
-   slack-cli config test
+   slack-chat-api config test
    # Should validate both tokens
    ```
 
@@ -250,72 +250,72 @@ First, create a message with a unique identifier that we can search for:
 | Step | Command | Expected | Capture |
 |------|---------|----------|---------|
 | 1 | `export SEARCH_ID="integ-test-$(date +%s)"` | Sets unique identifier | **Save SEARCH_ID** |
-| 2 | `slack-cli messages send $TEST_CHANNEL_ID "Search test: $SEARCH_ID"` | Message sent | **Save TS₃** |
+| 2 | `slack-chat-api messages send $TEST_CHANNEL_ID "Search test: $SEARCH_ID"` | Message sent | **Save TS₃** |
 | 3 | Wait ~5 seconds for Slack to index | (Slack search has indexing delay) | |
 
 ### 3B.2 Search Messages
 
 | Step | Command | Expected |
 |------|---------|----------|
-| 1 | `slack-cli search messages "$SEARCH_ID"` | Shows the test message with channel, user, timestamp |
-| 2 | `slack-cli search messages "$SEARCH_ID" -o json` | Valid JSON with `query`, `messages.matches[]`, `messages.paging` |
-| 3 | `slack-cli search messages "$SEARCH_ID" -o table` | Table format output |
-| 4 | `slack-cli search messages "in:#$TEST_CHANNEL_NAME $SEARCH_ID"` | Same message (filtered by channel) |
+| 1 | `slack-chat-api search messages "$SEARCH_ID"` | Shows the test message with channel, user, timestamp |
+| 2 | `slack-chat-api search messages "$SEARCH_ID" -o json` | Valid JSON with `query`, `messages.matches[]`, `messages.paging` |
+| 3 | `slack-chat-api search messages "$SEARCH_ID" -o table` | Table format output |
+| 4 | `slack-chat-api search messages "in:#$TEST_CHANNEL_NAME $SEARCH_ID"` | Same message (filtered by channel) |
 
 ### 3B.3 Search with Pagination
 
 | Step | Command | Expected |
 |------|---------|----------|
-| 1 | `slack-cli search messages "test" --count 5` | Max 5 results |
-| 2 | `slack-cli search messages "test" --count 5 --page 1` | Page 1 of results |
-| 3 | `slack-cli search messages "test" --count 5 --page 2` | Page 2 (may be empty or have different results) |
+| 1 | `slack-chat-api search messages "test" --count 5` | Max 5 results |
+| 2 | `slack-chat-api search messages "test" --count 5 --page 1` | Page 1 of results |
+| 3 | `slack-chat-api search messages "test" --count 5 --page 2` | Page 2 (may be empty or have different results) |
 
 ### 3B.4 Search with Sorting
 
 | Step | Command | Expected |
 |------|---------|----------|
-| 1 | `slack-cli search messages "test" --sort score` | Sorted by relevance (default) |
-| 2 | `slack-cli search messages "test" --sort timestamp --sort-dir desc` | Most recent first |
-| 3 | `slack-cli search messages "test" --sort timestamp --sort-dir asc` | Oldest first |
+| 1 | `slack-chat-api search messages "test" --sort score` | Sorted by relevance (default) |
+| 2 | `slack-chat-api search messages "test" --sort timestamp --sort-dir desc` | Most recent first |
+| 3 | `slack-chat-api search messages "test" --sort timestamp --sort-dir asc` | Oldest first |
 
 ### 3B.5 Search Files
 
 | Step | Command | Expected |
 |------|---------|----------|
-| 1 | `slack-cli search files "document"` | Lists matching files (if any exist) |
-| 2 | `slack-cli search files "document" -o json` | Valid JSON with `files.matches[]` |
+| 1 | `slack-chat-api search files "document"` | Lists matching files (if any exist) |
+| 2 | `slack-chat-api search files "document" -o json` | Valid JSON with `files.matches[]` |
 
 ### 3B.6 Search All
 
 | Step | Command | Expected |
 |------|---------|----------|
-| 1 | `slack-cli search all "$SEARCH_ID"` | Shows message result under "Messages" section |
-| 2 | `slack-cli search all "$SEARCH_ID" -o json` | JSON with both `messages` and `files` objects |
-| 3 | `slack-cli search all "test" --count 10` | Shows both messages and files (if any) |
+| 1 | `slack-chat-api search all "$SEARCH_ID"` | Shows message result under "Messages" section |
+| 2 | `slack-chat-api search all "$SEARCH_ID" -o json` | JSON with both `messages` and `files` objects |
+| 3 | `slack-chat-api search all "test" --count 10` | Shows both messages and files (if any) |
 
 ### 3B.7 Search Error Cases
 
 | Step | Command | Expected |
 |------|---------|----------|
-| 1 | `slack-cli search messages "xyznonexistent123"` | "No messages found" |
-| 2 | `slack-cli search messages "test" --count 101` | Error: count must be between 1 and 100 |
-| 3 | `slack-cli search messages "test" --page 0` | Error: page must be between 1 and 100 |
-| 4 | `slack-cli search messages "test" --sort invalid` | Error: sort must be 'score' or 'timestamp' |
+| 1 | `slack-chat-api search messages "xyznonexistent123"` | "No messages found" |
+| 2 | `slack-chat-api search messages "test" --count 101` | Error: count must be between 1 and 100 |
+| 3 | `slack-chat-api search messages "test" --page 0` | Error: page must be between 1 and 100 |
+| 4 | `slack-chat-api search messages "test" --sort invalid` | Error: sort must be 'score' or 'timestamp' |
 
 ### 3B.8 Search Without User Token (Error Case)
 
 | Step | Command | Expected |
 |------|---------|----------|
 | 1 | `unset SLACK_USER_TOKEN` | Clear env var |
-| 2 | `slack-cli config delete-token --type user --force` | Delete stored user token |
-| 3 | `slack-cli search messages "test"` | Error mentioning user token requirement |
-| 4 | `slack-cli config set-token xoxp-your-user-token` | Re-configure user token |
+| 2 | `slack-chat-api config delete-token --type user --force` | Delete stored user token |
+| 3 | `slack-chat-api search messages "test"` | Error mentioning user token requirement |
+| 4 | `slack-chat-api config set-token xoxp-your-user-token` | Re-configure user token |
 
 ### 3B.9 Cleanup: Delete Search Test Message
 
 | Step | Command | Expected |
 |------|---------|----------|
-| 1 | `slack-cli messages delete $TEST_CHANNEL_ID <TS₃> --force` | "Message deleted" |
+| 1 | `slack-chat-api messages delete $TEST_CHANNEL_ID <TS₃> --force` | "Message deleted" |
 
 ---
 
@@ -329,16 +329,16 @@ These tests modify channel metadata but restore original values afterward.
 
 | Step | Command | Capture |
 |------|---------|---------|
-| 1 | `slack-cli channels get $TEST_CHANNEL_ID -o json` | **Save original TOPIC and PURPOSE** |
+| 1 | `slack-chat-api channels get $TEST_CHANNEL_ID -o json` | **Save original TOPIC and PURPOSE** |
 
 ### 4.2 Modify Topic & Purpose
 
 | Step | Command | Expected |
 |------|---------|----------|
-| 1 | `slack-cli channels set-topic $TEST_CHANNEL_ID "Integration test topic"` | "Set topic for channel" |
-| 2 | `slack-cli channels get $TEST_CHANNEL_ID` | Topic shows "Integration test topic" |
-| 3 | `slack-cli channels set-purpose $TEST_CHANNEL_ID "Integration test purpose"` | "Set purpose for channel" |
-| 4 | `slack-cli channels get $TEST_CHANNEL_ID` | Purpose shows "Integration test purpose" |
+| 1 | `slack-chat-api channels set-topic $TEST_CHANNEL_ID "Integration test topic"` | "Set topic for channel" |
+| 2 | `slack-chat-api channels get $TEST_CHANNEL_ID` | Topic shows "Integration test topic" |
+| 3 | `slack-chat-api channels set-purpose $TEST_CHANNEL_ID "Integration test purpose"` | "Set purpose for channel" |
+| 4 | `slack-chat-api channels get $TEST_CHANNEL_ID` | Purpose shows "Integration test purpose" |
 
 ### 4.3 Invite User (Optional)
 
@@ -346,14 +346,14 @@ Skip if you didn't set `TEST_USER_ID`.
 
 | Step | Command | Expected |
 |------|---------|----------|
-| 1 | `slack-cli channels invite $TEST_CHANNEL_ID $TEST_USER_ID` | "Invited 1 user(s)" or "already_in_channel" |
+| 1 | `slack-chat-api channels invite $TEST_CHANNEL_ID $TEST_USER_ID` | "Invited 1 user(s)" or "already_in_channel" |
 
 ### 4.4 Restore Original State
 
 | Step | Command | Expected |
 |------|---------|----------|
-| 1 | `slack-cli channels set-topic $TEST_CHANNEL_ID "<original topic>"` | Restored |
-| 2 | `slack-cli channels set-purpose $TEST_CHANNEL_ID "<original purpose>"` | Restored |
+| 1 | `slack-chat-api channels set-topic $TEST_CHANNEL_ID "<original topic>"` | Restored |
+| 2 | `slack-chat-api channels set-purpose $TEST_CHANNEL_ID "<original purpose>"` | Restored |
 
 ---
 
@@ -367,16 +367,16 @@ Skip if you didn't set `TEST_USER_ID`.
 
 | Step | Command | Expected | Capture |
 |------|---------|----------|---------|
-| 1 | `slack-cli channels create test-integ-$(date +%s)` | "Created channel: test-integ-X (C...)" | **Save NEW_CHANNEL_ID** |
-| 2 | `slack-cli channels create test-private-$(date +%s) --private` | "Created channel" (private) | **Save PRIVATE_CHANNEL_ID** |
-| 3 | `slack-cli channels get <NEW_CHANNEL_ID>` | Shows new channel details |
+| 1 | `slack-chat-api channels create test-integ-$(date +%s)` | "Created channel: test-integ-X (C...)" | **Save NEW_CHANNEL_ID** |
+| 2 | `slack-chat-api channels create test-private-$(date +%s) --private` | "Created channel" (private) | **Save PRIVATE_CHANNEL_ID** |
+| 3 | `slack-chat-api channels get <NEW_CHANNEL_ID>` | Shows new channel details |
 
 ### 5.2 Channel Creation Errors
 
 | Step | Command | Expected |
 |------|---------|----------|
-| 1 | `slack-cli channels create general` | Error: `name_taken` |
-| 2 | `slack-cli channels create "has spaces"` | Error: `invalid_name_specials` |
+| 1 | `slack-chat-api channels create general` | Error: `name_taken` |
+| 2 | `slack-chat-api channels create "has spaces"` | Error: `invalid_name_specials` |
 
 ### 5.3 Archive & Unarchive
 
@@ -384,17 +384,17 @@ Using **NEW_CHANNEL_ID** from step 5.1:
 
 | Step | Command | Expected |
 |------|---------|----------|
-| 1 | `slack-cli channels archive <NEW_CHANNEL_ID> --force` | "Archived channel" |
-| 2 | `slack-cli channels archive <NEW_CHANNEL_ID>` | Error: `already_archived` |
-| 3 | `slack-cli channels unarchive <NEW_CHANNEL_ID>` | "Unarchived channel" |
-| 4 | `slack-cli channels unarchive <NEW_CHANNEL_ID>` | Error: `not_archived` |
+| 1 | `slack-chat-api channels archive <NEW_CHANNEL_ID> --force` | "Archived channel" |
+| 2 | `slack-chat-api channels archive <NEW_CHANNEL_ID>` | Error: `already_archived` |
+| 3 | `slack-chat-api channels unarchive <NEW_CHANNEL_ID>` | "Unarchived channel" |
+| 4 | `slack-chat-api channels unarchive <NEW_CHANNEL_ID>` | Error: `not_archived` |
 
 ### 5.4 Cleanup: Archive Test Channels
 
 | Step | Command | Expected |
 |------|---------|----------|
-| 1 | `slack-cli channels archive <NEW_CHANNEL_ID> --force` | "Archived channel" |
-| 2 | `slack-cli channels archive <PRIVATE_CHANNEL_ID> --force` | "Archived channel" |
+| 1 | `slack-chat-api channels archive <NEW_CHANNEL_ID> --force` | "Archived channel" |
+| 2 | `slack-chat-api channels archive <PRIVATE_CHANNEL_ID> --force` | "Archived channel" |
 
 ---
 
@@ -406,48 +406,48 @@ Using **NEW_CHANNEL_ID** from step 5.1:
 
 | Step | Command | Expected |
 |------|---------|----------|
-| 1 | `slack-cli config show` | Shows both Bot Token and User Token (masked) with storage location |
+| 1 | `slack-chat-api config show` | Shows both Bot Token and User Token (masked) with storage location |
 
 ### 6.2 Config Test (Dual Token)
 
 | Step | Command | Expected |
 |------|---------|----------|
-| 1 | `slack-cli config test` | Tests both bot and user tokens, shows workspace info for each |
+| 1 | `slack-chat-api config test` | Tests both bot and user tokens, shows workspace info for each |
 
 ### 6.3 Token Type Detection
 
 | Step | Command | Expected |
 |------|---------|----------|
-| 1 | `slack-cli config set-token xoxb-test-fake-token` | "Bot token stored" |
-| 2 | `slack-cli config set-token xoxp-test-fake-token` | "User token stored" |
-| 3 | `slack-cli config set-token invalid-token` | Error: unrecognized token format |
+| 1 | `slack-chat-api config set-token xoxb-test-fake-token` | "Bot token stored" |
+| 2 | `slack-chat-api config set-token xoxp-test-fake-token` | "User token stored" |
+| 3 | `slack-chat-api config set-token invalid-token` | Error: unrecognized token format |
 
 ### 6.4 Selective Token Deletion
 
 | Step | Command | Expected |
 |------|---------|----------|
-| 1 | `slack-cli config delete-token --type bot --force` | "Bot token deleted" |
-| 2 | `slack-cli config show` | Bot Token: Not configured, User Token: still present |
-| 3 | `slack-cli workspace info` | Error: no bot token configured |
-| 4 | `slack-cli search messages "test"` | Still works (uses user token) |
-| 5 | `slack-cli config delete-token --type user --force` | "User token deleted" |
-| 6 | `slack-cli search messages "test"` | Error: user token required |
+| 1 | `slack-chat-api config delete-token --type bot --force` | "Bot token deleted" |
+| 2 | `slack-chat-api config show` | Bot Token: Not configured, User Token: still present |
+| 3 | `slack-chat-api workspace info` | Error: no bot token configured |
+| 4 | `slack-chat-api search messages "test"` | Still works (uses user token) |
+| 5 | `slack-chat-api config delete-token --type user --force` | "User token deleted" |
+| 6 | `slack-chat-api search messages "test"` | Error: user token required |
 
 ### 6.5 Restore Tokens
 
 | Step | Command | Expected |
 |------|---------|----------|
-| 1 | `slack-cli config set-token` | Prompts for token, stores it (bot) |
-| 2 | `slack-cli config set-token xoxp-your-user-token` | Stores user token |
-| 3 | `slack-cli config show` | Both tokens configured |
-| 4 | `slack-cli config test` | Both tokens valid |
+| 1 | `slack-chat-api config set-token` | Prompts for token, stores it (bot) |
+| 2 | `slack-chat-api config set-token xoxp-your-user-token` | Stores user token |
+| 3 | `slack-chat-api config show` | Both tokens configured |
+| 4 | `slack-chat-api config test` | Both tokens valid |
 
 ### 6.6 Delete All Tokens
 
 | Step | Command | Expected |
 |------|---------|----------|
-| 1 | `slack-cli config delete-token --type all --force` | Both tokens deleted |
-| 2 | `slack-cli config show` | No tokens configured |
+| 1 | `slack-chat-api config delete-token --type all --force` | Both tokens deleted |
+| 2 | `slack-chat-api config show` | No tokens configured |
 
 ---
 
@@ -459,26 +459,26 @@ These can be run at any time to verify error handling.
 
 | Step | Command | Expected |
 |------|---------|----------|
-| 1 | `slack-cli channels get INVALID` | Error with helpful hint |
-| 2 | `slack-cli users get INVALID` | Error with helpful hint |
-| 3 | `slack-cli messages react $TEST_CHANNEL_ID badts emoji` | Validation error |
-| 4 | `slack-cli messages send` | Usage help shown |
-| 5 | `slack-cli channels unknown` | Unknown command error |
+| 1 | `slack-chat-api channels get INVALID` | Error with helpful hint |
+| 2 | `slack-chat-api users get INVALID` | Error with helpful hint |
+| 3 | `slack-chat-api messages react $TEST_CHANNEL_ID badts emoji` | Validation error |
+| 4 | `slack-chat-api messages send` | Usage help shown |
+| 5 | `slack-chat-api channels unknown` | Unknown command error |
 
 ### 7.2 Permission Errors
 
 | Step | Command | Expected |
 |------|---------|----------|
-| 1 | `SLACK_API_TOKEN=invalid slack-cli workspace info` | Error: `invalid_auth` |
-| 2 | (Use token without `channels:manage`) `slack-cli channels create test` | Error describing missing scope |
+| 1 | `SLACK_API_TOKEN=invalid slack-chat-api workspace info` | Error: `invalid_auth` |
+| 2 | (Use token without `channels:manage`) `slack-chat-api channels create test` | Error describing missing scope |
 
 ### 7.3 Edge Cases
 
 | Step | Command | Expected |
 |------|---------|----------|
-| 1 | `slack-cli messages send $TEST_CHANNEL_ID "Hello 👋 世界"` | Unicode preserved |
-| 2 | `slack-cli messages send $TEST_CHANNEL_ID 'Test <>&"'"'"' chars'` | Special chars escaped |
-| 3 | `slack-cli channels create my-test-with-hyphens` | Works (clean up after) |
+| 1 | `slack-chat-api messages send $TEST_CHANNEL_ID "Hello 👋 世界"` | Unicode preserved |
+| 2 | `slack-chat-api messages send $TEST_CHANNEL_ID 'Test <>&"'"'"' chars'` | Special chars escaped |
+| 3 | `slack-chat-api channels create my-test-with-hyphens` | Works (clean up after) |
 
 ---
 
@@ -500,15 +500,15 @@ These can be run at any time to verify error handling.
 
 ```bash
 # Show all commands
-slack-cli --help
+slack-chat-api --help
 
 # Command-specific help
-slack-cli channels --help
-slack-cli messages send --help
-slack-cli search --help
-slack-cli search messages --help
+slack-chat-api channels --help
+slack-chat-api messages send --help
+slack-chat-api search --help
+slack-chat-api search messages --help
 
 # Check token configuration
-slack-cli config show
-slack-cli config test
+slack-chat-api config show
+slack-chat-api config test
 ```
