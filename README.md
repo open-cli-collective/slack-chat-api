@@ -70,11 +70,41 @@ make build
 
 Your token is stored securely in macOS Keychain.
 
+### Verify Setup
+
+```bash
+slack-cli config test
+```
+
+This tests your token against the Slack API and shows workspace/user info.
+
 ### Alternative: Environment Variable
 
 ```bash
 export SLACK_API_TOKEN=xoxb-your-token-here
 ```
+
+### Alternative: 1Password Integration
+
+Use a shell function to lazy-load your token from 1Password on first use:
+
+```bash
+# Add to ~/.zshrc or ~/.bashrc
+slack() {
+  if [[ -z "$SLACK_API_TOKEN" ]]; then
+    export SLACK_API_TOKEN="$(op read 'op://Personal/slack-cli/api_token')"
+  fi
+  command slack-cli "$@"
+}
+```
+
+Or create an alias that always fetches fresh:
+
+```bash
+alias slack='SLACK_API_TOKEN="$(op read '\''op://Personal/slack-cli/api_token'\'')" slack-cli'
+```
+
+Replace `op://Personal/slack-cli/api_token` with your 1Password secret reference.
 
 ### Required Scopes
 
@@ -233,6 +263,9 @@ slack-cli config set-token xoxb-your-token-here
 # Show current config status
 slack-cli config show
 
+# Test authentication
+slack-cli config test
+
 # Delete stored token
 slack-cli config delete-token
 ```
@@ -243,6 +276,7 @@ slack-cli config delete-token
 |---------|-------|-------------|
 | `set-token [token]` | | Set API token (prompts if not provided) |
 | `show` | | Show current configuration status |
+| `test` | | Test Slack authentication |
 | `delete-token` | `--force` | Delete stored API token (prompts for confirmation) |
 
 ### Output Formats

@@ -519,6 +519,30 @@ func (c *Client) GetTeamInfo() (*Team, error) {
 	return &result.Team, nil
 }
 
+// AuthTestResponse represents the response from auth.test API
+type AuthTestResponse struct {
+	Team   string `json:"team"`
+	User   string `json:"user"`
+	TeamID string `json:"team_id"`
+	UserID string `json:"user_id"`
+	BotID  string `json:"bot_id,omitempty"`
+}
+
+// AuthTest verifies authentication and returns identity info
+func (c *Client) AuthTest() (*AuthTestResponse, error) {
+	body, err := c.post("auth.test", map[string]interface{}{})
+	if err != nil {
+		return nil, err
+	}
+
+	var result AuthTestResponse
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
 // CreateChannel creates a new channel
 func (c *Client) CreateChannel(name string, isPrivate bool) (*Channel, error) {
 	data := map[string]interface{}{
