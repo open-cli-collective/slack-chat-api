@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.0](https://github.com/piekstra/slack-cli/compare/v2.0.0...v2.1.0) (2026-01-12)
+
+
+### Features
+
+* Add Slack search functionality with dual token support ([#31](https://github.com/piekstra/slack-cli/issues/31)) ([00c28f9](https://github.com/piekstra/slack-cli/commit/00c28f9f50127b072cec2dfec8044ff31d05dc8f))
+
 ## [2.0.0](https://github.com/piekstra/slack-cli/compare/v1.2.0...v2.0.0) (2026-01-12)
 
 
