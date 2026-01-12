@@ -1,9 +1,14 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - "v*"
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build (e.g., v2.1.0)'
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -11,9 +16,12 @@ permissions:
 jobs:
   release:
     runs-on: macos-latest
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ env.TAG }}
           fetch-depth: 0
 
       - uses: actions/setup-go@v5
@@ -22,26 +30,26 @@ jobs:
 
       - name: Build macOS ARM64
         run: |
-          GOOS=darwin GOARCH=arm64 go build -o slack-cli .
-          tar -czvf slack-cli_${{ github.ref_name }}_darwin_arm64.tar.gz slack-cli
+          GOOS=darwin GOARCH=arm64 go build -o slack-cli ./cmd/slack-cli
+          tar -czvf slack-cli_${{ env.TAG }}_darwin_arm64.tar.gz slack-cli
           rm slack-cli
 
       - name: Build macOS AMD64
         run: |
-          GOOS=darwin GOARCH=amd64 go build -o slack-cli .
-          tar -czvf slack-cli_${{ github.ref_name }}_darwin_amd64.tar.gz slack-cli
+          GOOS=darwin GOARCH=amd64 go build -o slack-cli ./cmd/slack-cli
+          tar -czvf slack-cli_${{ env.TAG }}_darwin_amd64.tar.gz slack-cli
           rm slack-cli
 
       - name: Build Linux ARM64
         run: |
-          GOOS=linux GOARCH=arm64 go build -o slack-cli .
-          tar -czvf slack-cli_${{ github.ref_name }}_linux_arm64.tar.gz slack-cli
+          GOOS=linux GOARCH=arm64 go build -o slack-cli ./cmd/slack-cli
+          tar -czvf slack-cli_${{ env.TAG }}_linux_arm64.tar.gz slack-cli
           rm slack-cli
 
       - name: Build Linux AMD64
         run: |
-          GOOS=linux GOARCH=amd64 go build -o slack-cli .
-          tar -czvf slack-cli_${{ github.ref_name }}_linux_amd64.tar.gz slack-cli
+          GOOS=linux GOARCH=amd64 go build -o slack-cli ./cmd/slack-cli
+          tar -czvf slack-cli_${{ env.TAG }}_linux_amd64.tar.gz slack-cli
           rm slack-cli
 
       - name: Generate checksums
@@ -49,25 +57,25 @@ jobs:
           shasum -a 256 *.tar.gz > checksums.txt
           cat checksums.txt
 
-      - name: Create Release
+      - name: Upload Release Assets
         uses: softprops/action-gh-release@v1
         with:
+          tag_name: ${{ env.TAG }}
           files: |
             *.tar.gz
             checksums.txt
-          generate_release_notes: true
 
       - name: Update Homebrew Cask
         env:
           TAP_GITHUB_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
         run: |
-          VERSION="${{ github.ref_name }}"
+          VERSION="${{ env.TAG }}"
           VERSION_NUM="${VERSION#v}"
 
-          DARWIN_ARM64_SHA=$(shasum -a 256 slack-cli_${{ github.ref_name }}_darwin_arm64.tar.gz | cut -d' ' -f1)
-          DARWIN_AMD64_SHA=$(shasum -a 256 slack-cli_${{ github.ref_name }}_darwin_amd64.tar.gz | cut -d' ' -f1)
-          LINUX_ARM64_SHA=$(shasum -a 256 slack-cli_${{ github.ref_name }}_linux_arm64.tar.gz | cut -d' ' -f1)
-          LINUX_AMD64_SHA=$(shasum -a 256 slack-cli_${{ github.ref_name }}_linux_amd64.tar.gz | cut -d' ' -f1)
+          DARWIN_ARM64_SHA=$(shasum -a 256 slack-cli_${{ env.TAG }}_darwin_arm64.tar.gz | cut -d' ' -f1)
+          DARWIN_AMD64_SHA=$(shasum -a 256 slack-cli_${{ env.TAG }}_darwin_amd64.tar.gz | cut -d' ' -f1)
+          LINUX_ARM64_SHA=$(shasum -a 256 slack-cli_${{ env.TAG }}_linux_arm64.tar.gz | cut -d' ' -f1)
+          LINUX_AMD64_SHA=$(shasum -a 256 slack-cli_${{ env.TAG }}_linux_amd64.tar.gz | cut -d' ' -f1)
 
           git clone https://x-access-token:${TAP_GITHUB_TOKEN}@github.com/piekstra/homebrew-tap.git
           cd homebrew-tap
