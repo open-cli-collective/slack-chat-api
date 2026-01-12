@@ -767,3 +767,148 @@ func TestClient_AuthHeader(t *testing.T) {
 		t.Errorf("expected 'Bearer xoxb-test-token-12345', got '%s'", capturedAuth)
 	}
 }
+
+func TestClient_ListChannels_LimitTruncation(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Server returns 5 channels, but we'll request limit=3
+		resp := map[string]interface{}{
+			"ok": true,
+			"channels": []map[string]interface{}{
+				{"id": "C1", "name": "ch1"},
+				{"id": "C2", "name": "ch2"},
+				{"id": "C3", "name": "ch3"},
+				{"id": "C4", "name": "ch4"},
+				{"id": "C5", "name": "ch5"},
+			},
+			"response_metadata": map[string]string{"next_cursor": ""},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	client := NewWithConfig(server.URL, "test-token", nil)
+	channels, err := client.ListChannels("", true, 3) // Request only 3
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(channels) != 3 {
+		t.Errorf("expected 3 channels (limit), got %d", len(channels))
+	}
+}
+
+func TestClient_ListChannels_PaginationWithLimit(t *testing.T) {
+	callCount := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		callCount++
+		var resp map[string]interface{}
+
+		if callCount == 1 {
+			// First page: 3 channels, more available
+			resp = map[string]interface{}{
+				"ok": true,
+				"channels": []map[string]interface{}{
+					{"id": "C1", "name": "ch1"},
+					{"id": "C2", "name": "ch2"},
+					{"id": "C3", "name": "ch3"},
+				},
+				"response_metadata": map[string]string{"next_cursor": "cursor123"},
+			}
+		} else {
+			// Should NOT reach here with limit=3
+			t.Error("should not fetch second page when limit already reached")
+			resp = map[string]interface{}{
+				"ok":       true,
+				"channels": []map[string]interface{}{{"id": "C4", "name": "ch4"}},
+				"response_metadata": map[string]string{"next_cursor": ""},
+			}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	client := NewWithConfig(server.URL, "test-token", nil)
+	channels, err := client.ListChannels("", true, 3)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if callCount != 1 {
+		t.Errorf("expected 1 API call (limit reached), got %d", callCount)
+	}
+	if len(channels) != 3 {
+		t.Errorf("expected 3 channels, got %d", len(channels))
+	}
+}
+
+func TestClient_ListUsers_LimitTruncation(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resp := map[string]interface{}{
+			"ok": true,
+			"members": []map[string]interface{}{
+				{"id": "U1", "name": "user1"},
+				{"id": "U2", "name": "user2"},
+				{"id": "U3", "name": "user3"},
+				{"id": "U4", "name": "user4"},
+			},
+			"response_metadata": map[string]string{"next_cursor": ""},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	client := NewWithConfig(server.URL, "test-token", nil)
+	users, err := client.ListUsers(2)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(users) != 2 {
+		t.Errorf("expected 2 users (limit), got %d", len(users))
+	}
+}
+
+func TestClient_ListUsers_PaginationWithLimit(t *testing.T) {
+	callCount := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		callCount++
+		var resp map[string]interface{}
+
+		if callCount == 1 {
+			resp = map[string]interface{}{
+				"ok": true,
+				"members": []map[string]interface{}{
+					{"id": "U1", "name": "user1"},
+					{"id": "U2", "name": "user2"},
+				},
+				"response_metadata": map[string]string{"next_cursor": "cursor456"},
+			}
+		} else {
+			t.Error("should not fetch second page when limit already reached")
+			resp = map[string]interface{}{
+				"ok":      true,
+				"members": []map[string]interface{}{{"id": "U3", "name": "user3"}},
+				"response_metadata": map[string]string{"next_cursor": ""},
+			}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	client := NewWithConfig(server.URL, "test-token", nil)
+	users, err := client.ListUsers(2)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if callCount != 1 {
+		t.Errorf("expected 1 API call (limit reached), got %d", callCount)
+	}
+	if len(users) != 2 {
+		t.Errorf("expected 2 users, got %d", len(users))
+	}
+}

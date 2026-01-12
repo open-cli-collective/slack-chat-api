@@ -185,15 +185,21 @@ type Team struct {
 	Domain string `json:"domain"`
 }
 
-// ListChannels returns all channels (handles pagination automatically)
+// ListChannels returns channels up to the specified limit (handles pagination automatically)
 func (c *Client) ListChannels(types string, excludeArchived bool, limit int) ([]Channel, error) {
 	var allChannels []Channel
 	cursor := ""
+	remaining := limit
 
-	for {
+	for remaining > 0 {
 		params := url.Values{}
 		params.Set("exclude_archived", fmt.Sprintf("%t", excludeArchived))
-		params.Set("limit", fmt.Sprintf("%d", limit))
+		// Request up to 200 at a time (Slack recommended max), or remaining if smaller
+		batchSize := remaining
+		if batchSize > 200 {
+			batchSize = 200
+		}
+		params.Set("limit", fmt.Sprintf("%d", batchSize))
 		if types != "" {
 			params.Set("types", types)
 		}
@@ -217,11 +223,17 @@ func (c *Client) ListChannels(types string, excludeArchived bool, limit int) ([]
 		}
 
 		allChannels = append(allChannels, result.Channels...)
+		remaining -= len(result.Channels)
 
 		if result.ResponseMetadata.NextCursor == "" {
 			break
 		}
 		cursor = result.ResponseMetadata.NextCursor
+	}
+
+	// Trim to exact limit if we got more
+	if len(allChannels) > limit {
+		allChannels = allChannels[:limit]
 	}
 
 	return allChannels, nil
@@ -247,14 +259,20 @@ func (c *Client) GetChannelInfo(channelID string) (*Channel, error) {
 	return &result.Channel, nil
 }
 
-// ListUsers returns all users (handles pagination automatically)
+// ListUsers returns users up to the specified limit (handles pagination automatically)
 func (c *Client) ListUsers(limit int) ([]User, error) {
 	var allUsers []User
 	cursor := ""
+	remaining := limit
 
-	for {
+	for remaining > 0 {
 		params := url.Values{}
-		params.Set("limit", fmt.Sprintf("%d", limit))
+		// Request up to 200 at a time (Slack recommended max), or remaining if smaller
+		batchSize := remaining
+		if batchSize > 200 {
+			batchSize = 200
+		}
+		params.Set("limit", fmt.Sprintf("%d", batchSize))
 		if cursor != "" {
 			params.Set("cursor", cursor)
 		}
@@ -275,11 +293,17 @@ func (c *Client) ListUsers(limit int) ([]User, error) {
 		}
 
 		allUsers = append(allUsers, result.Members...)
+		remaining -= len(result.Members)
 
 		if result.ResponseMetadata.NextCursor == "" {
 			break
 		}
 		cursor = result.ResponseMetadata.NextCursor
+	}
+
+	// Trim to exact limit if we got more
+	if len(allUsers) > limit {
+		allUsers = allUsers[:limit]
 	}
 
 	return allUsers, nil
