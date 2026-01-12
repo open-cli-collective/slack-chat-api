@@ -1,6 +1,6 @@
 display_information:
-  name: Slack CLI
-  description: Command-line interface for Slack
+  name: Slack Chat API
+  description: Command-line interface for Slack Chat API
   background_color: "#4A154B"
 
 oauth_config:

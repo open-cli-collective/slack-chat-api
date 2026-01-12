@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/piekstra/slack-cli/internal/cmd/root"
+	"github.com/piekstra/slack-chat-api/internal/cmd/root"
 )
 
 func main() {

@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/piekstra/slack-cli/internal/keychain"
+	"github.com/piekstra/slack-chat-api/internal/keychain"
 )
 
 func TestRunSetToken_Success(t *testing.T) {

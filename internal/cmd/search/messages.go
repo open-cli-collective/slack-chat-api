@@ -8,8 +8,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/piekstra/slack-cli/internal/client"
-	"github.com/piekstra/slack-cli/internal/output"
+	"github.com/piekstra/slack-chat-api/internal/client"
+	"github.com/piekstra/slack-chat-api/internal/output"
 )
 
 type messagesOptions struct {
@@ -40,10 +40,10 @@ Search modifiers:
   has:reaction   Messages with reactions
 
 Examples:
-  slack-cli search messages "quarterly report"
-  slack-cli search messages "in:#engineering bug fix"
-  slack-cli search messages "from:@alice project update"
-  slack-cli search messages "after:2025-01-01 deployment"`,
+  slack-chat-api search messages "quarterly report"
+  slack-chat-api search messages "in:#engineering bug fix"
+  slack-chat-api search messages "from:@alice project update"
+  slack-chat-api search messages "after:2025-01-01 deployment"`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runSearchMessages(args[0], opts, nil)

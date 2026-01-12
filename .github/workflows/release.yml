@@ -30,27 +30,27 @@ jobs:
 
       - name: Build macOS ARM64
         run: |
-          GOOS=darwin GOARCH=arm64 go build -o slack-cli ./cmd/slack-cli
-          tar -czvf slack-cli_${{ env.TAG }}_darwin_arm64.tar.gz slack-cli
-          rm slack-cli
+          GOOS=darwin GOARCH=arm64 go build -o slack-chat-api ./cmd/slack-chat-api
+          tar -czvf slack-chat-api_${{ env.TAG }}_darwin_arm64.tar.gz slack-chat-api
+          rm slack-chat-api
 
       - name: Build macOS AMD64
         run: |
-          GOOS=darwin GOARCH=amd64 go build -o slack-cli ./cmd/slack-cli
-          tar -czvf slack-cli_${{ env.TAG }}_darwin_amd64.tar.gz slack-cli
-          rm slack-cli
+          GOOS=darwin GOARCH=amd64 go build -o slack-chat-api ./cmd/slack-chat-api
+          tar -czvf slack-chat-api_${{ env.TAG }}_darwin_amd64.tar.gz slack-chat-api
+          rm slack-chat-api
 
       - name: Build Linux ARM64
         run: |
-          GOOS=linux GOARCH=arm64 go build -o slack-cli ./cmd/slack-cli
-          tar -czvf slack-cli_${{ env.TAG }}_linux_arm64.tar.gz slack-cli
-          rm slack-cli
+          GOOS=linux GOARCH=arm64 go build -o slack-chat-api ./cmd/slack-chat-api
+          tar -czvf slack-chat-api_${{ env.TAG }}_linux_arm64.tar.gz slack-chat-api
+          rm slack-chat-api
 
       - name: Build Linux AMD64
         run: |
-          GOOS=linux GOARCH=amd64 go build -o slack-cli ./cmd/slack-cli
-          tar -czvf slack-cli_${{ env.TAG }}_linux_amd64.tar.gz slack-cli
-          rm slack-cli
+          GOOS=linux GOARCH=amd64 go build -o slack-chat-api ./cmd/slack-chat-api
+          tar -czvf slack-chat-api_${{ env.TAG }}_linux_amd64.tar.gz slack-chat-api
+          rm slack-chat-api
 
       - name: Generate checksums
         run: |
@@ -72,72 +72,72 @@ jobs:
           VERSION="${{ env.TAG }}"
           VERSION_NUM="${VERSION#v}"
 
-          DARWIN_ARM64_SHA=$(shasum -a 256 slack-cli_${{ env.TAG }}_darwin_arm64.tar.gz | cut -d' ' -f1)
-          DARWIN_AMD64_SHA=$(shasum -a 256 slack-cli_${{ env.TAG }}_darwin_amd64.tar.gz | cut -d' ' -f1)
-          LINUX_ARM64_SHA=$(shasum -a 256 slack-cli_${{ env.TAG }}_linux_arm64.tar.gz | cut -d' ' -f1)
-          LINUX_AMD64_SHA=$(shasum -a 256 slack-cli_${{ env.TAG }}_linux_amd64.tar.gz | cut -d' ' -f1)
+          DARWIN_ARM64_SHA=$(shasum -a 256 slack-chat-api_${{ env.TAG }}_darwin_arm64.tar.gz | cut -d' ' -f1)
+          DARWIN_AMD64_SHA=$(shasum -a 256 slack-chat-api_${{ env.TAG }}_darwin_amd64.tar.gz | cut -d' ' -f1)
+          LINUX_ARM64_SHA=$(shasum -a 256 slack-chat-api_${{ env.TAG }}_linux_arm64.tar.gz | cut -d' ' -f1)
+          LINUX_AMD64_SHA=$(shasum -a 256 slack-chat-api_${{ env.TAG }}_linux_amd64.tar.gz | cut -d' ' -f1)
 
           git clone https://x-access-token:${TAP_GITHUB_TOKEN}@github.com/piekstra/homebrew-tap.git
           cd homebrew-tap
 
           mkdir -p Casks
 
-          cat > Casks/slack-cli.rb << 'CASKEOF'
-          cask "slack-cli" do
-            name "slack-cli"
+          cat > Casks/slack-chat-api.rb << 'CASKEOF'
+          cask "slack-chat-api" do
+            name "slack-chat-api"
             desc "Command-line interface for Slack"
-            homepage "https://github.com/piekstra/slack-cli"
+            homepage "https://github.com/piekstra/slack-chat-api"
             version "VERSION_PLACEHOLDER"
 
-            binary "slack-cli"
+            binary "slack-chat-api"
 
             on_macos do
               on_arm do
-                url "https://github.com/piekstra/slack-cli/releases/download/v#{version}/slack-cli_v#{version}_darwin_arm64.tar.gz"
+                url "https://github.com/piekstra/slack-chat-api/releases/download/v#{version}/slack-chat-api_v#{version}_darwin_arm64.tar.gz"
                 sha256 "DARWIN_ARM64_PLACEHOLDER"
               end
               on_intel do
-                url "https://github.com/piekstra/slack-cli/releases/download/v#{version}/slack-cli_v#{version}_darwin_amd64.tar.gz"
+                url "https://github.com/piekstra/slack-chat-api/releases/download/v#{version}/slack-chat-api_v#{version}_darwin_amd64.tar.gz"
                 sha256 "DARWIN_AMD64_PLACEHOLDER"
               end
             end
 
             on_linux do
               on_arm do
-                url "https://github.com/piekstra/slack-cli/releases/download/v#{version}/slack-cli_v#{version}_linux_arm64.tar.gz"
+                url "https://github.com/piekstra/slack-chat-api/releases/download/v#{version}/slack-chat-api_v#{version}_linux_arm64.tar.gz"
                 sha256 "LINUX_ARM64_PLACEHOLDER"
               end
               on_intel do
-                url "https://github.com/piekstra/slack-cli/releases/download/v#{version}/slack-cli_v#{version}_linux_amd64.tar.gz"
+                url "https://github.com/piekstra/slack-chat-api/releases/download/v#{version}/slack-chat-api_v#{version}_linux_amd64.tar.gz"
                 sha256 "LINUX_AMD64_PLACEHOLDER"
               end
             end
 
             postflight do
-              system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/slack-cli"]
+              system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/slack-chat-api"]
             end
 
             caveats <<~EOS
-              To configure slack-cli, run:
-                slack-cli config set-token
+              To configure slack-chat-api, run:
+                slack-chat-api config set-token
 
               On macOS, your token is stored securely in the system Keychain.
-              On Linux, your token is stored in ~/.config/slack-cli/credentials.
+              On Linux, your token is stored in ~/.config/slack-chat-api/credentials.
             EOS
           end
           CASKEOF
 
-          sed -i '' "s/VERSION_PLACEHOLDER/${VERSION_NUM}/g" Casks/slack-cli.rb
-          sed -i '' "s/DARWIN_ARM64_PLACEHOLDER/${DARWIN_ARM64_SHA}/g" Casks/slack-cli.rb
-          sed -i '' "s/DARWIN_AMD64_PLACEHOLDER/${DARWIN_AMD64_SHA}/g" Casks/slack-cli.rb
-          sed -i '' "s/LINUX_ARM64_PLACEHOLDER/${LINUX_ARM64_SHA}/g" Casks/slack-cli.rb
-          sed -i '' "s/LINUX_AMD64_PLACEHOLDER/${LINUX_AMD64_SHA}/g" Casks/slack-cli.rb
+          sed -i '' "s/VERSION_PLACEHOLDER/${VERSION_NUM}/g" Casks/slack-chat-api.rb
+          sed -i '' "s/DARWIN_ARM64_PLACEHOLDER/${DARWIN_ARM64_SHA}/g" Casks/slack-chat-api.rb
+          sed -i '' "s/DARWIN_AMD64_PLACEHOLDER/${DARWIN_AMD64_SHA}/g" Casks/slack-chat-api.rb
+          sed -i '' "s/LINUX_ARM64_PLACEHOLDER/${LINUX_ARM64_SHA}/g" Casks/slack-chat-api.rb
+          sed -i '' "s/LINUX_AMD64_PLACEHOLDER/${LINUX_AMD64_SHA}/g" Casks/slack-chat-api.rb
 
           # Remove old formula if it exists
-          rm -f Formula/slack-cli.rb
+          rm -f Formula/slack-chat-api.rb
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "Update slack-cli to ${VERSION_NUM}"
+          git commit -m "Update slack-chat-api to ${VERSION_NUM}"
           git push

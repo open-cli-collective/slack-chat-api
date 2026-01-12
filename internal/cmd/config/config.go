@@ -8,7 +8,7 @@ import (
 func NewCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "config",
-		Short: "Configure slack-cli",
+		Short: "Configure slack-chat-api",
 	}
 
 	cmd.AddCommand(newSetTokenCmd())

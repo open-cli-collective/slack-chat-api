@@ -9,8 +9,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/piekstra/slack-cli/internal/keychain"
-	"github.com/piekstra/slack-cli/internal/output"
+	"github.com/piekstra/slack-chat-api/internal/keychain"
+	"github.com/piekstra/slack-chat-api/internal/output"
 )
 
 type deleteTokenOptions struct {

@@ -3,8 +3,8 @@ package search
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/piekstra/slack-cli/internal/client"
-	"github.com/piekstra/slack-cli/internal/output"
+	"github.com/piekstra/slack-chat-api/internal/client"
+	"github.com/piekstra/slack-chat-api/internal/output"
 )
 
 type allOptions struct {
@@ -34,9 +34,9 @@ Search modifiers:
   after:date     Content after date (YYYY-MM-DD)
 
 Examples:
-  slack-cli search all "project proposal"
-  slack-cli search all "quarterly report" --sort timestamp
-  slack-cli search all "from:@alice important"`,
+  slack-chat-api search all "project proposal"
+  slack-chat-api search all "quarterly report" --sort timestamp
+  slack-chat-api search all "from:@alice important"`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runSearchAll(args[0], opts, nil)

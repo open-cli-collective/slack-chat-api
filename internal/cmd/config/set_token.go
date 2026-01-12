@@ -8,8 +8,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/piekstra/slack-cli/internal/keychain"
-	"github.com/piekstra/slack-cli/internal/output"
+	"github.com/piekstra/slack-chat-api/internal/keychain"
+	"github.com/piekstra/slack-chat-api/internal/output"
 )
 
 type setTokenOptions struct{}
@@ -27,7 +27,7 @@ Token types are detected automatically:
   - User tokens (xoxp-*): Used for search commands
 
 On macOS: Tokens are stored securely in the system Keychain.
-On Linux: Tokens are stored in ~/.config/slack-cli/credentials (file permissions 0600).
+On Linux: Tokens are stored in ~/.config/slack-chat-api/credentials (file permissions 0600).
 
 If no token is provided as an argument, you will be prompted to enter it.`,
 		Args: cobra.MaximumNArgs(1),
@@ -45,7 +45,7 @@ func runSetToken(token string, opts *setTokenOptions) error {
 	// Warn Linux users about file-based storage
 	if !keychain.IsSecureStorage() {
 		output.Println("Warning: On Linux, your token will be stored in a config file")
-		output.Println("         (~/.config/slack-cli/credentials) with restricted permissions (0600).")
+		output.Println("         (~/.config/slack-chat-api/credentials) with restricted permissions (0600).")
 		output.Println("         This is less secure than macOS Keychain storage.")
 		output.Println()
 	}
@@ -75,7 +75,7 @@ func runSetToken(token string, opts *setTokenOptions) error {
 		if keychain.IsSecureStorage() {
 			output.Println("Bot token stored securely in Keychain")
 		} else {
-			output.Println("Bot token stored in ~/.config/slack-cli/credentials")
+			output.Println("Bot token stored in ~/.config/slack-chat-api/credentials")
 		}
 	case "user":
 		if err := keychain.SetUserToken(token); err != nil {
@@ -84,7 +84,7 @@ func runSetToken(token string, opts *setTokenOptions) error {
 		if keychain.IsSecureStorage() {
 			output.Println("User token stored securely in Keychain")
 		} else {
-			output.Println("User token stored in ~/.config/slack-cli/credentials")
+			output.Println("User token stored in ~/.config/slack-chat-api/credentials")
 		}
 		output.Println("Note: This token will be used for search commands.")
 	default:

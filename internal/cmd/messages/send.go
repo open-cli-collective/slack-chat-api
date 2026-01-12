@@ -9,9 +9,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/piekstra/slack-cli/internal/client"
-	"github.com/piekstra/slack-cli/internal/output"
-	"github.com/piekstra/slack-cli/internal/validate"
+	"github.com/piekstra/slack-chat-api/internal/client"
+	"github.com/piekstra/slack-chat-api/internal/output"
+	"github.com/piekstra/slack-chat-api/internal/validate"
 )
 
 type sendOptions struct {
@@ -33,8 +33,8 @@ By default, messages are sent using Slack Block Kit formatting for a more
 refined appearance. Use --simple to send plain text messages instead.
 
 Use "-" as the text argument to read from stdin:
-  echo "Hello" | slack-cli messages send C1234567890 -
-  cat message.txt | slack-cli messages send C1234567890 -`,
+  echo "Hello" | slack-chat-api messages send C1234567890 -
+  cat message.txt | slack-chat-api messages send C1234567890 -`,
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runSend(args[0], args[1], opts, nil)

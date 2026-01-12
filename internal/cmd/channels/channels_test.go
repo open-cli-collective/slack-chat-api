@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/piekstra/slack-cli/internal/client"
+	"github.com/piekstra/slack-chat-api/internal/client"
 )
 
 func TestRunList_Success(t *testing.T) {

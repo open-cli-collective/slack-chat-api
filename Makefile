@@ -1,11 +1,11 @@
-BINARY := slack-cli
+BINARY := slack-chat-api
 VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 DATE := $(shell date -u '+%Y-%m-%dT%H:%M:%SZ')
 LDFLAGS := -ldflags "-s -w \
-	-X github.com/piekstra/slack-cli/internal/version.Version=$(VERSION) \
-	-X github.com/piekstra/slack-cli/internal/version.Commit=$(COMMIT) \
-	-X github.com/piekstra/slack-cli/internal/version.Date=$(DATE)"
+	-X github.com/piekstra/slack-chat-api/internal/version.Version=$(VERSION) \
+	-X github.com/piekstra/slack-chat-api/internal/version.Commit=$(COMMIT) \
+	-X github.com/piekstra/slack-chat-api/internal/version.Date=$(DATE)"
 
 DIST_DIR = dist
 
@@ -14,7 +14,7 @@ DIST_DIR = dist
 all: build
 
 build:
-	go build $(LDFLAGS) -o bin/$(BINARY) ./cmd/slack-cli
+	go build $(LDFLAGS) -o bin/$(BINARY) ./cmd/slack-chat-api
 
 test:
 	go test -v -race ./...
@@ -31,7 +31,7 @@ lint:
 
 fmt:
 	go fmt ./...
-	goimports -local github.com/piekstra/slack-cli -w .
+	goimports -local github.com/piekstra/slack-chat-api -w .
 
 deps:
 	go mod download
@@ -48,22 +48,22 @@ release: clean
 	mkdir -p $(DIST_DIR)
 
 	# macOS ARM64
-	GOOS=darwin GOARCH=arm64 go build $(LDFLAGS) -o $(DIST_DIR)/$(BINARY) ./cmd/slack-cli
+	GOOS=darwin GOARCH=arm64 go build $(LDFLAGS) -o $(DIST_DIR)/$(BINARY) ./cmd/slack-chat-api
 	tar -czvf $(DIST_DIR)/$(BINARY)_$(VERSION)_darwin_arm64.tar.gz -C $(DIST_DIR) $(BINARY)
 	rm $(DIST_DIR)/$(BINARY)
 
 	# macOS AMD64
-	GOOS=darwin GOARCH=amd64 go build $(LDFLAGS) -o $(DIST_DIR)/$(BINARY) ./cmd/slack-cli
+	GOOS=darwin GOARCH=amd64 go build $(LDFLAGS) -o $(DIST_DIR)/$(BINARY) ./cmd/slack-chat-api
 	tar -czvf $(DIST_DIR)/$(BINARY)_$(VERSION)_darwin_amd64.tar.gz -C $(DIST_DIR) $(BINARY)
 	rm $(DIST_DIR)/$(BINARY)
 
 	# Linux ARM64
-	GOOS=linux GOARCH=arm64 go build $(LDFLAGS) -o $(DIST_DIR)/$(BINARY) ./cmd/slack-cli
+	GOOS=linux GOARCH=arm64 go build $(LDFLAGS) -o $(DIST_DIR)/$(BINARY) ./cmd/slack-chat-api
 	tar -czvf $(DIST_DIR)/$(BINARY)_$(VERSION)_linux_arm64.tar.gz -C $(DIST_DIR) $(BINARY)
 	rm $(DIST_DIR)/$(BINARY)
 
 	# Linux AMD64
-	GOOS=linux GOARCH=amd64 go build $(LDFLAGS) -o $(DIST_DIR)/$(BINARY) ./cmd/slack-cli
+	GOOS=linux GOARCH=amd64 go build $(LDFLAGS) -o $(DIST_DIR)/$(BINARY) ./cmd/slack-chat-api
 	tar -czvf $(DIST_DIR)/$(BINARY)_$(VERSION)_linux_amd64.tar.gz -C $(DIST_DIR) $(BINARY)
 	rm $(DIST_DIR)/$(BINARY)
 
