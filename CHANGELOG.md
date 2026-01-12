@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.0.1](https://github.com/piekstra/slack-chat-api/compare/v3.0.0...v3.0.1) (2026-01-12)
+
+
+### Bug Fixes
+
+* Add ldflags to release builds and auto-merge release PRs ([#39](https://github.com/piekstra/slack-chat-api/issues/39)) ([352a3f1](https://github.com/piekstra/slack-chat-api/commit/352a3f1c42e889f0a1957948fa9c44d6c414b3d0))
+* Extract PR number from JSON output for auto-merge ([#41](https://github.com/piekstra/slack-chat-api/issues/41)) ([95fce10](https://github.com/piekstra/slack-chat-api/commit/95fce10aed7c8618040e51409a66b48a3bfc2281))
+
 ## [3.0.0](https://github.com/piekstra/slack-chat-api/compare/v2.1.0...v3.0.0) (2026-01-12)
 
 
