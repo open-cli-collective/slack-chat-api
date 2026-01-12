@@ -23,19 +23,39 @@ func newShowCmd() *cobra.Command {
 	}
 }
 
+func maskToken(token string) string {
+	if len(token) < 12 {
+		return strings.Repeat("*", len(token))
+	}
+	return token[:8] + strings.Repeat("*", len(token)-12) + token[len(token)-4:]
+}
+
 func runShow(opts *showOptions) error {
-	token, err := keychain.GetAPIToken()
-	if err != nil {
-		output.Println("API Token: Not configured")
-		output.Println("\nRun 'slack-cli config set-token' to configure")
-		return nil
+	hasAnyToken := false
+
+	// Bot token
+	botToken, botErr := keychain.GetAPIToken()
+	if botErr == nil {
+		hasAnyToken = true
+		source := keychain.GetTokenSource()
+		output.Printf("Bot Token: %s (from %s)\n", maskToken(botToken), source)
+	} else {
+		output.Println("Bot Token: Not configured")
 	}
 
-	// Mask the token for display
-	masked := token[:8] + strings.Repeat("*", len(token)-12) + token[len(token)-4:]
+	// User token
+	userToken, userErr := keychain.GetUserToken()
+	if userErr == nil {
+		hasAnyToken = true
+		source := keychain.GetUserTokenSource()
+		output.Printf("User Token: %s (from %s)\n", maskToken(userToken), source)
+	} else {
+		output.Println("User Token: Not configured (required for search)")
+	}
 
-	source := keychain.GetTokenSource()
-	output.Printf("API Token: %s (from %s)\n", masked, source)
+	if !hasAnyToken {
+		output.Println("\nRun 'slack-cli config set-token' to configure")
+	}
 
 	return nil
 }

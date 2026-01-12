@@ -56,6 +56,8 @@ make build
          - reactions:write
          - team:read
          - users:read
+       user:
+         - search:read
    settings:
      org_deploy_enabled: false
      socket_mode_enabled: false
@@ -113,6 +115,44 @@ The manifest above includes these scopes:
 | `reactions:write` | Add/remove reactions |
 | `team:read` | Get workspace info |
 | `users:read` | List users, get user info |
+| `search:read` | Search messages and files (user token only) |
+
+### Token Types
+
+This CLI supports two types of Slack tokens:
+
+| Token Type | Prefix | Commands | How to Get |
+|------------|--------|----------|------------|
+| Bot token | `xoxb-` | channels, users, messages, workspace | OAuth & Permissions → Bot User OAuth Token |
+| User token | `xoxp-` | search | OAuth & Permissions → User OAuth Token |
+
+Most commands use the **bot token**. Search commands require a **user token**.
+
+**Setting up both tokens:**
+
+```bash
+# Set bot token (for channels, users, messages, workspace)
+slack-cli config set-token xoxb-your-bot-token
+
+# Set user token (for search)
+slack-cli config set-token xoxp-your-user-token
+```
+
+The `set-token` command automatically detects the token type and stores it appropriately.
+
+**Getting a user token:**
+
+1. Go to [api.slack.com/apps](https://api.slack.com/apps) → Your app
+2. OAuth & Permissions → User Token Scopes → Add `search:read`
+3. Reinstall app to workspace (if already installed)
+4. Copy the **User OAuth Token** (starts with `xoxp-`)
+
+**Environment variables:**
+
+| Variable | Token Type | Description |
+|----------|------------|-------------|
+| `SLACK_API_TOKEN` | Bot | Bot token for most commands |
+| `SLACK_USER_TOKEN` | User | User token for search commands |
 
 ## Global Flags
 
@@ -241,6 +281,58 @@ slack-cli messages unreact C1234567890 1234567890.123456 thumbsup
 | `react <channel> <ts> <emoji>` | | Add reaction |
 | `unreact <channel> <ts> <emoji>` | | Remove reaction |
 
+### Search
+
+> **Note:** Search requires a user token (`xoxp-*`). See [Token Types](#token-types).
+
+```bash
+# Search messages
+slack-cli search messages "quarterly report"
+slack-cli search messages "in:#general bug fix"
+slack-cli search messages "from:@alice project update"
+
+# Search files
+slack-cli search files "budget spreadsheet"
+slack-cli search files "type:pdf report"
+
+# Search all (messages + files)
+slack-cli search all "project proposal"
+slack-cli search all "quarterly" --sort timestamp
+
+# With pagination
+slack-cli search messages "error" --count 50 --page 2
+```
+
+#### Search Modifiers
+
+| Modifier | Example | Description |
+|----------|---------|-------------|
+| `in:` | `in:#channel` or `in:@user` | Search in specific channel or DM |
+| `from:` | `from:@username` | Content from specific user |
+| `before:` | `before:2025-01-01` | Before date |
+| `after:` | `after:2025-01-01` | After date |
+| `has:link` | | Messages containing links |
+| `has:reaction` | | Messages with reactions |
+| `type:` | `type:pdf` | Files of specific type |
+
+#### Search Command Reference
+
+| Command | Flags | Description |
+|---------|-------|-------------|
+| `messages <query>` | `--count`, `--page`, `--sort`, `--sort-dir`, `--highlight` | Search messages |
+| `files <query>` | `--count`, `--page`, `--sort`, `--sort-dir`, `--highlight` | Search files |
+| `all <query>` | `--count`, `--page`, `--sort`, `--sort-dir`, `--highlight` | Search messages and files |
+
+#### Search Flags
+
+| Flag | Short | Default | Description |
+|------|-------|---------|-------------|
+| `--count` | `-c` | `20` | Results per page (max 100) |
+| `--page` | `-p` | `1` | Page number (max 100) |
+| `--sort` | `-s` | `score` | Sort by: `score` or `timestamp` |
+| `--sort-dir` | | `desc` | Sort direction: `asc` or `desc` |
+| `--highlight` | | `false` | Highlight matching terms |
+
 ### Workspace
 
 ```bash
@@ -268,9 +360,15 @@ slack-cli config delete-token
 
 | Command | Flags | Description |
 |---------|-------|-------------|
-| `set-token [token]` | | Set API token (prompts if not provided) |
+| `set-token [token]` | | Set API token (auto-detects bot/user type) |
 | `show` | | Show current configuration status |
-| `delete-token` | `--force` | Delete stored API token (prompts for confirmation) |
+| `delete-token` | `--force`, `--type` | Delete stored token(s) |
+| `test` | | Test authentication for configured tokens |
+
+The `delete-token` command accepts a `--type` flag:
+- `--type bot` - Delete only the bot token
+- `--type user` - Delete only the user token
+- `--type all` - Delete both tokens (default)
 
 ### Output Formats
 
@@ -313,13 +411,15 @@ Commands have convenient aliases:
 | `channels` | `ch` |
 | `users` | `u` |
 | `messages` | `msg`, `m` |
+| `search` | `s` |
 | `workspace` | `ws`, `team` |
 
 ## Environment Variables
 
 | Variable | Description |
 |----------|-------------|
-| `SLACK_API_TOKEN` | API token (overrides stored token) |
+| `SLACK_API_TOKEN` | Bot token (overrides stored bot token) |
+| `SLACK_USER_TOKEN` | User token for search (overrides stored user token) |
 | `NO_COLOR` | Disable colored output when set |
 | `XDG_CONFIG_HOME` | Custom config directory (default: `~/.config`) |
 

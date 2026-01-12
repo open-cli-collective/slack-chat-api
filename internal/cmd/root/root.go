@@ -9,6 +9,7 @@ import (
 	"github.com/piekstra/slack-cli/internal/cmd/channels"
 	"github.com/piekstra/slack-cli/internal/cmd/config"
 	"github.com/piekstra/slack-cli/internal/cmd/messages"
+	"github.com/piekstra/slack-cli/internal/cmd/search"
 	"github.com/piekstra/slack-cli/internal/cmd/users"
 	"github.com/piekstra/slack-cli/internal/cmd/workspace"
 	"github.com/piekstra/slack-cli/internal/output"
@@ -60,6 +61,7 @@ func init() {
 	rootCmd.AddCommand(channels.NewCmd())
 	rootCmd.AddCommand(users.NewCmd())
 	rootCmd.AddCommand(messages.NewCmd())
+	rootCmd.AddCommand(search.NewCmd())
 	rootCmd.AddCommand(workspace.NewCmd())
 	rootCmd.AddCommand(config.NewCmd())
 }

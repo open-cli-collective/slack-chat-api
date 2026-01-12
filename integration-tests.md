@@ -12,9 +12,9 @@ Manual integration tests for verifying slack-cli against a live Slack workspace.
 2. Click "Create New App" → "From scratch"
 3. Name it (e.g., "slack-cli-test") and select your workspace
 
-### Step 2: Configure Bot Token Scopes
+### Step 2: Configure Token Scopes
 
-In **OAuth & Permissions**, add these scopes:
+In **OAuth & Permissions**, add these **Bot Token Scopes**:
 
 | Scope | Purpose | Required For |
 |-------|---------|--------------|
@@ -32,21 +32,35 @@ In **OAuth & Permissions**, add these scopes:
 
 **Note:** `channels:manage` is a superset that includes `channels:write.topic` and `channels:write.invites`. You can use the granular scopes instead if you want more limited permissions.
 
+Also add this **User Token Scope** (for Part 3B: Search Tests):
+
+| Scope | Purpose | Required For |
+|-------|---------|--------------|
+| `search:read` | Search messages and files | Part 3B |
+
 ### Step 3: Install App & Configure CLI
 
 ```bash
 # Install app to workspace (in Slack app settings)
-# Copy the "Bot User OAuth Token" (starts with xoxb-)
 
 # Build the CLI
 make build
 
-# Store the token
+# Set up Bot Token (required for most commands)
+# Copy the "Bot User OAuth Token" (starts with xoxb-)
 ./bin/slack-cli config set-token
 # Paste your xoxb-... token when prompted
 
-# Verify it works
+# Verify bot token works
 ./bin/slack-cli workspace info
+
+# Set up User Token (required for search tests in Part 3B)
+# Copy the "User OAuth Token" (starts with xoxp-)
+./bin/slack-cli config set-token xoxp-your-user-token
+
+# Verify both tokens are configured
+./bin/slack-cli config show
+./bin/slack-cli config test
 ```
 
 ### Step 4: Discover Test Inputs
@@ -202,6 +216,109 @@ Using **TS₁** from step 3.1:
 
 ---
 
+## Part 3B: Search Tests
+
+**Scopes required:** `search:read` (user token)
+
+Search requires a **user token** (`xoxp-*`), not a bot token. These tests verify search functionality.
+
+### Prerequisites
+
+1. Configure a user token:
+   ```bash
+   # Get your user token from Slack app settings:
+   # OAuth & Permissions → User OAuth Token (starts with xoxp-)
+   slack-cli config set-token xoxp-your-user-token
+
+   # Or use environment variable:
+   export SLACK_USER_TOKEN=xoxp-your-user-token
+   ```
+
+2. Verify both tokens are configured:
+   ```bash
+   slack-cli config show
+   # Should show both Bot Token and User Token
+
+   slack-cli config test
+   # Should validate both tokens
+   ```
+
+### 3B.1 Setup: Create Searchable Content
+
+First, create a message with a unique identifier that we can search for:
+
+| Step | Command | Expected | Capture |
+|------|---------|----------|---------|
+| 1 | `export SEARCH_ID="integ-test-$(date +%s)"` | Sets unique identifier | **Save SEARCH_ID** |
+| 2 | `slack-cli messages send $TEST_CHANNEL_ID "Search test: $SEARCH_ID"` | Message sent | **Save TS₃** |
+| 3 | Wait ~5 seconds for Slack to index | (Slack search has indexing delay) | |
+
+### 3B.2 Search Messages
+
+| Step | Command | Expected |
+|------|---------|----------|
+| 1 | `slack-cli search messages "$SEARCH_ID"` | Shows the test message with channel, user, timestamp |
+| 2 | `slack-cli search messages "$SEARCH_ID" -o json` | Valid JSON with `query`, `messages.matches[]`, `messages.paging` |
+| 3 | `slack-cli search messages "$SEARCH_ID" -o table` | Table format output |
+| 4 | `slack-cli search messages "in:#$TEST_CHANNEL_NAME $SEARCH_ID"` | Same message (filtered by channel) |
+
+### 3B.3 Search with Pagination
+
+| Step | Command | Expected |
+|------|---------|----------|
+| 1 | `slack-cli search messages "test" --count 5` | Max 5 results |
+| 2 | `slack-cli search messages "test" --count 5 --page 1` | Page 1 of results |
+| 3 | `slack-cli search messages "test" --count 5 --page 2` | Page 2 (may be empty or have different results) |
+
+### 3B.4 Search with Sorting
+
+| Step | Command | Expected |
+|------|---------|----------|
+| 1 | `slack-cli search messages "test" --sort score` | Sorted by relevance (default) |
+| 2 | `slack-cli search messages "test" --sort timestamp --sort-dir desc` | Most recent first |
+| 3 | `slack-cli search messages "test" --sort timestamp --sort-dir asc` | Oldest first |
+
+### 3B.5 Search Files
+
+| Step | Command | Expected |
+|------|---------|----------|
+| 1 | `slack-cli search files "document"` | Lists matching files (if any exist) |
+| 2 | `slack-cli search files "document" -o json` | Valid JSON with `files.matches[]` |
+
+### 3B.6 Search All
+
+| Step | Command | Expected |
+|------|---------|----------|
+| 1 | `slack-cli search all "$SEARCH_ID"` | Shows message result under "Messages" section |
+| 2 | `slack-cli search all "$SEARCH_ID" -o json` | JSON with both `messages` and `files` objects |
+| 3 | `slack-cli search all "test" --count 10` | Shows both messages and files (if any) |
+
+### 3B.7 Search Error Cases
+
+| Step | Command | Expected |
+|------|---------|----------|
+| 1 | `slack-cli search messages "xyznonexistent123"` | "No messages found" |
+| 2 | `slack-cli search messages "test" --count 101` | Error: count must be between 1 and 100 |
+| 3 | `slack-cli search messages "test" --page 0` | Error: page must be between 1 and 100 |
+| 4 | `slack-cli search messages "test" --sort invalid` | Error: sort must be 'score' or 'timestamp' |
+
+### 3B.8 Search Without User Token (Error Case)
+
+| Step | Command | Expected |
+|------|---------|----------|
+| 1 | `unset SLACK_USER_TOKEN` | Clear env var |
+| 2 | `slack-cli config delete-token --type user --force` | Delete stored user token |
+| 3 | `slack-cli search messages "test"` | Error mentioning user token requirement |
+| 4 | `slack-cli config set-token xoxp-your-user-token` | Re-configure user token |
+
+### 3B.9 Cleanup: Delete Search Test Message
+
+| Step | Command | Expected |
+|------|---------|----------|
+| 1 | `slack-cli messages delete $TEST_CHANNEL_ID <TS₃> --force` | "Message deleted" |
+
+---
+
 ## Part 4: Channel Metadata Tests
 
 **Scopes required:** `channels:write`
@@ -283,28 +400,54 @@ Using **NEW_CHANNEL_ID** from step 5.1:
 
 ## Part 6: Config Command Tests ⚠️
 
-**Warning:** These tests manipulate your stored token. Run last and be prepared to re-authenticate.
+**Warning:** These tests manipulate your stored tokens. Run last and be prepared to re-authenticate.
 
-### 6.1 Config Show
-
-| Step | Command | Expected |
-|------|---------|----------|
-| 1 | `slack-cli config show` | Shows masked token and storage location |
-
-### 6.2 Config Test (Optional)
+### 6.1 Config Show (Dual Token)
 
 | Step | Command | Expected |
 |------|---------|----------|
-| 1 | `slack-cli config test` | "Token is valid" + workspace info |
+| 1 | `slack-cli config show` | Shows both Bot Token and User Token (masked) with storage location |
 
-### 6.3 Token Manipulation (Careful!)
+### 6.2 Config Test (Dual Token)
 
 | Step | Command | Expected |
 |------|---------|----------|
-| 1 | `slack-cli config delete-token` | "API token deleted" |
-| 2 | `slack-cli workspace info` | Error: no token configured |
-| 3 | `slack-cli config set-token` | Prompts for token, stores it |
-| 4 | `slack-cli workspace info` | Works again |
+| 1 | `slack-cli config test` | Tests both bot and user tokens, shows workspace info for each |
+
+### 6.3 Token Type Detection
+
+| Step | Command | Expected |
+|------|---------|----------|
+| 1 | `slack-cli config set-token xoxb-test-fake-token` | "Bot token stored" |
+| 2 | `slack-cli config set-token xoxp-test-fake-token` | "User token stored" |
+| 3 | `slack-cli config set-token invalid-token` | Error: unrecognized token format |
+
+### 6.4 Selective Token Deletion
+
+| Step | Command | Expected |
+|------|---------|----------|
+| 1 | `slack-cli config delete-token --type bot --force` | "Bot token deleted" |
+| 2 | `slack-cli config show` | Bot Token: Not configured, User Token: still present |
+| 3 | `slack-cli workspace info` | Error: no bot token configured |
+| 4 | `slack-cli search messages "test"` | Still works (uses user token) |
+| 5 | `slack-cli config delete-token --type user --force` | "User token deleted" |
+| 6 | `slack-cli search messages "test"` | Error: user token required |
+
+### 6.5 Restore Tokens
+
+| Step | Command | Expected |
+|------|---------|----------|
+| 1 | `slack-cli config set-token` | Prompts for token, stores it (bot) |
+| 2 | `slack-cli config set-token xoxp-your-user-token` | Stores user token |
+| 3 | `slack-cli config show` | Both tokens configured |
+| 4 | `slack-cli config test` | Both tokens valid |
+
+### 6.6 Delete All Tokens
+
+| Step | Command | Expected |
+|------|---------|----------|
+| 1 | `slack-cli config delete-token --type all --force` | Both tokens deleted |
+| 2 | `slack-cli config show` | No tokens configured |
 
 ---
 
@@ -362,4 +505,10 @@ slack-cli --help
 # Command-specific help
 slack-cli channels --help
 slack-cli messages send --help
+slack-cli search --help
+slack-cli search messages --help
+
+# Check token configuration
+slack-cli config show
+slack-cli config test
 ```

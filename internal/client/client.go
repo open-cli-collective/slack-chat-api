@@ -48,6 +48,20 @@ func NewWithConfig(baseURL, token string, httpClient *http.Client) *Client {
 	}
 }
 
+// NewUserClient creates a new Slack client using the user token (for search)
+func NewUserClient() (*Client, error) {
+	token, err := keychain.GetUserToken()
+	if err != nil {
+		return nil, fmt.Errorf("user token required for search: %w", err)
+	}
+
+	return &Client{
+		httpClient: &http.Client{Timeout: 30 * time.Second},
+		token:      token,
+		baseURL:    defaultBaseURL,
+	}, nil
+}
+
 // SlackResponse represents a generic Slack API response
 type SlackResponse struct {
 	OK    bool   `json:"ok"`
@@ -183,6 +197,61 @@ type Team struct {
 	ID     string `json:"id"`
 	Name   string `json:"name"`
 	Domain string `json:"domain"`
+}
+
+// SearchMatch represents a message match from search
+type SearchMatch struct {
+	Type    string `json:"type"`
+	Channel struct {
+		ID   string `json:"id"`
+		Name string `json:"name"`
+	} `json:"channel"`
+	User      string `json:"user"`
+	Username  string `json:"username"`
+	Text      string `json:"text"`
+	TS        string `json:"ts"`
+	Permalink string `json:"permalink"`
+}
+
+// FileMatch represents a file match from search
+type FileMatch struct {
+	ID              string `json:"id"`
+	Name            string `json:"name"`
+	Title           string `json:"title"`
+	Filetype        string `json:"filetype"`
+	User            string `json:"user"`
+	Created         int64  `json:"created"`
+	Permalink       string `json:"permalink"`
+	PermalinkPublic string `json:"permalink_public,omitempty"`
+}
+
+// SearchPaging contains pagination info
+type SearchPaging struct {
+	Count int `json:"count"`
+	Total int `json:"total"`
+	Page  int `json:"page"`
+	Pages int `json:"pages"`
+}
+
+// MessageGroup contains message search results
+type MessageGroup struct {
+	Total   int           `json:"total"`
+	Paging  SearchPaging  `json:"paging"`
+	Matches []SearchMatch `json:"matches"`
+}
+
+// FileGroup contains file search results
+type FileGroup struct {
+	Total   int          `json:"total"`
+	Paging  SearchPaging `json:"paging"`
+	Matches []FileMatch  `json:"matches"`
+}
+
+// SearchResult contains search results
+type SearchResult struct {
+	Query    string        `json:"query"`
+	Messages *MessageGroup `json:"messages,omitempty"`
+	Files    *FileGroup    `json:"files,omitempty"`
 }
 
 // ListChannels returns channels up to the specified limit (handles pagination automatically)
@@ -495,13 +564,6 @@ func (c *Client) GetThreadReplies(channel, threadTS string, limit int) ([]Messag
 	return allMessages, nil
 }
 
-// NOTE: Search functionality (search.messages API) was removed because it requires
-// a user token (xoxp-*), not a bot token (xoxb-*). To add search support in the future:
-// 1. Add user token storage (separate from bot token) in keychain
-// 2. Implement OAuth flow for user tokens, or allow manual user token entry
-// 3. Use the user token specifically for SearchMessages calls
-// 4. The search.messages API uses page-based pagination (page, count params, max 100 each)
-
 // AddReaction adds an emoji reaction
 func (c *Client) AddReaction(channel, timestamp, name string) error {
 	data := map[string]interface{}{
@@ -643,4 +705,81 @@ func (c *Client) InviteToChannel(channel string, users []string) error {
 	}
 	_, err := c.post("conversations.invite", data)
 	return err
+}
+
+// --- Search Methods (require user token) ---
+
+// SearchMessages searches for messages matching a query
+func (c *Client) SearchMessages(query string, count, page int, sort, sortDir string, highlight bool) (*SearchResult, error) {
+	params := url.Values{}
+	params.Set("query", query)
+	params.Set("count", fmt.Sprintf("%d", count))
+	params.Set("page", fmt.Sprintf("%d", page))
+	params.Set("sort", sort)
+	params.Set("sort_dir", sortDir)
+	if highlight {
+		params.Set("highlight", "true")
+	}
+
+	body, err := c.get("search.messages", params)
+	if err != nil {
+		return nil, err
+	}
+
+	var result SearchResult
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, err
+	}
+	result.Query = query
+	return &result, nil
+}
+
+// SearchFiles searches for files matching a query
+func (c *Client) SearchFiles(query string, count, page int, sort, sortDir string, highlight bool) (*SearchResult, error) {
+	params := url.Values{}
+	params.Set("query", query)
+	params.Set("count", fmt.Sprintf("%d", count))
+	params.Set("page", fmt.Sprintf("%d", page))
+	params.Set("sort", sort)
+	params.Set("sort_dir", sortDir)
+	if highlight {
+		params.Set("highlight", "true")
+	}
+
+	body, err := c.get("search.files", params)
+	if err != nil {
+		return nil, err
+	}
+
+	var result SearchResult
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, err
+	}
+	result.Query = query
+	return &result, nil
+}
+
+// SearchAll searches for both messages and files matching a query
+func (c *Client) SearchAll(query string, count, page int, sort, sortDir string, highlight bool) (*SearchResult, error) {
+	params := url.Values{}
+	params.Set("query", query)
+	params.Set("count", fmt.Sprintf("%d", count))
+	params.Set("page", fmt.Sprintf("%d", page))
+	params.Set("sort", sort)
+	params.Set("sort_dir", sortDir)
+	if highlight {
+		params.Set("highlight", "true")
+	}
+
+	body, err := c.get("search.all", params)
+	if err != nil {
+		return nil, err
+	}
+
+	var result SearchResult
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, err
+	}
+	result.Query = query
+	return &result, nil
 }

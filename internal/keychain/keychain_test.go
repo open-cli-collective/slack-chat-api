@@ -402,3 +402,266 @@ func TestGetTokenSource_EnvVar(t *testing.T) {
 		t.Errorf("expected 'environment variable', got %s", source)
 	}
 }
+
+// --- User Token Tests ---
+
+func TestUserToken_SetAndGet(t *testing.T) {
+	if runtime.GOOS == "darwin" {
+		t.Skip("Skipping on macOS - keychain tests require manual setup")
+	}
+
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	// Clear env var
+	_ = os.Unsetenv("SLACK_USER_TOKEN")
+
+	// Set user token
+	err := SetUserToken("xoxp-test-user-token")
+	if err != nil {
+		t.Fatalf("SetUserToken failed: %v", err)
+	}
+
+	// Get user token
+	token, err := GetUserToken()
+	if err != nil {
+		t.Fatalf("GetUserToken failed: %v", err)
+	}
+	if token != "xoxp-test-user-token" {
+		t.Errorf("expected xoxp-test-user-token, got %s", token)
+	}
+}
+
+func TestUserToken_Delete(t *testing.T) {
+	if runtime.GOOS == "darwin" {
+		t.Skip("Skipping on macOS - keychain tests require manual setup")
+	}
+
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+	_ = os.Unsetenv("SLACK_USER_TOKEN")
+
+	// Set a token first
+	err := SetUserToken("xoxp-delete-test")
+	if err != nil {
+		t.Fatalf("SetUserToken failed: %v", err)
+	}
+
+	// Verify it exists
+	if !HasStoredUserToken() {
+		t.Error("expected stored user token after set")
+	}
+
+	// Delete it
+	err = DeleteUserToken()
+	if err != nil {
+		t.Fatalf("DeleteUserToken failed: %v", err)
+	}
+
+	// Verify it's gone
+	if HasStoredUserToken() {
+		t.Error("expected no stored user token after delete")
+	}
+}
+
+func TestUserToken_EnvVar(t *testing.T) {
+	if runtime.GOOS == "darwin" {
+		t.Skip("Skipping on macOS - keychain tests require manual setup")
+	}
+
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+	t.Setenv("SLACK_USER_TOKEN", "xoxp-env-user-token")
+
+	// Should get token from env var
+	token, err := GetUserToken()
+	if err != nil {
+		t.Fatalf("GetUserToken failed: %v", err)
+	}
+	if token != "xoxp-env-user-token" {
+		t.Errorf("expected xoxp-env-user-token, got %s", token)
+	}
+}
+
+func TestUserToken_NoToken(t *testing.T) {
+	if runtime.GOOS == "darwin" {
+		t.Skip("Skipping on macOS - keychain tests require manual setup")
+	}
+
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+	_ = os.Unsetenv("SLACK_USER_TOKEN")
+
+	_, err := GetUserToken()
+	if err == nil {
+		t.Error("expected error when no user token is configured")
+	}
+}
+
+func TestHasStoredUserToken(t *testing.T) {
+	if runtime.GOOS == "darwin" {
+		t.Skip("Skipping on macOS - keychain tests require manual setup")
+	}
+
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+	_ = os.Unsetenv("SLACK_USER_TOKEN")
+
+	// Initially no token
+	if HasStoredUserToken() {
+		t.Error("expected no stored user token initially")
+	}
+
+	// Set a token
+	err := SetUserToken("xoxp-test-token")
+	if err != nil {
+		t.Fatalf("SetUserToken failed: %v", err)
+	}
+
+	// Now should have a token
+	if !HasStoredUserToken() {
+		t.Error("expected stored user token after set")
+	}
+}
+
+func TestHasStoredUserToken_EnvVarOnly(t *testing.T) {
+	if runtime.GOOS == "darwin" {
+		t.Skip("Skipping on macOS - keychain tests require manual setup")
+	}
+
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+	t.Setenv("SLACK_USER_TOKEN", "xoxp-env-token")
+
+	// HasStoredUserToken should return false when only env var is set
+	if HasStoredUserToken() {
+		t.Error("expected false when only env var is set")
+	}
+}
+
+func TestGetUserTokenSource_ConfigFile(t *testing.T) {
+	if runtime.GOOS == "darwin" {
+		t.Skip("Skipping on macOS - keychain tests require manual setup")
+	}
+
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+	_ = os.Unsetenv("SLACK_USER_TOKEN")
+
+	// No token - should return empty string
+	source := GetUserTokenSource()
+	if source != "" {
+		t.Errorf("expected empty string for no token, got %s", source)
+	}
+
+	// Set a token in config file
+	err := SetUserToken("xoxp-test-token")
+	if err != nil {
+		t.Fatalf("SetUserToken failed: %v", err)
+	}
+
+	// Should return "config file" on non-darwin
+	source = GetUserTokenSource()
+	if source != "config file" {
+		t.Errorf("expected 'config file', got %s", source)
+	}
+}
+
+func TestGetUserTokenSource_EnvVar(t *testing.T) {
+	if runtime.GOOS == "darwin" {
+		t.Skip("Skipping on macOS - keychain tests require manual setup")
+	}
+
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+	t.Setenv("SLACK_USER_TOKEN", "xoxp-env-token")
+
+	// When only env var is set (no config file)
+	source := GetUserTokenSource()
+	if source != "environment variable" {
+		t.Errorf("expected 'environment variable', got %s", source)
+	}
+}
+
+func TestDetectTokenType(t *testing.T) {
+	tests := []struct {
+		token    string
+		expected string
+	}{
+		{"xoxb-123-456-789", "bot"},
+		{"xoxp-123-456-789", "user"},
+		{"invalid-token", "unknown"},
+		{"", "unknown"},
+		{"xoxb", "unknown"},
+		{"xoxp", "unknown"},
+		{"xoxb-", "bot"},
+		{"xoxp-", "user"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.token, func(t *testing.T) {
+			result := DetectTokenType(tt.token)
+			if result != tt.expected {
+				t.Errorf("DetectTokenType(%q) = %q, expected %q", tt.token, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestBothTokenTypes_Coexist(t *testing.T) {
+	if runtime.GOOS == "darwin" {
+		t.Skip("Skipping on macOS - keychain tests require manual setup")
+	}
+
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+	_ = os.Unsetenv("SLACK_API_TOKEN")
+	_ = os.Unsetenv("SLACK_USER_TOKEN")
+
+	// Set both tokens
+	err := SetAPIToken("xoxb-bot-token")
+	if err != nil {
+		t.Fatalf("SetAPIToken failed: %v", err)
+	}
+	err = SetUserToken("xoxp-user-token")
+	if err != nil {
+		t.Fatalf("SetUserToken failed: %v", err)
+	}
+
+	// Verify both exist independently
+	botToken, err := GetAPIToken()
+	if err != nil {
+		t.Fatalf("GetAPIToken failed: %v", err)
+	}
+	if botToken != "xoxb-bot-token" {
+		t.Errorf("expected xoxb-bot-token, got %s", botToken)
+	}
+
+	userToken, err := GetUserToken()
+	if err != nil {
+		t.Fatalf("GetUserToken failed: %v", err)
+	}
+	if userToken != "xoxp-user-token" {
+		t.Errorf("expected xoxp-user-token, got %s", userToken)
+	}
+
+	// Delete bot token, user token should remain
+	err = DeleteAPIToken()
+	if err != nil {
+		t.Fatalf("DeleteAPIToken failed: %v", err)
+	}
+
+	// User token should still exist
+	userToken, err = GetUserToken()
+	if err != nil {
+		t.Fatalf("GetUserToken after bot delete failed: %v", err)
+	}
+	if userToken != "xoxp-user-token" {
+		t.Errorf("user token should persist after bot token delete")
+	}
+
+	// Bot token should be gone
+	if HasStoredToken() {
+		t.Error("bot token should be deleted")
+	}
+}

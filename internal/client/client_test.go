@@ -912,3 +912,262 @@ func TestClient_ListUsers_PaginationWithLimit(t *testing.T) {
 		t.Errorf("expected 2 users, got %d", len(users))
 	}
 }
+
+// --- Search Tests ---
+
+func TestClient_SearchMessages_Success(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "GET" {
+			t.Errorf("expected GET, got %s", r.Method)
+		}
+		if !strings.Contains(r.URL.Path, "search.messages") {
+			t.Errorf("expected path to contain search.messages, got %s", r.URL.Path)
+		}
+
+		// Verify query params
+		if r.URL.Query().Get("query") != "test query" {
+			t.Errorf("expected query='test query', got %s", r.URL.Query().Get("query"))
+		}
+		if r.URL.Query().Get("count") != "20" {
+			t.Errorf("expected count=20, got %s", r.URL.Query().Get("count"))
+		}
+		if r.URL.Query().Get("page") != "1" {
+			t.Errorf("expected page=1, got %s", r.URL.Query().Get("page"))
+		}
+		if r.URL.Query().Get("sort") != "score" {
+			t.Errorf("expected sort=score, got %s", r.URL.Query().Get("sort"))
+		}
+		if r.URL.Query().Get("sort_dir") != "desc" {
+			t.Errorf("expected sort_dir=desc, got %s", r.URL.Query().Get("sort_dir"))
+		}
+
+		resp := map[string]interface{}{
+			"ok": true,
+			"messages": map[string]interface{}{
+				"total": 42,
+				"paging": map[string]int{
+					"count": 20,
+					"total": 42,
+					"page":  1,
+					"pages": 3,
+				},
+				"matches": []map[string]interface{}{
+					{
+						"type": "message",
+						"channel": map[string]string{
+							"id":   "C123",
+							"name": "general",
+						},
+						"user":      "U456",
+						"username":  "alice",
+						"text":      "test message",
+						"ts":        "1234567890.123456",
+						"permalink": "https://example.slack.com/archives/C123/p1234567890123456",
+					},
+				},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	client := NewWithConfig(server.URL, "test-token", nil)
+	result, err := client.SearchMessages("test query", 20, 1, "score", "desc", false)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Query != "test query" {
+		t.Errorf("expected query 'test query', got %s", result.Query)
+	}
+	if result.Messages == nil {
+		t.Fatal("expected messages to be non-nil")
+	}
+	if result.Messages.Total != 42 {
+		t.Errorf("expected total 42, got %d", result.Messages.Total)
+	}
+	if len(result.Messages.Matches) != 1 {
+		t.Errorf("expected 1 match, got %d", len(result.Messages.Matches))
+	}
+	if result.Messages.Matches[0].Channel.Name != "general" {
+		t.Errorf("expected channel name 'general', got %s", result.Messages.Matches[0].Channel.Name)
+	}
+}
+
+func TestClient_SearchMessages_WithHighlight(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("highlight") != "true" {
+			t.Errorf("expected highlight=true, got %s", r.URL.Query().Get("highlight"))
+		}
+
+		resp := map[string]interface{}{
+			"ok": true,
+			"messages": map[string]interface{}{
+				"total":   0,
+				"paging":  map[string]int{"count": 20, "total": 0, "page": 1, "pages": 0},
+				"matches": []map[string]interface{}{},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	client := NewWithConfig(server.URL, "test-token", nil)
+	_, err := client.SearchMessages("test", 20, 1, "score", "desc", true)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestClient_SearchMessages_APIError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resp := map[string]interface{}{
+			"ok":    false,
+			"error": "not_authed",
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	client := NewWithConfig(server.URL, "test-token", nil)
+	_, err := client.SearchMessages("test", 20, 1, "score", "desc", false)
+
+	if err == nil {
+		t.Error("expected error for API failure")
+	}
+	if !strings.Contains(err.Error(), "not_authed") {
+		t.Errorf("expected error to contain 'not_authed', got %s", err.Error())
+	}
+}
+
+func TestClient_SearchFiles_Success(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.Contains(r.URL.Path, "search.files") {
+			t.Errorf("expected path to contain search.files, got %s", r.URL.Path)
+		}
+
+		resp := map[string]interface{}{
+			"ok": true,
+			"files": map[string]interface{}{
+				"total": 5,
+				"paging": map[string]int{
+					"count": 20,
+					"total": 5,
+					"page":  1,
+					"pages": 1,
+				},
+				"matches": []map[string]interface{}{
+					{
+						"id":        "F123",
+						"name":      "document.pdf",
+						"title":     "Project Document",
+						"filetype":  "pdf",
+						"user":      "U456",
+						"created":   1234567890,
+						"permalink": "https://example.slack.com/files/U456/F123/document.pdf",
+					},
+				},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	client := NewWithConfig(server.URL, "test-token", nil)
+	result, err := client.SearchFiles("document", 20, 1, "score", "desc", false)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Files == nil {
+		t.Fatal("expected files to be non-nil")
+	}
+	if result.Files.Total != 5 {
+		t.Errorf("expected total 5, got %d", result.Files.Total)
+	}
+	if len(result.Files.Matches) != 1 {
+		t.Errorf("expected 1 match, got %d", len(result.Files.Matches))
+	}
+	if result.Files.Matches[0].Name != "document.pdf" {
+		t.Errorf("expected file name 'document.pdf', got %s", result.Files.Matches[0].Name)
+	}
+}
+
+func TestClient_SearchAll_Success(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.Contains(r.URL.Path, "search.all") {
+			t.Errorf("expected path to contain search.all, got %s", r.URL.Path)
+		}
+
+		resp := map[string]interface{}{
+			"ok": true,
+			"messages": map[string]interface{}{
+				"total": 10,
+				"paging": map[string]int{
+					"count": 20,
+					"total": 10,
+					"page":  1,
+					"pages": 1,
+				},
+				"matches": []map[string]interface{}{
+					{
+						"type":      "message",
+						"channel":   map[string]string{"id": "C123", "name": "general"},
+						"user":      "U456",
+						"username":  "bob",
+						"text":      "hello world",
+						"ts":        "1234567890.123456",
+						"permalink": "https://example.slack.com/archives/C123/p1234567890123456",
+					},
+				},
+			},
+			"files": map[string]interface{}{
+				"total": 3,
+				"paging": map[string]int{
+					"count": 20,
+					"total": 3,
+					"page":  1,
+					"pages": 1,
+				},
+				"matches": []map[string]interface{}{
+					{
+						"id":        "F789",
+						"name":      "report.xlsx",
+						"title":     "Quarterly Report",
+						"filetype":  "xlsx",
+						"user":      "U456",
+						"created":   1234567890,
+						"permalink": "https://example.slack.com/files/U456/F789/report.xlsx",
+					},
+				},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	client := NewWithConfig(server.URL, "test-token", nil)
+	result, err := client.SearchAll("report", 20, 1, "timestamp", "asc", false)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Messages == nil {
+		t.Fatal("expected messages to be non-nil")
+	}
+	if result.Files == nil {
+		t.Fatal("expected files to be non-nil")
+	}
+	if result.Messages.Total != 10 {
+		t.Errorf("expected messages total 10, got %d", result.Messages.Total)
+	}
+	if result.Files.Total != 3 {
+		t.Errorf("expected files total 3, got %d", result.Files.Total)
+	}
+}

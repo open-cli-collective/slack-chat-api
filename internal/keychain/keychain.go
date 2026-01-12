@@ -10,8 +10,9 @@ import (
 )
 
 const (
-	serviceName = "slack-cli"
-	apiTokenKey = "api_token"
+	serviceName  = "slack-cli"
+	apiTokenKey  = "api_token"
+	userTokenKey = "user_token"
 )
 
 // GetAPIToken retrieves the Slack API token from keychain/config or environment
@@ -64,6 +65,65 @@ func GetTokenSource() string {
 		return "environment variable"
 	}
 	return ""
+}
+
+// --- User Token (for search) ---
+
+// GetUserToken retrieves the user token from keychain/config or environment
+func GetUserToken() (string, error) {
+	// Check environment variable first
+	if token := os.Getenv("SLACK_USER_TOKEN"); token != "" {
+		return token, nil
+	}
+
+	// Try secure storage (keychain on macOS, config file on Linux)
+	token, err := getCredential(userTokenKey)
+	if err == nil && token != "" {
+		return token, nil
+	}
+
+	return "", fmt.Errorf("no user token found - run 'slack-cli config set-token <xoxp-token>' or set SLACK_USER_TOKEN")
+}
+
+// SetUserToken stores a user token
+func SetUserToken(token string) error {
+	return setCredential(userTokenKey, token)
+}
+
+// DeleteUserToken removes the stored user token
+func DeleteUserToken() error {
+	return deleteCredential(userTokenKey)
+}
+
+// HasStoredUserToken returns true if a user token is stored in keychain/config (not env var)
+func HasStoredUserToken() bool {
+	token, err := getCredential(userTokenKey)
+	return err == nil && token != ""
+}
+
+// GetUserTokenSource returns where the user token comes from
+func GetUserTokenSource() string {
+	if token, err := getCredential(userTokenKey); err == nil && token != "" {
+		if runtime.GOOS == "darwin" {
+			return "Keychain"
+		}
+		return "config file"
+	}
+	if os.Getenv("SLACK_USER_TOKEN") != "" {
+		return "environment variable"
+	}
+	return ""
+}
+
+// DetectTokenType returns "bot" for xoxb-*, "user" for xoxp-*, or "unknown"
+func DetectTokenType(token string) string {
+	if strings.HasPrefix(token, "xoxb-") {
+		return "bot"
+	}
+	if strings.HasPrefix(token, "xoxp-") {
+		return "user"
+	}
+	return "unknown"
 }
 
 // --- Platform-specific implementations ---

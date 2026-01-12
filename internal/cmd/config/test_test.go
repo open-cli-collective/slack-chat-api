@@ -62,17 +62,20 @@ func TestRunTest_Success(t *testing.T) {
 			c := client.NewWithConfig(server.URL, "test-token", nil)
 			opts := &testOptions{}
 
-			err := runTest(opts, c)
+			// Pass same client for both bot and user for simplicity in test
+			err := runTest(opts, c, c)
 			require.NoError(t, err)
 		})
 	}
 }
 
 func TestRunTest_AuthErrors(t *testing.T) {
+	// Note: The runTest function handles auth errors gracefully by printing
+	// failure messages but not returning errors. This allows it to test
+	// multiple tokens and report all results.
 	tests := []struct {
-		name            string
-		response        map[string]interface{}
-		wantErrContains string
+		name     string
+		response map[string]interface{}
 	}{
 		{
 			name: "invalid_auth",
@@ -80,7 +83,6 @@ func TestRunTest_AuthErrors(t *testing.T) {
 				"ok":    false,
 				"error": "invalid_auth",
 			},
-			wantErrContains: "invalid_auth",
 		},
 		{
 			name: "token_revoked",
@@ -88,7 +90,6 @@ func TestRunTest_AuthErrors(t *testing.T) {
 				"ok":    false,
 				"error": "token_revoked",
 			},
-			wantErrContains: "token_revoked",
 		},
 		{
 			name: "account_inactive",
@@ -96,7 +97,6 @@ func TestRunTest_AuthErrors(t *testing.T) {
 				"ok":    false,
 				"error": "account_inactive",
 			},
-			wantErrContains: "account_inactive",
 		},
 		{
 			name: "missing_scope",
@@ -104,7 +104,6 @@ func TestRunTest_AuthErrors(t *testing.T) {
 				"ok":    false,
 				"error": "missing_scope",
 			},
-			wantErrContains: "missing_scope",
 		},
 	}
 
@@ -119,21 +118,28 @@ func TestRunTest_AuthErrors(t *testing.T) {
 			c := client.NewWithConfig(server.URL, "bad-token", nil)
 			opts := &testOptions{}
 
-			err := runTest(opts, c)
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), tt.wantErrContains)
+			// Pass same client for both bot and user for simplicity in test
+			// Function should not return error - it prints failures and continues
+			err := runTest(opts, c, c)
+			require.NoError(t, err)
 		})
 	}
 }
 
 func TestRunTest_NetworkErrors(t *testing.T) {
+	// Note: The runTest function handles errors gracefully by printing
+	// failure messages but not returning errors. This allows it to test
+	// multiple tokens and report all results.
+
 	t.Run("server unavailable", func(t *testing.T) {
 		// Use a port that's not listening
 		c := client.NewWithConfig("http://localhost:59999", "test-token", nil)
 		opts := &testOptions{}
 
-		err := runTest(opts, c)
-		require.Error(t, err)
+		// Pass same client for both bot and user for simplicity in test
+		// Function should not return error - it prints failures and continues
+		err := runTest(opts, c, c)
+		require.NoError(t, err)
 	})
 
 	t.Run("server returns 500", func(t *testing.T) {
@@ -145,8 +151,10 @@ func TestRunTest_NetworkErrors(t *testing.T) {
 		c := client.NewWithConfig(server.URL, "test-token", nil)
 		opts := &testOptions{}
 
-		err := runTest(opts, c)
-		require.Error(t, err)
+		// Pass same client for both bot and user for simplicity in test
+		// Function should not return error - it prints failures and continues
+		err := runTest(opts, c, c)
+		require.NoError(t, err)
 	})
 
 	t.Run("server returns invalid JSON", func(t *testing.T) {
@@ -158,8 +166,10 @@ func TestRunTest_NetworkErrors(t *testing.T) {
 		c := client.NewWithConfig(server.URL, "test-token", nil)
 		opts := &testOptions{}
 
-		err := runTest(opts, c)
-		require.Error(t, err)
+		// Pass same client for both bot and user for simplicity in test
+		// Function should not return error - it prints failures and continues
+		err := runTest(opts, c, c)
+		require.NoError(t, err)
 	})
 }
 
@@ -171,12 +181,13 @@ func TestRunTest_NoTokenConfigured(t *testing.T) {
 	// Use temp dir with no token set
 	tempDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tempDir)
-	t.Setenv("SLACK_API_TOKEN", "") // Ensure env var is empty
+	t.Setenv("SLACK_API_TOKEN", "")  // Ensure bot env var is empty
+	t.Setenv("SLACK_USER_TOKEN", "") // Ensure user env var is empty
 
 	opts := &testOptions{}
 
-	// Pass nil client to trigger token lookup
-	err := runTest(opts, nil)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "no API token")
+	// Pass nil clients to trigger token lookup - should report "not configured" for both
+	err := runTest(opts, nil, nil)
+	// The function should return nil since it handles missing tokens gracefully
+	require.NoError(t, err)
 }

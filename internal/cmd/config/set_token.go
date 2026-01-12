@@ -19,11 +19,15 @@ func newSetTokenCmd() *cobra.Command {
 
 	return &cobra.Command{
 		Use:   "set-token [token]",
-		Short: "Set the Slack API token",
-		Long: `Set the Slack API token for authentication.
+		Short: "Set a Slack API token",
+		Long: `Set a Slack API token for authentication.
 
-On macOS: Token is stored securely in the system Keychain.
-On Linux: Token is stored in ~/.config/slack-cli/credentials (file permissions 0600).
+Token types are detected automatically:
+  - Bot tokens (xoxb-*): Used for channels, users, messages commands
+  - User tokens (xoxp-*): Used for search commands
+
+On macOS: Tokens are stored securely in the system Keychain.
+On Linux: Tokens are stored in ~/.config/slack-cli/credentials (file permissions 0600).
 
 If no token is provided as an argument, you will be prompted to enter it.`,
 		Args: cobra.MaximumNArgs(1),
@@ -60,14 +64,32 @@ func runSetToken(token string, opts *setTokenOptions) error {
 		return fmt.Errorf("token cannot be empty")
 	}
 
-	if err := keychain.SetAPIToken(token); err != nil {
-		return fmt.Errorf("failed to store token: %w", err)
+	// Detect token type and store appropriately
+	tokenType := keychain.DetectTokenType(token)
+
+	switch tokenType {
+	case "bot":
+		if err := keychain.SetAPIToken(token); err != nil {
+			return fmt.Errorf("failed to store bot token: %w", err)
+		}
+		if keychain.IsSecureStorage() {
+			output.Println("Bot token stored securely in Keychain")
+		} else {
+			output.Println("Bot token stored in ~/.config/slack-cli/credentials")
+		}
+	case "user":
+		if err := keychain.SetUserToken(token); err != nil {
+			return fmt.Errorf("failed to store user token: %w", err)
+		}
+		if keychain.IsSecureStorage() {
+			output.Println("User token stored securely in Keychain")
+		} else {
+			output.Println("User token stored in ~/.config/slack-cli/credentials")
+		}
+		output.Println("Note: This token will be used for search commands.")
+	default:
+		return fmt.Errorf("unrecognized token format (expected xoxb-* for bot or xoxp-* for user)")
 	}
 
-	if keychain.IsSecureStorage() {
-		output.Println("API token stored securely in Keychain")
-	} else {
-		output.Println("API token stored in ~/.config/slack-cli/credentials")
-	}
 	return nil
 }

@@ -57,7 +57,7 @@ func TestRunDeleteToken_Success(t *testing.T) {
 		err := runSetToken("xoxb-test-token-12345678", setOpts)
 		require.NoError(t, err)
 
-		deleteOpts := &deleteTokenOptions{}
+		deleteOpts := &deleteTokenOptions{tokenType: "all"}
 		err = runDeleteToken(deleteOpts)
 		require.NoError(t, err)
 	} else {
@@ -68,7 +68,7 @@ func TestRunDeleteToken_Success(t *testing.T) {
 		err := runSetToken("xoxb-test-token-12345678", setOpts)
 		require.NoError(t, err)
 
-		deleteOpts := &deleteTokenOptions{}
+		deleteOpts := &deleteTokenOptions{tokenType: "all"}
 		err = runDeleteToken(deleteOpts)
 		require.NoError(t, err)
 	}
@@ -141,7 +141,6 @@ func TestRunSetToken_TokenFormats(t *testing.T) {
 	}{
 		{"bot token", "xoxb-fake-token-for-testing-only"},
 		{"user token", "xoxp-fake-token-for-testing-only"},
-		{"app token", "xapp-fake-token-for-testing-only"},
 	}
 
 	for _, tt := range tests {
@@ -151,6 +150,7 @@ func TestRunSetToken_TokenFormats(t *testing.T) {
 				err := runSetToken(tt.token, opts)
 				require.NoError(t, err)
 				_ = keychain.DeleteAPIToken()
+				_ = keychain.DeleteUserToken()
 			} else {
 				tempDir := t.TempDir()
 				t.Setenv("XDG_CONFIG_HOME", tempDir)
@@ -159,6 +159,25 @@ func TestRunSetToken_TokenFormats(t *testing.T) {
 				err := runSetToken(tt.token, opts)
 				assert.NoError(t, err)
 			}
+		})
+	}
+}
+
+func TestRunSetToken_InvalidTokenFormat(t *testing.T) {
+	invalidTokens := []struct {
+		name  string
+		token string
+	}{
+		{"app token", "xapp-fake-token-for-testing-only"},
+		{"unknown prefix", "invalid-token-format"},
+	}
+
+	for _, tt := range invalidTokens {
+		t.Run(tt.name, func(t *testing.T) {
+			opts := &setTokenOptions{}
+			err := runSetToken(tt.token, opts)
+			assert.Error(t, err)
+			assert.Contains(t, err.Error(), "unrecognized token format")
 		})
 	}
 }
@@ -201,8 +220,9 @@ func TestRunDeleteToken_Confirmation(t *testing.T) {
 
 			// Now test delete with confirmation
 			deleteOpts := &deleteTokenOptions{
-				force: tt.force,
-				stdin: strings.NewReader(tt.input),
+				force:     tt.force,
+				stdin:     strings.NewReader(tt.input),
+				tokenType: "all",
 			}
 
 			err = runDeleteToken(deleteOpts)
