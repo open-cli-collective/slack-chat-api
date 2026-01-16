@@ -89,7 +89,7 @@ jobs:
             *.tar.gz
             checksums.txt
 
-      # TAP_GITHUB_TOKEN (a PAT) is required to push to the piekstra/homebrew-tap
+      # TAP_GITHUB_TOKEN (a PAT) is required to push to the open-cli-collective/homebrew-tap
       # repository. The default GITHUB_TOKEN only has access to this repository.
       - name: Update Homebrew Cask
         env:
@@ -103,7 +103,7 @@ jobs:
           LINUX_ARM64_SHA=$(shasum -a 256 slack-chat-api_${{ env.TAG }}_linux_arm64.tar.gz | cut -d' ' -f1)
           LINUX_AMD64_SHA=$(shasum -a 256 slack-chat-api_${{ env.TAG }}_linux_amd64.tar.gz | cut -d' ' -f1)
 
-          git clone https://x-access-token:${TAP_GITHUB_TOKEN}@github.com/piekstra/homebrew-tap.git
+          git clone https://x-access-token:${TAP_GITHUB_TOKEN}@github.com/open-cli-collective/homebrew-tap.git
           cd homebrew-tap
 
           mkdir -p Casks
@@ -112,29 +112,29 @@ jobs:
           cask "slack-chat-api" do
             name "slack-chat-api"
             desc "Command-line interface for Slack"
-            homepage "https://github.com/piekstra/slack-chat-api"
+            homepage "https://github.com/open-cli-collective/slack-chat-api"
             version "VERSION_PLACEHOLDER"
 
             binary "slack-chat-api"
 
             on_macos do
               on_arm do
-                url "https://github.com/piekstra/slack-chat-api/releases/download/v#{version}/slack-chat-api_v#{version}_darwin_arm64.tar.gz"
+                url "https://github.com/open-cli-collective/slack-chat-api/releases/download/v#{version}/slack-chat-api_v#{version}_darwin_arm64.tar.gz"
                 sha256 "DARWIN_ARM64_PLACEHOLDER"
               end
               on_intel do
-                url "https://github.com/piekstra/slack-chat-api/releases/download/v#{version}/slack-chat-api_v#{version}_darwin_amd64.tar.gz"
+                url "https://github.com/open-cli-collective/slack-chat-api/releases/download/v#{version}/slack-chat-api_v#{version}_darwin_amd64.tar.gz"
                 sha256 "DARWIN_AMD64_PLACEHOLDER"
               end
             end
 
             on_linux do
               on_arm do
-                url "https://github.com/piekstra/slack-chat-api/releases/download/v#{version}/slack-chat-api_v#{version}_linux_arm64.tar.gz"
+                url "https://github.com/open-cli-collective/slack-chat-api/releases/download/v#{version}/slack-chat-api_v#{version}_linux_arm64.tar.gz"
                 sha256 "LINUX_ARM64_PLACEHOLDER"
               end
               on_intel do
-                url "https://github.com/piekstra/slack-chat-api/releases/download/v#{version}/slack-chat-api_v#{version}_linux_amd64.tar.gz"
+                url "https://github.com/open-cli-collective/slack-chat-api/releases/download/v#{version}/slack-chat-api_v#{version}_linux_amd64.tar.gz"
                 sha256 "LINUX_AMD64_PLACEHOLDER"
               end
             end
