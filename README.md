@@ -27,20 +27,20 @@ This project is **not** affiliated with Slack or Salesforce. If you're looking t
 ### Homebrew (macOS/Linux)
 
 ```bash
-brew tap piekstra/tap
-brew install --cask piekstra/tap/slack-chat-api
+brew tap open-cli-collective/tap
+brew install --cask slack-chat-api
 ```
 
 ### From Source
 
 ```bash
-go install github.com/piekstra/slack-chat-api@latest
+go install github.com/open-cli-collective/slack-chat-api@latest
 ```
 
 ### Manual Build
 
 ```bash
-git clone https://github.com/piekstra/slack-chat-api.git
+git clone https://github.com/open-cli-collective/slack-chat-api.git
 cd slack-chat-api
 make build
 ```
