@@ -14,6 +14,7 @@ builds:
     goos:
       - darwin
       - linux
+      - windows
     goarch:
       - amd64
       - arm64
@@ -25,8 +26,11 @@ builds:
 
 archives:
   - format: tar.gz
-    name_template: >-
-      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    format_overrides:
+      - goos: windows
+        format: zip
+    # Preserve v prefix in filename for backward compatibility with Homebrew Cask URLs
+    name_template: "{{ .ProjectName }}_v{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     files:
       - LICENSE
       - README.md
@@ -53,22 +57,3 @@ changelog:
       order: 1
     - title: Other
       order: 999
-
-brews:
-  - name: slack-chat-api
-    repository:
-      owner: piekstra
-      name: homebrew-tap
-    directory: Formula
-    homepage: "https://github.com/piekstra/slack-chat-api"
-    description: "Command-line interface for Slack"
-    license: "MIT"
-    install: |
-      bin.install "slack-chat-api"
-    caveats: |
-      To configure slack-chat-api, run:
-        slack-chat-api config set-token <your-slack-api-token>
-
-      Or set the SLACK_API_TOKEN environment variable.
-    test: |
-      assert_match "slack-chat-api", shell_output("#{bin}/slack-chat-api --help")

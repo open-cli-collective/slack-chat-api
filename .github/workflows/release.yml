@@ -15,8 +15,8 @@ permissions:
   contents: write
 
 jobs:
-  release:
-    runs-on: macos-latest
+  goreleaser:
+    runs-on: ubuntu-latest
     env:
       TAG: ${{ github.ref_name || inputs.tag }}
     steps:
@@ -27,67 +27,46 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.21"
+          go-version: "1.22"
 
-      - name: Set build variables
-        id: vars
-        run: |
-          echo "VERSION=${{ env.TAG }}" >> $GITHUB_OUTPUT
-          echo "COMMIT=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-          echo "DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_OUTPUT
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          version: latest
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build macOS ARM64
+  update-homebrew:
+    needs: goreleaser
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.ref_name || inputs.tag }}
+    steps:
+      - name: Download checksums from release
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          GOOS=darwin GOARCH=arm64 go build -ldflags "-s -w \
-            -X github.com/piekstra/slack-chat-api/internal/version.Version=${{ steps.vars.outputs.VERSION }} \
-            -X github.com/piekstra/slack-chat-api/internal/version.Commit=${{ steps.vars.outputs.COMMIT }} \
-            -X github.com/piekstra/slack-chat-api/internal/version.Date=${{ steps.vars.outputs.DATE }}" \
-            -o slack-chat-api ./cmd/slack-chat-api
-          tar -czvf slack-chat-api_${{ env.TAG }}_darwin_arm64.tar.gz slack-chat-api
-          rm slack-chat-api
-
-      - name: Build macOS AMD64
-        run: |
-          GOOS=darwin GOARCH=amd64 go build -ldflags "-s -w \
-            -X github.com/piekstra/slack-chat-api/internal/version.Version=${{ steps.vars.outputs.VERSION }} \
-            -X github.com/piekstra/slack-chat-api/internal/version.Commit=${{ steps.vars.outputs.COMMIT }} \
-            -X github.com/piekstra/slack-chat-api/internal/version.Date=${{ steps.vars.outputs.DATE }}" \
-            -o slack-chat-api ./cmd/slack-chat-api
-          tar -czvf slack-chat-api_${{ env.TAG }}_darwin_amd64.tar.gz slack-chat-api
-          rm slack-chat-api
-
-      - name: Build Linux ARM64
-        run: |
-          GOOS=linux GOARCH=arm64 go build -ldflags "-s -w \
-            -X github.com/piekstra/slack-chat-api/internal/version.Version=${{ steps.vars.outputs.VERSION }} \
-            -X github.com/piekstra/slack-chat-api/internal/version.Commit=${{ steps.vars.outputs.COMMIT }} \
-            -X github.com/piekstra/slack-chat-api/internal/version.Date=${{ steps.vars.outputs.DATE }}" \
-            -o slack-chat-api ./cmd/slack-chat-api
-          tar -czvf slack-chat-api_${{ env.TAG }}_linux_arm64.tar.gz slack-chat-api
-          rm slack-chat-api
-
-      - name: Build Linux AMD64
-        run: |
-          GOOS=linux GOARCH=amd64 go build -ldflags "-s -w \
-            -X github.com/piekstra/slack-chat-api/internal/version.Version=${{ steps.vars.outputs.VERSION }} \
-            -X github.com/piekstra/slack-chat-api/internal/version.Commit=${{ steps.vars.outputs.COMMIT }} \
-            -X github.com/piekstra/slack-chat-api/internal/version.Date=${{ steps.vars.outputs.DATE }}" \
-            -o slack-chat-api ./cmd/slack-chat-api
-          tar -czvf slack-chat-api_${{ env.TAG }}_linux_amd64.tar.gz slack-chat-api
-          rm slack-chat-api
-
-      - name: Generate checksums
-        run: |
-          shasum -a 256 *.tar.gz > checksums.txt
+          gh release download "${{ env.TAG }}" --repo ${{ github.repository }} --pattern "checksums.txt"
           cat checksums.txt
 
-      - name: Upload Release Assets
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: ${{ env.TAG }}
-          files: |
-            *.tar.gz
-            checksums.txt
+      - name: Parse checksums
+        id: checksums
+        run: |
+          VERSION="${{ env.TAG }}"
+          VERSION_NUM="${VERSION#v}"
+
+          # GoReleaser checksums.txt format: <hash>  <filename>
+          DARWIN_ARM64_SHA=$(grep "darwin_arm64.tar.gz" checksums.txt | cut -d' ' -f1)
+          DARWIN_AMD64_SHA=$(grep "darwin_amd64.tar.gz" checksums.txt | cut -d' ' -f1)
+          LINUX_ARM64_SHA=$(grep "linux_arm64.tar.gz" checksums.txt | cut -d' ' -f1)
+          LINUX_AMD64_SHA=$(grep "linux_amd64.tar.gz" checksums.txt | cut -d' ' -f1)
+
+          echo "version=${VERSION_NUM}" >> $GITHUB_OUTPUT
+          echo "darwin_arm64_sha=${DARWIN_ARM64_SHA}" >> $GITHUB_OUTPUT
+          echo "darwin_amd64_sha=${DARWIN_AMD64_SHA}" >> $GITHUB_OUTPUT
+          echo "linux_arm64_sha=${LINUX_ARM64_SHA}" >> $GITHUB_OUTPUT
+          echo "linux_amd64_sha=${LINUX_AMD64_SHA}" >> $GITHUB_OUTPUT
 
       # TAP_GITHUB_TOKEN (a PAT) is required to push to the open-cli-collective/homebrew-tap
       # repository. The default GITHUB_TOKEN only has access to this repository.
@@ -95,47 +74,45 @@ jobs:
         env:
           TAP_GITHUB_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
         run: |
-          VERSION="${{ env.TAG }}"
-          VERSION_NUM="${VERSION#v}"
-
-          DARWIN_ARM64_SHA=$(shasum -a 256 slack-chat-api_${{ env.TAG }}_darwin_arm64.tar.gz | cut -d' ' -f1)
-          DARWIN_AMD64_SHA=$(shasum -a 256 slack-chat-api_${{ env.TAG }}_darwin_amd64.tar.gz | cut -d' ' -f1)
-          LINUX_ARM64_SHA=$(shasum -a 256 slack-chat-api_${{ env.TAG }}_linux_arm64.tar.gz | cut -d' ' -f1)
-          LINUX_AMD64_SHA=$(shasum -a 256 slack-chat-api_${{ env.TAG }}_linux_amd64.tar.gz | cut -d' ' -f1)
+          VERSION="${{ steps.checksums.outputs.version }}"
+          DARWIN_ARM64_SHA="${{ steps.checksums.outputs.darwin_arm64_sha }}"
+          DARWIN_AMD64_SHA="${{ steps.checksums.outputs.darwin_amd64_sha }}"
+          LINUX_ARM64_SHA="${{ steps.checksums.outputs.linux_arm64_sha }}"
+          LINUX_AMD64_SHA="${{ steps.checksums.outputs.linux_amd64_sha }}"
 
           git clone https://x-access-token:${TAP_GITHUB_TOKEN}@github.com/open-cli-collective/homebrew-tap.git
           cd homebrew-tap
 
           mkdir -p Casks
 
-          cat > Casks/slack-chat-api.rb << 'CASKEOF'
+          cat > Casks/slack-chat-api.rb << CASKEOF
           cask "slack-chat-api" do
             name "slack-chat-api"
             desc "Command-line interface for Slack"
             homepage "https://github.com/open-cli-collective/slack-chat-api"
-            version "VERSION_PLACEHOLDER"
+            version "${VERSION}"
 
             binary "slack-chat-api"
 
             on_macos do
               on_arm do
                 url "https://github.com/open-cli-collective/slack-chat-api/releases/download/v#{version}/slack-chat-api_v#{version}_darwin_arm64.tar.gz"
-                sha256 "DARWIN_ARM64_PLACEHOLDER"
+                sha256 "${DARWIN_ARM64_SHA}"
               end
               on_intel do
                 url "https://github.com/open-cli-collective/slack-chat-api/releases/download/v#{version}/slack-chat-api_v#{version}_darwin_amd64.tar.gz"
-                sha256 "DARWIN_AMD64_PLACEHOLDER"
+                sha256 "${DARWIN_AMD64_SHA}"
               end
             end
 
             on_linux do
               on_arm do
                 url "https://github.com/open-cli-collective/slack-chat-api/releases/download/v#{version}/slack-chat-api_v#{version}_linux_arm64.tar.gz"
-                sha256 "LINUX_ARM64_PLACEHOLDER"
+                sha256 "${LINUX_ARM64_SHA}"
               end
               on_intel do
                 url "https://github.com/open-cli-collective/slack-chat-api/releases/download/v#{version}/slack-chat-api_v#{version}_linux_amd64.tar.gz"
-                sha256 "LINUX_AMD64_PLACEHOLDER"
+                sha256 "${LINUX_AMD64_SHA}"
               end
             end
 
@@ -153,17 +130,11 @@ jobs:
           end
           CASKEOF
 
-          sed -i '' "s/VERSION_PLACEHOLDER/${VERSION_NUM}/g" Casks/slack-chat-api.rb
-          sed -i '' "s/DARWIN_ARM64_PLACEHOLDER/${DARWIN_ARM64_SHA}/g" Casks/slack-chat-api.rb
-          sed -i '' "s/DARWIN_AMD64_PLACEHOLDER/${DARWIN_AMD64_SHA}/g" Casks/slack-chat-api.rb
-          sed -i '' "s/LINUX_ARM64_PLACEHOLDER/${LINUX_ARM64_SHA}/g" Casks/slack-chat-api.rb
-          sed -i '' "s/LINUX_AMD64_PLACEHOLDER/${LINUX_AMD64_SHA}/g" Casks/slack-chat-api.rb
-
           # Remove old formula if it exists
           rm -f Formula/slack-chat-api.rb
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "Update slack-chat-api to ${VERSION_NUM}"
+          git commit -m "Update slack-chat-api to ${VERSION}"
           git push
