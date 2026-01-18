@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+  <metadata>
+    <id>slack-chat-api</id>
+    <version>0.0.0</version>
+    <title>Slack Chat API CLI</title>
+    <authors>Open CLI Collective</authors>
+    <owners>rianjs</owners>
+    <licenseUrl>https://github.com/open-cli-collective/slack-chat-api/blob/main/LICENSE</licenseUrl>
+    <projectUrl>https://github.com/open-cli-collective/slack-chat-api#readme</projectUrl>
+    <projectSourceUrl>https://github.com/open-cli-collective/slack-chat-api</projectSourceUrl>
+    <packageSourceUrl>https://github.com/open-cli-collective/slack-chat-api/tree/main/packaging/chocolatey</packageSourceUrl>
+    <bugTrackerUrl>https://github.com/open-cli-collective/slack-chat-api/issues</bugTrackerUrl>
+    <copyright>Copyright (c) 2025 Open CLI Collective</copyright>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>A lightweight command-line interface for interacting with the Slack Web API. Provides direct API access for automation and scripting.
+
+Features:
+- Send messages to channels and threads
+- Manage channels (create, archive, set topic/purpose)
+- List and search users
+- View message history and reactions
+- Search messages and files (with user token)
+- Secure credential storage (Windows Credential Manager)
+
+Binary: slack-chat-api.exe</description>
+    <summary>Command-line interface for Slack Web API</summary>
+    <releaseNotes>https://github.com/open-cli-collective/slack-chat-api/releases</releaseNotes>
+    <tags>slack cli api messaging automation chat</tags>
+  </metadata>
+  <files>
+    <file src="tools\**" target="tools" />
+  </files>
+</package>
