@@ -194,3 +194,104 @@ jobs:
         run: |
           cd packaging/chocolatey
           choco push (Get-ChildItem *.nupkg).Name --source https://push.chocolatey.org/ --key ${{ secrets.CHOCOLATEY_API_KEY }}
+
+  winget:
+    needs: goreleaser
+    runs-on: windows-latest
+    env:
+      TAG: ${{ github.ref_name || inputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install wingetcreate
+        shell: pwsh
+        run: |
+          Invoke-WebRequest https://aka.ms/wingetcreate/latest -OutFile wingetcreate.exe
+
+      - name: Check if manifest exists in winget-pkgs
+        id: check-manifest
+        shell: pwsh
+        run: |
+          $response = Invoke-WebRequest -Uri "https://api.github.com/repos/microsoft/winget-pkgs/contents/manifests/o/OpenCLICollective/slack-chat-api" -Method Head -SkipHttpErrorCheck
+          if ($response.StatusCode -eq 200) {
+            Write-Host "Manifest exists - will use wingetcreate update"
+            echo "exists=true" >> $env:GITHUB_OUTPUT
+          } else {
+            Write-Host "Manifest does not exist - will use wingetcreate submit"
+            echo "exists=false" >> $env:GITHUB_OUTPUT
+          }
+
+      - name: Get checksums from release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "${{ env.TAG }}" --repo ${{ github.repository }} --pattern "checksums.txt" --dir .
+
+          $checksums = Get-Content checksums.txt
+          $x64Hash = ($checksums | Select-String "windows_amd64.zip").Line.Split()[0]
+          $arm64Hash = ($checksums | Select-String "windows_arm64.zip").Line.Split()[0]
+
+          Write-Host "x64 SHA256: $x64Hash"
+          Write-Host "arm64 SHA256: $arm64Hash"
+
+          echo "X64_HASH=$x64Hash" >> $env:GITHUB_ENV
+          echo "ARM64_HASH=$arm64Hash" >> $env:GITHUB_ENV
+
+      - name: Update manifest (existing package)
+        if: steps.check-manifest.outputs.exists == 'true'
+        shell: pwsh
+        env:
+          WINGET_GITHUB_TOKEN: ${{ secrets.WINGET_GITHUB_TOKEN }}
+        run: |
+          $version = "${{ env.TAG }}".TrimStart('v')
+          $x64 = "https://github.com/open-cli-collective/slack-chat-api/releases/download/${{ env.TAG }}/slack-chat-api_v${version}_windows_amd64.zip"
+          $arm64 = "https://github.com/open-cli-collective/slack-chat-api/releases/download/${{ env.TAG }}/slack-chat-api_v${version}_windows_arm64.zip"
+
+          Write-Host "Updating existing manifest to version $version"
+          Write-Host "x64 URL: $x64"
+          Write-Host "arm64 URL: $arm64"
+          ./wingetcreate.exe update OpenCLICollective.slack-chat-api --version $version --urls $x64 $arm64 --submit --token $env:WINGET_GITHUB_TOKEN
+
+      - name: Create manifest (new package)
+        if: steps.check-manifest.outputs.exists == 'false'
+        shell: pwsh
+        env:
+          WINGET_GITHUB_TOKEN: ${{ secrets.WINGET_GITHUB_TOKEN }}
+        run: |
+          $version = "${{ env.TAG }}".TrimStart('v')
+          $manifestDir = "manifests"
+          New-Item -ItemType Directory -Path $manifestDir -Force | Out-Null
+
+          # Update version manifest
+          $versionManifest = Get-Content "packaging/winget/OpenCLICollective.slack-chat-api.yaml" -Raw
+          $versionManifest = $versionManifest -replace "0\.0\.0", $version
+          Set-Content "$manifestDir/OpenCLICollective.slack-chat-api.yaml" $versionManifest
+
+          # Update locale manifest
+          $localeManifest = Get-Content "packaging/winget/OpenCLICollective.slack-chat-api.locale.en-US.yaml" -Raw
+          $localeManifest = $localeManifest -replace "0\.0\.0", $version
+          Set-Content "$manifestDir/OpenCLICollective.slack-chat-api.locale.en-US.yaml" $localeManifest
+
+          # Update installer manifest with version and real checksums
+          $installerManifest = Get-Content "packaging/winget/OpenCLICollective.slack-chat-api.installer.yaml" -Raw
+          $installerManifest = $installerManifest -replace "0\.0\.0", $version
+          # Use .NET regex for sequential replacement (PowerShell -replace doesn't support count)
+          $regex = [regex]"0{64}"
+          $installerManifest = $regex.Replace($installerManifest, $env:X64_HASH, 1)
+          $installerManifest = $regex.Replace($installerManifest, $env:ARM64_HASH, 1)
+          Set-Content "$manifestDir/OpenCLICollective.slack-chat-api.installer.yaml" $installerManifest
+
+          Write-Host "Generated manifests:"
+          Get-ChildItem $manifestDir | ForEach-Object { Write-Host "  $_" }
+
+          Write-Host "`nValidating manifests..."
+          winget validate --manifest $manifestDir
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Manifest validation failed"
+            exit 1
+          }
+          Write-Host "Validation passed!"
+
+          Write-Host "`nSubmitting new package to Winget..."
+          ./wingetcreate.exe submit --token $env:WINGET_GITHUB_TOKEN $manifestDir
