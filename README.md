@@ -31,6 +31,18 @@ brew tap open-cli-collective/tap
 brew install --cask slack-chat-api
 ```
 
+### Chocolatey (Windows)
+
+```powershell
+choco install slack-chat-api
+```
+
+### Winget (Windows)
+
+```powershell
+winget install OpenCLICollective.slack-chat-api
+```
+
 ### From Source
 
 ```bash
@@ -51,8 +63,9 @@ make build
 |----------|-------------------|
 | macOS | Secure (Keychain) |
 | Linux | Config file (`~/.config/slack-chat-api/credentials`) |
+| Windows | Config file (`%USERPROFILE%\.config\slack-chat-api\credentials`) |
 
-**Note:** On Linux, credentials are stored in a file with restricted permissions (0600). While not as secure as macOS Keychain, this is standard practice for CLI tools on Linux.
+**Note:** On Linux and Windows, credentials are stored in a file with restricted permissions (0600). While not as secure as macOS Keychain, this is standard practice for CLI tools.
 
 ## Authentication
 
@@ -90,7 +103,7 @@ make build
    # Paste your token when prompted
    ```
 
-Your token is stored securely in macOS Keychain (or config file on Linux).
+Your token is stored securely in macOS Keychain, or in a config file on Linux and Windows.
 
 ### Alternative: Environment Variable
 
