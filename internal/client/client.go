@@ -400,9 +400,12 @@ func (c *Client) GetUserInfo(userID string) (*User, error) {
 
 // SendMessage sends a message to a channel.
 // Text can be empty if blocks are provided (Slack API allows this).
-func (c *Client) SendMessage(channel, text, threadTS string, blocks []interface{}) (*Message, error) {
+// The unfurl parameter controls whether link previews are shown (unfurl_links and unfurl_media).
+func (c *Client) SendMessage(channel, text, threadTS string, blocks []interface{}, unfurl bool) (*Message, error) {
 	data := map[string]interface{}{
-		"channel": channel,
+		"channel":      channel,
+		"unfurl_links": unfurl,
+		"unfurl_media": unfurl,
 	}
 	// Only include text if non-empty (Slack allows omitting text when blocks are provided)
 	if text != "" {
@@ -433,12 +436,15 @@ func (c *Client) SendMessage(channel, text, threadTS string, blocks []interface{
 	return &result.Message, nil
 }
 
-// UpdateMessage updates an existing message
-func (c *Client) UpdateMessage(channel, ts, text string, blocks []interface{}) error {
+// UpdateMessage updates an existing message.
+// The unfurl parameter controls whether link previews are shown (unfurl_links and unfurl_media).
+func (c *Client) UpdateMessage(channel, ts, text string, blocks []interface{}, unfurl bool) error {
 	data := map[string]interface{}{
-		"channel": channel,
-		"ts":      ts,
-		"text":    text,
+		"channel":      channel,
+		"ts":           ts,
+		"text":         text,
+		"unfurl_links": unfurl,
+		"unfurl_media": unfurl,
 	}
 	if len(blocks) > 0 {
 		data["blocks"] = blocks

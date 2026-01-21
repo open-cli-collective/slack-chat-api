@@ -1008,3 +1008,89 @@ func TestRunSend_EmptyTextNoBlocks(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "message text cannot be empty")
 }
+
+func TestRunSend_NoUnfurl(t *testing.T) {
+	var receivedBody map[string]interface{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&receivedBody)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"ok": true,
+			"ts": "1234567890.123456",
+		})
+	}))
+	defer server.Close()
+
+	c := client.NewWithConfig(server.URL, "test-token", nil)
+	opts := &sendOptions{simple: true, noUnfurl: true}
+
+	err := runSend("C123456789", "Check https://example.com", opts, c)
+	require.NoError(t, err)
+
+	// Verify unfurl parameters are set to false
+	assert.Equal(t, false, receivedBody["unfurl_links"])
+	assert.Equal(t, false, receivedBody["unfurl_media"])
+}
+
+func TestRunSend_UnfurlEnabled(t *testing.T) {
+	var receivedBody map[string]interface{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&receivedBody)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"ok": true,
+			"ts": "1234567890.123456",
+		})
+	}))
+	defer server.Close()
+
+	c := client.NewWithConfig(server.URL, "test-token", nil)
+	opts := &sendOptions{simple: true, noUnfurl: false}
+
+	err := runSend("C123456789", "Check https://example.com", opts, c)
+	require.NoError(t, err)
+
+	// Verify unfurl parameters are set to true (default behavior)
+	assert.Equal(t, true, receivedBody["unfurl_links"])
+	assert.Equal(t, true, receivedBody["unfurl_media"])
+}
+
+func TestRunUpdate_NoUnfurl(t *testing.T) {
+	var receivedBody map[string]interface{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&receivedBody)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"ok": true,
+		})
+	}))
+	defer server.Close()
+
+	c := client.NewWithConfig(server.URL, "test-token", nil)
+	opts := &updateOptions{simple: true, noUnfurl: true}
+
+	err := runUpdate("C123456789", "1234567890.123456", "Updated https://example.com", opts, c)
+	require.NoError(t, err)
+
+	// Verify unfurl parameters are set to false
+	assert.Equal(t, false, receivedBody["unfurl_links"])
+	assert.Equal(t, false, receivedBody["unfurl_media"])
+}
+
+func TestRunUpdate_UnfurlEnabled(t *testing.T) {
+	var receivedBody map[string]interface{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&receivedBody)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"ok": true,
+		})
+	}))
+	defer server.Close()
+
+	c := client.NewWithConfig(server.URL, "test-token", nil)
+	opts := &updateOptions{simple: true, noUnfurl: false}
+
+	err := runUpdate("C123456789", "1234567890.123456", "Updated https://example.com", opts, c)
+	require.NoError(t, err)
+
+	// Verify unfurl parameters are set to true (default behavior)
+	assert.Equal(t, true, receivedBody["unfurl_links"])
+	assert.Equal(t, true, receivedBody["unfurl_media"])
+}

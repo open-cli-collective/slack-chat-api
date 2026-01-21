@@ -13,6 +13,7 @@ import (
 type updateOptions struct {
 	blocksJSON string
 	simple     bool
+	noUnfurl   bool
 }
 
 func newUpdateCmd() *cobra.Command {
@@ -33,6 +34,7 @@ refined appearance. Use --simple to update with plain text instead.`,
 
 	cmd.Flags().StringVar(&opts.blocksJSON, "blocks", "", "Block Kit blocks as JSON array (overrides default block formatting)")
 	cmd.Flags().BoolVar(&opts.simple, "simple", false, "Update as plain text without block formatting")
+	cmd.Flags().BoolVar(&opts.noUnfurl, "no-unfurl", false, "Disable link preview unfurling")
 
 	return cmd
 }
@@ -59,7 +61,7 @@ func runUpdate(channel, timestamp, text string, opts *updateOptions, c *client.C
 		blocks = buildDefaultBlocks(text)
 	}
 
-	if err := c.UpdateMessage(channel, timestamp, text, blocks); err != nil {
+	if err := c.UpdateMessage(channel, timestamp, text, blocks, !opts.noUnfurl); err != nil {
 		return err
 	}
 

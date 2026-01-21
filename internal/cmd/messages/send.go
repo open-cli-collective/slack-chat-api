@@ -20,6 +20,7 @@ type sendOptions struct {
 	blocksFile  string
 	blocksStdin bool
 	simple      bool
+	noUnfurl    bool
 	stdin       io.Reader // For testing
 }
 
@@ -70,6 +71,7 @@ Examples:
 	cmd.Flags().StringVar(&opts.blocksFile, "blocks-file", "", "Read blocks from JSON file (recommended for complex payloads)")
 	cmd.Flags().BoolVar(&opts.blocksStdin, "blocks-stdin", false, "Read blocks from stdin (for piping from other tools)")
 	cmd.Flags().BoolVar(&opts.simple, "simple", false, "Send as plain text without block formatting")
+	cmd.Flags().BoolVar(&opts.noUnfurl, "no-unfurl", false, "Disable link preview unfurling")
 
 	return cmd
 }
@@ -181,7 +183,7 @@ func runSend(channel, text string, opts *sendOptions, c *client.Client) error {
 		blocks = buildDefaultBlocks(text)
 	}
 
-	msg, err := c.SendMessage(channel, text, opts.threadTS, blocks)
+	msg, err := c.SendMessage(channel, text, opts.threadTS, blocks, !opts.noUnfurl)
 	if err != nil {
 		return client.WrapError("send message", err)
 	}
