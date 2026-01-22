@@ -6,14 +6,14 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/piekstra/slack-chat-api/internal/cmd/channels"
-	"github.com/piekstra/slack-chat-api/internal/cmd/config"
-	"github.com/piekstra/slack-chat-api/internal/cmd/messages"
-	"github.com/piekstra/slack-chat-api/internal/cmd/search"
-	"github.com/piekstra/slack-chat-api/internal/cmd/users"
-	"github.com/piekstra/slack-chat-api/internal/cmd/workspace"
-	"github.com/piekstra/slack-chat-api/internal/output"
-	"github.com/piekstra/slack-chat-api/internal/version"
+	"github.com/open-cli-collective/slack-chat-api/internal/cmd/channels"
+	"github.com/open-cli-collective/slack-chat-api/internal/cmd/config"
+	"github.com/open-cli-collective/slack-chat-api/internal/cmd/messages"
+	"github.com/open-cli-collective/slack-chat-api/internal/cmd/search"
+	"github.com/open-cli-collective/slack-chat-api/internal/cmd/users"
+	"github.com/open-cli-collective/slack-chat-api/internal/cmd/workspace"
+	"github.com/open-cli-collective/slack-chat-api/internal/output"
+	"github.com/open-cli-collective/slack-chat-api/internal/version"
 )
 
 var outputFormat string

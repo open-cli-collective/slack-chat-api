@@ -20,9 +20,9 @@ builds:
       - arm64
     ldflags:
       - -s -w
-      - -X github.com/piekstra/slack-chat-api/internal/version.Version={{.Version}}
-      - -X github.com/piekstra/slack-chat-api/internal/version.Commit={{.Commit}}
-      - -X github.com/piekstra/slack-chat-api/internal/version.Date={{.Date}}
+      - -X github.com/open-cli-collective/slack-chat-api/internal/version.Version={{.Version}}
+      - -X github.com/open-cli-collective/slack-chat-api/internal/version.Commit={{.Commit}}
+      - -X github.com/open-cli-collective/slack-chat-api/internal/version.Date={{.Date}}
 
 archives:
   - format: tar.gz

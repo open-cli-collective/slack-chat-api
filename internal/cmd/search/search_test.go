@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/piekstra/slack-chat-api/internal/client"
+	"github.com/open-cli-collective/slack-chat-api/internal/client"
 )
 
 // Helper to create a test client with a mock server

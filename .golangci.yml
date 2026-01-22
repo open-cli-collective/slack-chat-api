@@ -30,7 +30,7 @@ formatters:
   settings:
     goimports:
       local-prefixes:
-        - github.com/piekstra/slack-cli
+        - github.com/open-cli-collective/slack-chat-api
 
 run:
   timeout: 5m

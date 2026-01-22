@@ -3,9 +3,9 @@ VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev
 COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 DATE := $(shell date -u '+%Y-%m-%dT%H:%M:%SZ')
 LDFLAGS := -ldflags "-s -w \
-	-X github.com/piekstra/slack-chat-api/internal/version.Version=$(VERSION) \
-	-X github.com/piekstra/slack-chat-api/internal/version.Commit=$(COMMIT) \
-	-X github.com/piekstra/slack-chat-api/internal/version.Date=$(DATE)"
+	-X github.com/open-cli-collective/slack-chat-api/internal/version.Version=$(VERSION) \
+	-X github.com/open-cli-collective/slack-chat-api/internal/version.Commit=$(COMMIT) \
+	-X github.com/open-cli-collective/slack-chat-api/internal/version.Date=$(DATE)"
 
 DIST_DIR = dist
 
@@ -31,7 +31,7 @@ lint:
 
 fmt:
 	go fmt ./...
-	goimports -local github.com/piekstra/slack-chat-api -w .
+	goimports -local github.com/open-cli-collective/slack-chat-api -w .
 
 deps:
 	go mod download

@@ -1,4 +1,4 @@
-module github.com/piekstra/slack-chat-api
+module github.com/open-cli-collective/slack-chat-api
 
 go 1.21
 

@@ -3,8 +3,8 @@ package config
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/piekstra/slack-chat-api/internal/client"
-	"github.com/piekstra/slack-chat-api/internal/output"
+	"github.com/open-cli-collective/slack-chat-api/internal/client"
+	"github.com/open-cli-collective/slack-chat-api/internal/output"
 )
 
 type testOptions struct{}

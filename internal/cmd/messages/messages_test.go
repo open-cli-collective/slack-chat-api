@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/piekstra/slack-chat-api/internal/client"
+	"github.com/open-cli-collective/slack-chat-api/internal/client"
 )
 
 func TestFormatTimestamp(t *testing.T) {
