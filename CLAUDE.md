@@ -9,7 +9,7 @@ A command-line interface for Slack, supporting channel management, user lookup, 
 ## Quick Commands
 
 ```bash
-make build      # Build binary to ./bin/slack-chat-api
+make build      # Build binary to ./bin/slck
 make test       # Run tests with race detection and coverage
 make lint       # Run golangci-lint
 make clean      # Remove build artifacts
@@ -116,7 +116,7 @@ The `internal/client` package wraps the Slack API:
 
 ## Common Issues
 
-- **Token not found**: Run `slack-chat-api config set-token` or set `SLACK_API_TOKEN`
+- **Token not found**: Run `slck config set-token` or set `SLACK_API_TOKEN`
 - **Permission denied**: Check bot token scopes in Slack app settings
 - **Lint failures**: Run `make lint` locally before pushing
 - **golangci-lint version**: CI uses v2.0.2 with v2 config format

@@ -36,8 +36,8 @@ By default, messages are sent using Slack Block Kit formatting for a more
 refined appearance. Use --simple to send plain text messages instead.
 
 Use "-" as the text argument to read message text from stdin:
-  echo "Hello" | slack-chat-api messages send C1234567890 -
-  cat message.txt | slack-chat-api messages send C1234567890 -
+  echo "Hello" | slck messages send C1234567890 -
+  cat message.txt | slck messages send C1234567890 -
 
 BLOCK KIT OPTIONS
 
@@ -53,9 +53,9 @@ Text is optional when providing blocks via any of these methods:
                   (e.g., jq, scripts) directly into Slack.
 
 Examples:
-  slack-chat-api messages send C1234567890 --blocks '[{"type":"section",...}]'
-  slack-chat-api messages send C1234567890 --blocks-file ./report.json
-  generate-report | slack-chat-api messages send C1234567890 --blocks-stdin`,
+  slck messages send C1234567890 --blocks '[{"type":"section",...}]'
+  slck messages send C1234567890 --blocks-file ./report.json
+  generate-report | slck messages send C1234567890 --blocks-stdin`,
 		Args: cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			text := ""

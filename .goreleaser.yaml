@@ -1,6 +1,6 @@
 version: 2
 
-project_name: slack-chat-api
+project_name: slack-chat-cli
 
 before:
   hooks:
@@ -8,7 +8,9 @@ before:
     - go test ./...
 
 builds:
-  - main: ./cmd/slack-chat-api
+  - id: slck
+    main: ./cmd/slck
+    binary: slck
     env:
       - CGO_ENABLED=0
     goos:
@@ -29,8 +31,8 @@ archives:
     format_overrides:
       - goos: windows
         format: zip
-    # Preserve v prefix in filename for backward compatibility with Homebrew Cask URLs
-    name_template: "{{ .ProjectName }}_v{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    # Use binary name with v prefix for archive filenames
+    name_template: "slck_v{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     files:
       - LICENSE
       - README.md

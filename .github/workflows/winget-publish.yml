@@ -35,7 +35,7 @@ jobs:
         id: check-manifest
         shell: pwsh
         run: |
-          $response = Invoke-WebRequest -Uri "https://api.github.com/repos/microsoft/winget-pkgs/contents/manifests/o/OpenCLICollective/slack-chat-api" -Method Head -SkipHttpErrorCheck
+          $response = Invoke-WebRequest -Uri "https://api.github.com/repos/microsoft/winget-pkgs/contents/manifests/o/OpenCLICollective/slack-chat-cli" -Method Head -SkipHttpErrorCheck
           if ($response.StatusCode -eq 200) {
             Write-Host "Manifest exists - will use wingetcreate update"
             echo "exists=true" >> $env:GITHUB_OUTPUT
@@ -68,11 +68,11 @@ jobs:
           WINGET_GITHUB_TOKEN: ${{ secrets.WINGET_GITHUB_TOKEN }}
         run: |
           $version = "${{ inputs.version }}"
-          $x64 = "https://github.com/open-cli-collective/slack-chat-api/releases/download/v${version}/slack-chat-api_v${version}_windows_amd64.zip"
-          $arm64 = "https://github.com/open-cli-collective/slack-chat-api/releases/download/v${version}/slack-chat-api_v${version}_windows_arm64.zip"
+          $x64 = "https://github.com/open-cli-collective/slack-chat-api/releases/download/v${version}/slck_v${version}_windows_amd64.zip"
+          $arm64 = "https://github.com/open-cli-collective/slack-chat-api/releases/download/v${version}/slck_v${version}_windows_arm64.zip"
 
           Write-Host "Updating existing manifest to version $version"
-          ./wingetcreate.exe update OpenCLICollective.slack-chat-api --version $version --urls $x64 $arm64 --submit --token $env:WINGET_GITHUB_TOKEN
+          ./wingetcreate.exe update OpenCLICollective.slack-chat-cli --version $version --urls $x64 $arm64 --submit --token $env:WINGET_GITHUB_TOKEN
 
       - name: Create manifest (new package)
         if: steps.check-manifest.outputs.exists == 'false'
@@ -85,22 +85,22 @@ jobs:
           New-Item -ItemType Directory -Path $manifestDir -Force | Out-Null
 
           # Update version manifest
-          $versionManifest = Get-Content "packaging/winget/OpenCLICollective.slack-chat-api.yaml" -Raw
+          $versionManifest = Get-Content "packaging/winget/OpenCLICollective.slack-chat-cli.yaml" -Raw
           $versionManifest = $versionManifest -replace "0\.0\.0", $version
-          Set-Content "$manifestDir/OpenCLICollective.slack-chat-api.yaml" $versionManifest
+          Set-Content "$manifestDir/OpenCLICollective.slack-chat-cli.yaml" $versionManifest
 
           # Update locale manifest
-          $localeManifest = Get-Content "packaging/winget/OpenCLICollective.slack-chat-api.locale.en-US.yaml" -Raw
+          $localeManifest = Get-Content "packaging/winget/OpenCLICollective.slack-chat-cli.locale.en-US.yaml" -Raw
           $localeManifest = $localeManifest -replace "0\.0\.0", $version
-          Set-Content "$manifestDir/OpenCLICollective.slack-chat-api.locale.en-US.yaml" $localeManifest
+          Set-Content "$manifestDir/OpenCLICollective.slack-chat-cli.locale.en-US.yaml" $localeManifest
 
           # Update installer manifest with version and real checksums
-          $installerManifest = Get-Content "packaging/winget/OpenCLICollective.slack-chat-api.installer.yaml" -Raw
+          $installerManifest = Get-Content "packaging/winget/OpenCLICollective.slack-chat-cli.installer.yaml" -Raw
           $installerManifest = $installerManifest -replace "0\.0\.0", $version
           $regex = [regex]"0{64}"
           $installerManifest = $regex.Replace($installerManifest, $env:X64_HASH, 1)
           $installerManifest = $regex.Replace($installerManifest, $env:ARM64_HASH, 1)
-          Set-Content "$manifestDir/OpenCLICollective.slack-chat-api.installer.yaml" $installerManifest
+          Set-Content "$manifestDir/OpenCLICollective.slack-chat-cli.installer.yaml" $installerManifest
 
           Write-Host "Generated manifests:"
           Get-ChildItem $manifestDir | ForEach-Object { Write-Host "  $_" }

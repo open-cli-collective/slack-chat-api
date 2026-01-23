@@ -56,7 +56,7 @@ func TestWrapError(t *testing.T) {
 			name:       "user_not_found includes list hint",
 			operation:  "get user",
 			inputErr:   fmt.Errorf("user_not_found"),
-			wantHint:   "slack-chat-api users list",
+			wantHint:   "slck users list",
 			shouldHint: true,
 		},
 		{

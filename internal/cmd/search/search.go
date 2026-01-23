@@ -18,7 +18,7 @@ To set up a user token:
   2. Add 'search:read' to User Token Scopes
   3. Reinstall the app to your workspace
   4. Copy the User OAuth Token (starts with xoxp-)
-  5. Run: slack-chat-api config set-token <your-xoxp-token>`,
+  5. Run: slck config set-token <your-xoxp-token>`,
 	}
 
 	cmd.AddCommand(newMessagesCmd())

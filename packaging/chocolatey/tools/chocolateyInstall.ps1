@@ -15,14 +15,14 @@ if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') {
     $arch = 'amd64'
     $checksum = $checksumAmd64
 } else {
-    throw "32-bit Windows is not supported. slack-chat-api requires 64-bit Windows."
+    throw "32-bit Windows is not supported. slck requires 64-bit Windows."
 }
 
-$baseUrl = "https://github.com/open-cli-collective/slack-chat-api/releases/download/v${version}"
-$zipFile = "slack-chat-api_v${version}_windows_${arch}.zip"
+$baseUrl = "https://github.com/open-cli-collective/slck/releases/download/v${version}"
+$zipFile = "slck_v${version}_windows_${arch}.zip"
 $url = "${baseUrl}/${zipFile}"
 
-Write-Host "Installing slack-chat-api ${version} for Windows ${arch}..."
+Write-Host "Installing slck ${version} for Windows ${arch}..."
 Write-Host "URL: ${url}"
 Write-Host "Checksum (SHA256): ${checksum}"
 
@@ -37,4 +37,4 @@ Install-ChocolateyZipPackage -PackageName $env:ChocolateyPackageName `
 New-Item "$toolsDir\LICENSE.ignore" -Type File -Force | Out-Null
 New-Item "$toolsDir\README.md.ignore" -Type File -Force | Out-Null
 
-Write-Host "slack-chat-api installed successfully. Run 'slack-chat-api --help' to get started."
+Write-Host "slck installed successfully. Run 'slck --help' to get started."

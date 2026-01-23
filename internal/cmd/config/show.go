@@ -54,7 +54,7 @@ func runShow(opts *showOptions) error {
 	}
 
 	if !hasAnyToken {
-		output.Println("\nRun 'slack-chat-api config set-token' to configure")
+		output.Println("\nRun 'slck config set-token' to configure")
 	}
 
 	return nil

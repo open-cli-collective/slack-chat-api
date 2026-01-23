@@ -7,12 +7,12 @@ import (
 
 // errorHints maps Slack API error codes to helpful hints.
 var errorHints = map[string]string{
-	"channel_not_found":    "Verify the channel ID is correct. Use 'slack-chat-api channels list' to find channel IDs.",
+	"channel_not_found":    "Verify the channel ID is correct. Use 'slck channels list' to find channel IDs.",
 	"not_in_channel":       "The bot must be invited to the channel. Use /invite @yourbot in Slack.",
-	"invalid_auth":         "Token is invalid or expired. Run 'slack-chat-api config set-token' to set a new token.",
-	"token_revoked":        "Token has been revoked. Run 'slack-chat-api config set-token' to set a new token.",
+	"invalid_auth":         "Token is invalid or expired. Run 'slck config set-token' to set a new token.",
+	"token_revoked":        "Token has been revoked. Run 'slck config set-token' to set a new token.",
 	"ratelimited":          "Rate limit exceeded. Wait a moment and try again.",
-	"user_not_found":       "Verify the user ID is correct. Use 'slack-chat-api users list' to find user IDs.",
+	"user_not_found":       "Verify the user ID is correct. Use 'slck users list' to find user IDs.",
 	"message_not_found":    "Message not found. Verify the channel ID and timestamp are correct.",
 	"cant_delete_message":  "Cannot delete this message. You can only delete messages sent by the bot.",
 	"cant_update_message":  "Cannot update this message. You can only update messages sent by the bot.",

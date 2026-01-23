@@ -29,7 +29,7 @@ func GetAPIToken() (string, error) {
 		return token, nil
 	}
 
-	return "", fmt.Errorf("no API token found - run 'slack-chat-api config set-token' or set SLACK_API_TOKEN")
+	return "", fmt.Errorf("no API token found - run 'slck config set-token' or set SLACK_API_TOKEN")
 }
 
 // SetAPIToken stores the Slack API token
@@ -82,7 +82,7 @@ func GetUserToken() (string, error) {
 		return token, nil
 	}
 
-	return "", fmt.Errorf("no user token found - run 'slack-chat-api config set-token <xoxp-token>' or set SLACK_USER_TOKEN")
+	return "", fmt.Errorf("no user token found - run 'slck config set-token <xoxp-token>' or set SLACK_USER_TOKEN")
 }
 
 // SetUserToken stores a user token

@@ -42,11 +42,11 @@ Search modifiers (can also use flags below):
   after:date     Files after date (YYYY-MM-DD)
 
 Examples:
-  slack-chat-api search files "budget spreadsheet"
-  slack-chat-api search files "quarterly report" --in "#finance"
-  slack-chat-api search files "logo" --from "@alice" --type image
-  slack-chat-api search files "contract" --type pdf
-  slack-chat-api search files "document" --scope public`,
+  slck search files "budget spreadsheet"
+  slck search files "quarterly report" --in "#finance"
+  slck search files "logo" --from "@alice" --type image
+  slck search files "contract" --type pdf
+  slck search files "document" --scope public`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runSearchFiles(args[0], opts, nil)

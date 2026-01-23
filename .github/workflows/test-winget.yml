@@ -28,20 +28,20 @@ jobs:
           New-Item -ItemType Directory -Path $testDir -Force | Out-Null
 
           # Read and process actual template files
-          $content = Get-Content "packaging/winget/OpenCLICollective.slack-chat-api.yaml" -Raw
+          $content = Get-Content "packaging/winget/OpenCLICollective.slack-chat-cli.yaml" -Raw
           $content = $content -replace "0\.0\.0", $testVersion
-          Set-Content "$testDir/OpenCLICollective.slack-chat-api.yaml" $content -Encoding UTF8
+          Set-Content "$testDir/OpenCLICollective.slack-chat-cli.yaml" $content -Encoding UTF8
 
-          $content = Get-Content "packaging/winget/OpenCLICollective.slack-chat-api.locale.en-US.yaml" -Raw
+          $content = Get-Content "packaging/winget/OpenCLICollective.slack-chat-cli.locale.en-US.yaml" -Raw
           $content = $content -replace "0\.0\.0", $testVersion
-          Set-Content "$testDir/OpenCLICollective.slack-chat-api.locale.en-US.yaml" $content -Encoding UTF8
+          Set-Content "$testDir/OpenCLICollective.slack-chat-cli.locale.en-US.yaml" $content -Encoding UTF8
 
-          $content = Get-Content "packaging/winget/OpenCLICollective.slack-chat-api.installer.yaml" -Raw
+          $content = Get-Content "packaging/winget/OpenCLICollective.slack-chat-cli.installer.yaml" -Raw
           $content = $content -replace "0\.0\.0", $testVersion
           $regex = [regex]"0{64}"
           $content = $regex.Replace($content, $testHash1, 1)
           $content = $regex.Replace($content, $testHash2, 1)
-          Set-Content "$testDir/OpenCLICollective.slack-chat-api.installer.yaml" $content -Encoding UTF8
+          Set-Content "$testDir/OpenCLICollective.slack-chat-cli.installer.yaml" $content -Encoding UTF8
 
           Write-Host "Generated test manifests in $testDir"
           Get-ChildItem $testDir | ForEach-Object { Write-Host "  $_" }

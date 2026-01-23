@@ -1,18 +1,18 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.10.0.schema.json
 
-PackageIdentifier: OpenCLICollective.slack-chat-api
+PackageIdentifier: OpenCLICollective.slack-chat-cli
 PackageVersion: 0.0.0
 InstallerType: zip
 NestedInstallerType: portable
 NestedInstallerFiles:
-  - RelativeFilePath: slack-chat-api.exe
-    PortableCommandAlias: slack-chat-api
+  - RelativeFilePath: slck.exe
+    PortableCommandAlias: slck
 Installers:
   - Architecture: x64
-    InstallerUrl: https://github.com/open-cli-collective/slack-chat-api/releases/download/v0.0.0/slack-chat-api_v0.0.0_windows_amd64.zip
+    InstallerUrl: https://github.com/open-cli-collective/slack-chat-api/releases/download/v0.0.0/slck_v0.0.0_windows_amd64.zip
     InstallerSha256: 0000000000000000000000000000000000000000000000000000000000000000
   - Architecture: arm64
-    InstallerUrl: https://github.com/open-cli-collective/slack-chat-api/releases/download/v0.0.0/slack-chat-api_v0.0.0_windows_arm64.zip
+    InstallerUrl: https://github.com/open-cli-collective/slack-chat-api/releases/download/v0.0.0/slck_v0.0.0_windows_arm64.zip
     InstallerSha256: 0000000000000000000000000000000000000000000000000000000000000000
 ManifestType: installer
 ManifestVersion: 1.10.0

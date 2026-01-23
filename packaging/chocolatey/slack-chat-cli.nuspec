@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
   <metadata>
-    <id>slack-chat-api</id>
+    <id>slack-chat-cli</id>
     <version>0.0.0</version>
     <title>Slack Chat API CLI</title>
     <authors>Open CLI Collective</authors>
@@ -23,7 +23,7 @@ Features:
 - Search messages and files (with user token)
 - Secure credential storage (Windows Credential Manager)
 
-Binary: slack-chat-api.exe</description>
+Binary: slck.exe</description>
     <summary>Command-line interface for Slack Web API</summary>
     <releaseNotes>https://github.com/open-cli-collective/slack-chat-api/releases</releaseNotes>
     <tags>slack cli api messaging automation chat</tags>

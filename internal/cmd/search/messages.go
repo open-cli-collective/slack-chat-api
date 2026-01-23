@@ -47,12 +47,12 @@ Search modifiers (can also use flags below):
   has:reaction   Messages with reactions
 
 Examples:
-  slack-chat-api search messages "quarterly report"
-  slack-chat-api search messages "bug fix" --in "#engineering"
-  slack-chat-api search messages "project update" --from "@alice"
-  slack-chat-api search messages "deployment" --after 2025-01-01
-  slack-chat-api search messages "test" --scope public
-  slack-chat-api search messages "meeting" --has-link --has-reaction`,
+  slck search messages "quarterly report"
+  slck search messages "bug fix" --in "#engineering"
+  slck search messages "project update" --from "@alice"
+  slck search messages "deployment" --after 2025-01-01
+  slck search messages "test" --scope public
+  slck search messages "meeting" --has-link --has-reaction`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runSearchMessages(args[0], opts, nil)

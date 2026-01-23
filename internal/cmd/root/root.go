@@ -19,15 +19,15 @@ import (
 var outputFormat string
 
 var rootCmd = &cobra.Command{
-	Use:   "slack-chat-api",
+	Use:   "slck",
 	Short: "A CLI tool for interacting with Slack",
-	Long: `slack-chat-api is a command-line interface for Slack.
+	Long: `slck is a command-line interface for Slack.
 
 It provides commands for managing channels, users, messages,
 and other Slack workspace operations.
 
 Configure your API token with:
-  slack-chat-api config set-token <your-token>
+  slck config set-token <your-token>
 
 Or set the SLACK_API_TOKEN environment variable.`,
 	Version: version.Version,
@@ -55,7 +55,7 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&output.NoColor, "no-color", false, "Disable colored output")
 
 	// Set custom version template to include commit and build date
-	rootCmd.SetVersionTemplate("slack-chat-api " + version.Info() + "\n")
+	rootCmd.SetVersionTemplate("slck " + version.Info() + "\n")
 
 	// Add subcommands
 	rootCmd.AddCommand(channels.NewCmd())

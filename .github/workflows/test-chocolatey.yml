@@ -1,0 +1,83 @@
+name: Test Chocolatey Package
+
+on:
+  pull_request:
+    paths:
+      - 'packaging/chocolatey/**'
+      - '.github/workflows/test-chocolatey.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'packaging/chocolatey/**'
+      - '.github/workflows/test-chocolatey.yml'
+
+jobs:
+  test-chocolatey:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Build binary for testing
+        run: go build -o packaging/chocolatey/tools/slck.exe ./cmd/slck
+
+      - name: Prepare test package
+        shell: pwsh
+        working-directory: packaging/chocolatey
+        run: |
+          # Replace placeholder version with test version (must not be prerelease)
+          (Get-Content slack-chat-cli.nuspec) `
+            -replace '<version>0.0.0</version>', '<version>0.0.1</version>' |
+            Set-Content slack-chat-cli.nuspec
+
+          # Create a simple install script that uses the local binary
+          # (the real script downloads from GitHub, but we test structure here)
+          @'
+          $ErrorActionPreference = 'Stop'
+          $toolsDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
+
+          # Binary is already in tools/ from CI build
+          Write-Host "slack-chat-cli installed from local build for testing"
+
+          # Exclude non-executables from shimming
+          New-Item "$toolsDir\LICENSE.ignore" -Type File -Force | Out-Null
+          New-Item "$toolsDir\README.md.ignore" -Type File -Force | Out-Null
+          '@ | Set-Content tools/chocolateyInstall.ps1
+
+      - name: Pack Chocolatey package
+        shell: pwsh
+        working-directory: packaging/chocolatey
+        run: choco pack
+
+      - name: Install package locally
+        shell: pwsh
+        working-directory: packaging/chocolatey
+        run: choco install slack-chat-cli -dv -s . --force
+
+      - name: Verify installation
+        shell: pwsh
+        run: |
+          Write-Host "Testing slck --version..."
+          slck --version
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "slck --version failed"
+            exit 1
+          }
+          Write-Host "slck is working!"
+
+      - name: Test uninstall
+        shell: pwsh
+        run: |
+          choco uninstall slack-chat-cli -y
+
+          # Verify slck is no longer available
+          $slckPath = Get-Command slck -ErrorAction SilentlyContinue
+          if ($slckPath) {
+            Write-Error "slck should not be available after uninstall"
+            exit 1
+          }
+          Write-Host "Uninstall successful!"

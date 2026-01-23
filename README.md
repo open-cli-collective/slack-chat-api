@@ -1,4 +1,4 @@
-# slack-chat-api
+# slack-chat-cli
 
 A lightweight command-line interface for interacting with the Slack Web API.
 
@@ -8,14 +8,14 @@ This project is **not** affiliated with Slack or Salesforce. If you're looking t
 
 **What's the difference?**
 
-| Feature | slack-chat-api (this project) | Official Slack CLI |
+| Feature | slck (this project) | Official Slack CLI |
 |---------|-------------------------------|-------------------|
 | **Purpose** | Direct API access for automation & scripting | Build and deploy Slack apps |
 | **Use cases** | Send messages, manage channels, search, CI/CD integration | Workflows, triggers, datastores, app development |
 | **Authentication** | Bot/User OAuth tokens | Slack app credentials |
 | **Complexity** | Simple, single binary | Full development framework |
 
-**When to use slack-chat-api:**
+**When to use slck:**
 - Sending notifications from CI/CD pipelines
 - Automating channel management
 - Scripting message operations
@@ -28,25 +28,25 @@ This project is **not** affiliated with Slack or Salesforce. If you're looking t
 
 ```bash
 brew tap open-cli-collective/tap
-brew install --cask slack-chat-api
+brew install --cask slack-chat-cli
 ```
 
 ### Chocolatey (Windows)
 
 ```powershell
-choco install slack-chat-api
+choco install slack-chat-cli
 ```
 
 ### Winget (Windows)
 
 ```powershell
-winget install OpenCLICollective.slack-chat-api
+winget install OpenCLICollective.slack-chat-cli
 ```
 
 ### From Source
 
 ```bash
-go install github.com/open-cli-collective/slack-chat-api@latest
+go install github.com/open-cli-collective/slack-chat-api/cmd/slck@latest
 ```
 
 ### Manual Build
@@ -99,7 +99,7 @@ make build
 5. Copy the **Bot User OAuth Token** (starts with `xoxb-`)
 6. Run:
    ```bash
-   slack-chat-api config set-token
+   slck config set-token
    # Paste your token when prompted
    ```
 
@@ -119,19 +119,19 @@ Use a shell function to lazy-load your token from 1Password on first use:
 # Add to ~/.zshrc or ~/.bashrc
 slack-chat() {
   if [[ -z "$SLACK_API_TOKEN" ]]; then
-    export SLACK_API_TOKEN="$(op read 'op://Personal/slack-chat-api/api_token')"
+    export SLACK_API_TOKEN="$(op read 'op://Personal/slck/api_token')"
   fi
-  command slack-chat-api "$@"
+  command slck "$@"
 }
 ```
 
 Or create an alias that always fetches fresh:
 
 ```bash
-alias slack-chat='SLACK_API_TOKEN="$(op read '\''op://Personal/slack-chat-api/api_token'\'')" slack-chat-api'
+alias slack-chat='SLACK_API_TOKEN="$(op read '\''op://Personal/slck/api_token'\'')" slck'
 ```
 
-Replace `op://Personal/slack-chat-api/api_token` with your 1Password secret reference.
+Replace `op://Personal/slck/api_token` with your 1Password secret reference.
 
 ### Required Scopes
 
@@ -165,10 +165,10 @@ Most commands use the **bot token**. Search commands require a **user token**.
 
 ```bash
 # Set bot token (for channels, users, messages, workspace)
-slack-chat-api config set-token xoxb-your-bot-token
+slck config set-token xoxb-your-bot-token
 
 # Set user token (for search)
-slack-chat-api config set-token xoxp-your-user-token
+slck config set-token xoxp-your-user-token
 ```
 
 The `set-token` command automatically detects the token type and stores it appropriately.
@@ -204,30 +204,30 @@ These flags are available on all commands:
 
 ```bash
 # List all channels
-slack-chat-api channels list
+slck channels list
 
 # List with options
-slack-chat-api channels list --types public_channel,private_channel  # Include private channels
-slack-chat-api channels list --limit 50                              # Limit results
-slack-chat-api channels list --exclude-archived=false                # Include archived channels
+slck channels list --types public_channel,private_channel  # Include private channels
+slck channels list --limit 50                              # Limit results
+slck channels list --exclude-archived=false                # Include archived channels
 
 # Get channel info
-slack-chat-api channels get C1234567890
+slck channels get C1234567890
 
 # Create a channel
-slack-chat-api channels create my-new-channel
-slack-chat-api channels create private-channel --private
+slck channels create my-new-channel
+slck channels create private-channel --private
 
 # Archive/unarchive
-slack-chat-api channels archive C1234567890
-slack-chat-api channels unarchive C1234567890
+slck channels archive C1234567890
+slck channels unarchive C1234567890
 
 # Set topic/purpose
-slack-chat-api channels set-topic C1234567890 "New topic"
-slack-chat-api channels set-purpose C1234567890 "Channel purpose"
+slck channels set-topic C1234567890 "New topic"
+slck channels set-purpose C1234567890 "Channel purpose"
 
 # Invite users
-slack-chat-api channels invite C1234567890 U1111111111 U2222222222
+slck channels invite C1234567890 U1111111111 U2222222222
 ```
 
 #### Channels Command Reference
@@ -247,17 +247,17 @@ slack-chat-api channels invite C1234567890 U1111111111 U2222222222
 
 ```bash
 # List all users
-slack-chat-api users list
-slack-chat-api users list --limit 50
+slck users list
+slck users list --limit 50
 
 # Get user info
-slack-chat-api users get U1234567890
+slck users get U1234567890
 
 # Search users
-slack-chat-api users search "john"
-slack-chat-api users search "john@company.com" --field email
-slack-chat-api users search "John Smith" --field display_name
-slack-chat-api users search "bot" --include-bots
+slck users search "john"
+slck users search "john@company.com" --field email
+slck users search "John Smith" --field display_name
+slck users search "bot" --include-bots
 ```
 
 #### Users Command Reference
@@ -280,41 +280,41 @@ slack-chat-api users search "bot" --include-bots
 
 ```bash
 # Send a message (uses Block Kit formatting by default)
-slack-chat-api messages send C1234567890 "Hello, *world*!"
+slck messages send C1234567890 "Hello, *world*!"
 
 # Send from stdin (use "-" as text argument)
-echo "Hello from stdin" | slack-chat-api messages send C1234567890 -
-cat message.txt | slack-chat-api messages send C1234567890 -
+echo "Hello from stdin" | slck messages send C1234567890 -
+cat message.txt | slck messages send C1234567890 -
 
 # Send plain text (no formatting)
-slack-chat-api messages send C1234567890 "Plain text" --simple
+slck messages send C1234567890 "Plain text" --simple
 
 # Send with custom Block Kit blocks
-slack-chat-api messages send C1234567890 "Fallback" --blocks '[{"type":"section","text":{"type":"mrkdwn","text":"*Bold*"}}]'
+slck messages send C1234567890 "Fallback" --blocks '[{"type":"section","text":{"type":"mrkdwn","text":"*Bold*"}}]'
 
 # Reply in a thread
-slack-chat-api messages send C1234567890 "Thread reply" --thread 1234567890.123456
+slck messages send C1234567890 "Thread reply" --thread 1234567890.123456
 
 # Update a message
-slack-chat-api messages update C1234567890 1234567890.123456 "Updated text"
-slack-chat-api messages update C1234567890 1234567890.123456 "Plain update" --simple
+slck messages update C1234567890 1234567890.123456 "Updated text"
+slck messages update C1234567890 1234567890.123456 "Plain update" --simple
 
 # Delete a message
-slack-chat-api messages delete C1234567890 1234567890.123456
+slck messages delete C1234567890 1234567890.123456
 
 # Get channel history
-slack-chat-api messages history C1234567890
-slack-chat-api messages history C1234567890 --limit 50
-slack-chat-api messages history C1234567890 --oldest 1234567890.000000  # After this time
-slack-chat-api messages history C1234567890 --latest 1234567890.000000  # Before this time
+slck messages history C1234567890
+slck messages history C1234567890 --limit 50
+slck messages history C1234567890 --oldest 1234567890.000000  # After this time
+slck messages history C1234567890 --latest 1234567890.000000  # Before this time
 
 # Get thread replies
-slack-chat-api messages thread C1234567890 1234567890.123456
-slack-chat-api messages thread C1234567890 1234567890.123456 --limit 50
+slck messages thread C1234567890 1234567890.123456
+slck messages thread C1234567890 1234567890.123456 --limit 50
 
 # Add/remove reactions
-slack-chat-api messages react C1234567890 1234567890.123456 thumbsup
-slack-chat-api messages unreact C1234567890 1234567890.123456 thumbsup
+slck messages react C1234567890 1234567890.123456 thumbsup
+slck messages unreact C1234567890 1234567890.123456 thumbsup
 ```
 
 #### Messages Command Reference
@@ -335,28 +335,28 @@ slack-chat-api messages unreact C1234567890 1234567890.123456 thumbsup
 
 ```bash
 # Search messages
-slack-chat-api search messages "quarterly report"
-slack-chat-api search messages "in:#general bug fix"
-slack-chat-api search messages "from:@alice project update"
+slck search messages "quarterly report"
+slck search messages "in:#general bug fix"
+slck search messages "from:@alice project update"
 
 # Search files
-slack-chat-api search files "budget spreadsheet"
-slack-chat-api search files "type:pdf report"
+slck search files "budget spreadsheet"
+slck search files "type:pdf report"
 
 # Search all (messages + files)
-slack-chat-api search all "project proposal"
-slack-chat-api search all "quarterly" --sort timestamp
+slck search all "project proposal"
+slck search all "quarterly" --sort timestamp
 
 # With pagination
-slack-chat-api search messages "error" --count 50 --page 2
+slck search messages "error" --count 50 --page 2
 
 # Using query builder flags (alternative to modifiers in query string)
-slack-chat-api search messages "meeting" --in "#general"
-slack-chat-api search messages "update" --from "@alice"
-slack-chat-api search messages "report" --scope public
-slack-chat-api search messages "project" --after 2025-01-01 --before 2025-12-31
-slack-chat-api search messages "link" --has-link
-slack-chat-api search files "document" --type pdf
+slck search messages "meeting" --in "#general"
+slck search messages "update" --from "@alice"
+slck search messages "report" --scope public
+slck search messages "project" --after 2025-01-01 --before 2025-12-31
+slck search messages "link" --has-link
+slck search files "document" --type pdf
 ```
 
 #### Search Modifiers
@@ -409,23 +409,23 @@ These flags provide an alternative to using modifiers in the query string:
 
 ```bash
 # Get workspace info
-slack-chat-api workspace info
+slck workspace info
 ```
 
 ### Config
 
 ```bash
 # Set API token (interactive prompt)
-slack-chat-api config set-token
+slck config set-token
 
 # Set API token directly
-slack-chat-api config set-token xoxb-your-token-here
+slck config set-token xoxb-your-token-here
 
 # Show current config status
-slack-chat-api config show
+slck config show
 
 # Delete stored token
-slack-chat-api config delete-token
+slck config delete-token
 ```
 
 #### Config Command Reference
@@ -448,30 +448,30 @@ All commands support multiple output formats via the `--output` (or `-o`) flag:
 
 ```bash
 # Default text output
-slack-chat-api channels list
+slck channels list
 
 # JSON output (for scripting)
-slack-chat-api channels list --output json
-slack-chat-api users get U1234567890 -o json
+slck channels list --output json
+slck users get U1234567890 -o json
 
 # Table output (aligned columns)
-slack-chat-api channels list --output table
+slck channels list --output table
 ```
 
 ### Shell Completion
 
 ```bash
 # Bash
-slack-chat-api completion bash > /etc/bash_completion.d/slack-chat-api
+slck completion bash > /etc/bash_completion.d/slck
 
 # Zsh
-slack-chat-api completion zsh > "${fpath[1]}/_slack-chat-api"
+slck completion zsh > "${fpath[1]}/_slck"
 
 # Fish
-slack-chat-api completion fish > ~/.config/fish/completions/slack-chat-api.fish
+slck completion fish > ~/.config/fish/completions/slck.fish
 
 # PowerShell
-slack-chat-api completion powershell > slack-chat-api.ps1
+slck completion powershell > slck.ps1
 ```
 
 ## Aliases

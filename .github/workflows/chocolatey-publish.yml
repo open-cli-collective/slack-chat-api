@@ -49,7 +49,7 @@ jobs:
           $version = "${{ inputs.version }}"
 
           # Update version in nuspec
-          $nuspec = 'packaging/chocolatey/slack-chat-api.nuspec'
+          $nuspec = 'packaging/chocolatey/slack-chat-cli.nuspec'
           (Get-Content $nuspec) -replace '<version>0.0.0</version>', "<version>$version</version>" | Set-Content $nuspec
           Write-Host "Updated nuspec to version $version"
 

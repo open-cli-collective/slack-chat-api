@@ -79,7 +79,7 @@ func runTest(opts *testOptions, botClient *client.Client, userClient *client.Cli
 
 	if !anySuccess {
 		output.Println()
-		output.Println("No valid tokens configured. Run 'slack-chat-api config set-token' to configure.")
+		output.Println("No valid tokens configured. Run 'slck config set-token' to configure.")
 	}
 
 	return nil

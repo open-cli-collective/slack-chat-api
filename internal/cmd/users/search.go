@@ -36,10 +36,10 @@ Use --field to limit search to a specific field.
 Bot users are excluded by default. Use --include-bots to include them.
 
 Examples:
-  slack-chat-api users search "john"
-  slack-chat-api users search "john@company.com" --field email
-  slack-chat-api users search "John Smith" --field display_name
-  slack-chat-api users search "bot" --include-bots`,
+  slck users search "john"
+  slck users search "john@company.com" --field email
+  slck users search "John Smith" --field display_name
+  slck users search "bot" --include-bots`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runSearch(args[0], opts, nil)

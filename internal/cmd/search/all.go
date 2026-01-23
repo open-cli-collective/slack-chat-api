@@ -41,11 +41,11 @@ Search modifiers (can also use flags below):
   after:date     Content after date (YYYY-MM-DD)
 
 Examples:
-  slack-chat-api search all "project proposal"
-  slack-chat-api search all "quarterly report" --sort timestamp
-  slack-chat-api search all "important" --from "@alice"
-  slack-chat-api search all "meeting" --scope public
-  slack-chat-api search all "update" --after 2025-01-01 --in "#general"`,
+  slck search all "project proposal"
+  slck search all "quarterly report" --sort timestamp
+  slck search all "important" --from "@alice"
+  slck search all "meeting" --scope public
+  slck search all "update" --after 2025-01-01 --in "#general"`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runSearchAll(args[0], opts, nil)
