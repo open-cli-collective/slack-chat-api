@@ -1,12 +1,12 @@
-# Chocolatey Package for slack-chat-api
+# Chocolatey Package for slack-chat-cli
 
-This directory contains the Chocolatey package definition for slack-chat-api.
+This directory contains the Chocolatey package definition for slack-chat-cli (binary: `slck`).
 
 ## Package Structure
 
 ```
 packaging/chocolatey/
-├── slack-chat-api.nuspec          # Package metadata
+├── slack-chat-cli.nuspec          # Package metadata
 ├── tools/
 │   ├── chocolateyInstall.ps1      # Install script
 │   └── chocolateyUninstall.ps1    # Uninstall script
@@ -18,7 +18,7 @@ packaging/chocolatey/
 1. **Release Workflow**: When a new version is released, the GitHub Actions workflow:
    - Downloads `checksums.txt` from the release
    - Injects the Windows checksums into `chocolateyInstall.ps1`
-   - Updates the version in `slack-chat-api.nuspec`
+   - Updates the version in `slack-chat-cli.nuspec`
    - Packs and pushes to Chocolatey
 
 2. **Checksum Placeholders**: The install script uses placeholders that are replaced at build time:
@@ -53,13 +53,13 @@ To test the package locally:
 choco pack
 
 # Install locally for testing
-choco install slack-chat-api -s . -y
+choco install slack-chat-cli -s . -y
 
 # Verify installation
-slack-chat-api --version
+slck --version
 
 # Uninstall
-choco uninstall slack-chat-api -y
+choco uninstall slack-chat-cli -y
 ```
 
 ## Moderation Notes

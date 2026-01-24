@@ -1,6 +1,6 @@
 ---
 name: Feature Request
-about: Suggest a new feature for slack-chat-api
+about: Suggest a new feature for slck
 title: ''
 labels: enhancement
 assignees: ''
@@ -19,7 +19,7 @@ Any alternative solutions or features you've considered.
 Show how you'd use this feature:
 
 ```bash
-slack-chat-api <your-proposed-command>
+slck <your-proposed-command>
 ```
 
 **Additional context**
