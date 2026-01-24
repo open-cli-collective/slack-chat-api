@@ -298,7 +298,6 @@ jobs:
           ./wingetcreate.exe submit --token $env:WINGET_GITHUB_TOKEN $manifestDir
 
   snap:
-    if: false  # Temporarily disabled - waiting for personal-files interface approval
     needs: goreleaser
     runs-on: ubuntu-latest
     steps:
