@@ -2,19 +2,19 @@
 
 ## [Unreleased]
 
-### Features
+### Changed
 
+* **Binary renamed to `slck`** - The CLI binary is now `slck` (short for slack-chat-cli). Install via `brew install slack-chat-cli`, run with `slck`. ([#78](https://github.com/open-cli-collective/slack-chat-api/pull/78))
+* Module path migrated to `github.com/open-cli-collective/slack-chat-api` ([#76](https://github.com/open-cli-collective/slack-chat-api/pull/76))
+
+### Added
+
+* `--no-unfurl` flag for `messages send` and `messages update` commands to prevent link previews ([#74](https://github.com/open-cli-collective/slack-chat-api/pull/74))
 * Enhanced search capabilities: user search, scope filters, query builder flags ([#48](https://github.com/open-cli-collective/slack-chat-api/pull/48))
-* Replace release-please with auto-release on merge ([#45](https://github.com/open-cli-collective/slack-chat-api/pull/45))
 
-### Bug Fixes
+### Fixed
 
 * Unescape shell-escaped exclamation marks in message text ([#47](https://github.com/open-cli-collective/slack-chat-api/pull/47))
-* Use PAT for release-please to trigger release workflow ([#43](https://github.com/open-cli-collective/slack-chat-api/pull/43))
-
-### Other Changes
-
-* Update remaining docs to use slack-chat-api ([#46](https://github.com/open-cli-collective/slack-chat-api/pull/46))
 
 ## [3.0.1](https://github.com/open-cli-collective/slack-chat-api/compare/v3.0.0...v3.0.1) (2026-01-12)
 
