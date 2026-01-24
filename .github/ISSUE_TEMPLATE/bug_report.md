@@ -1,16 +1,16 @@
 ---
 name: Bug Report
-about: Report a bug in slack-chat-api
+about: Report a bug in slck
 title: ''
 labels: bug
 assignees: ''
 ---
 
-**slack-chat-api version**
-Run `slack-chat-api --version` and paste the output:
+**slck version**
+Run `slck --version` and paste the output:
 
 ```
-slack-chat-api version ...
+slck version ...
 ```
 
 **Environment**

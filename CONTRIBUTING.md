@@ -173,7 +173,7 @@ docs: update installation instructions
 
 ```
 slack-chat-api/
-├── cmd/slack-chat-api/   # Entry point
+├── cmd/slck/             # Entry point
 ├── internal/
 │   ├── cmd/              # Command implementations
 │   │   ├── root/         # Root command and global flags

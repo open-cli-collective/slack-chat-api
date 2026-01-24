@@ -1,14 +1,14 @@
-# Winget Package for slack-chat-api
+# Winget Package for slack-chat-cli
 
-This directory contains the Winget manifest templates for slack-chat-api.
+This directory contains the Winget manifest templates for slack-chat-cli (binary: `slck`).
 
 ## Package Structure
 
 ```
 packaging/winget/
-├── OpenCLICollective.slack-chat-api.yaml              # Version manifest
-├── OpenCLICollective.slack-chat-api.installer.yaml    # Installer manifest
-├── OpenCLICollective.slack-chat-api.locale.en-US.yaml # Locale manifest
+├── OpenCLICollective.slack-chat-cli.yaml              # Version manifest
+├── OpenCLICollective.slack-chat-cli.installer.yaml    # Installer manifest
+├── OpenCLICollective.slack-chat-cli.locale.en-US.yaml # Locale manifest
 └── README.md                                           # This file
 ```
 
@@ -35,10 +35,10 @@ The manifest files use placeholders:
 ## Package Identifier
 
 ```
-OpenCLICollective.slack-chat-api
+OpenCLICollective.slack-chat-cli
 ```
 
-Manifests are stored at: `manifests/o/OpenCLICollective/slack-chat-api/`
+Manifests are stored at: `manifests/o/OpenCLICollective/slack-chat-cli/`
 
 ## Manual Publishing
 
@@ -73,5 +73,5 @@ winget validate --manifest $testDir/
 ## Installation (after package is approved)
 
 ```powershell
-winget install OpenCLICollective.slack-chat-api
+winget install OpenCLICollective.slack-chat-cli
 ```
