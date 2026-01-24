@@ -27,15 +27,34 @@ builds:
       - -X github.com/open-cli-collective/slack-chat-api/internal/version.Date={{.Date}}
 
 archives:
-  - format: tar.gz
+  - formats:
+      - tar.gz
     format_overrides:
       - goos: windows
-        format: zip
+        formats:
+          - zip
     # Use binary name with v prefix for archive filenames
     name_template: "slck_v{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     files:
       - LICENSE
       - README.md
+
+# Linux packages (.deb and .rpm)
+nfpms:
+  - id: slck
+    package_name: slck
+    vendor: Open CLI Collective
+    homepage: https://github.com/open-cli-collective/slack-chat-api
+    maintainer: Open CLI Collective <https://github.com/open-cli-collective>
+    description: Command-line interface for Slack
+    license: MIT
+    formats:
+      - deb
+      - rpm
+    bindir: /usr/bin
+    contents:
+      - src: LICENSE
+        dst: /usr/share/licenses/slck/LICENSE
 
 checksum:
   name_template: "checksums.txt"

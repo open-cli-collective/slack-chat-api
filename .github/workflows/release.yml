@@ -296,3 +296,41 @@ jobs:
 
           Write-Host "`nSubmitting new package to Winget..."
           ./wingetcreate.exe submit --token $env:WINGET_GITHUB_TOKEN $manifestDir
+
+  snap:
+    if: false  # Temporarily disabled - waiting for personal-files interface approval
+    needs: goreleaser
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build snap
+        uses: snapcore/action-build@v1
+        id: build
+
+      - name: Publish to Snapcraft Store
+        uses: snapcore/action-publish@v1
+        env:
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+        with:
+          snap: ${{ steps.build.outputs.snap }}
+          release: stable
+
+  linux-packages:
+    needs: goreleaser
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger linux-packages repo update
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.LINUX_PACKAGES_DISPATCH_TOKEN }}
+          repository: open-cli-collective/linux-packages
+          event-type: package-release
+          client-payload: |-
+            {
+              "package": "slck",
+              "version": "${{ github.ref_name }}",
+              "repo": "open-cli-collective/slack-chat-api"
+            }

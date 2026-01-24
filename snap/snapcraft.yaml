@@ -1,0 +1,62 @@
+name: ocli-slack
+base: core22
+version: git
+summary: Command-line interface for Slack
+description: |
+  slck is a CLI for interacting with the Slack Web API.
+
+  Features:
+  - Send messages to channels
+  - List and manage channels
+  - Search users and conversations
+  - Message reactions and threads
+  - JSON output for scripting
+
+  Run 'slck config set-token' to configure your Slack token.
+
+grade: stable
+confinement: strict
+
+architectures:
+  - build-on: amd64
+  - build-on: arm64
+
+plugs:
+  dot-config-slack-chat-api:
+    interface: personal-files
+    read:
+      - $HOME/.config/slack-chat-api
+    write:
+      - $HOME/.config/slack-chat-api
+
+apps:
+  ocli-slack:
+    command: bin/slck
+    plugs:
+      - home
+      - network
+      - dot-config-slack-chat-api
+    aliases:
+      - slck
+
+parts:
+  slck:
+    plugin: go
+    source: .
+    build-snaps:
+      - go/1.24/stable
+    build-environment:
+      - CGO_ENABLED: "0"
+    override-build: |
+      # Get version from git
+      VERSION=$(git describe --tags --always --dirty 2>/dev/null || echo "dev")
+      COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+      DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+      # Build with ldflags
+      go build -o $SNAPCRAFT_PART_INSTALL/bin/slck \
+        -ldflags "-s -w \
+          -X github.com/open-cli-collective/slack-chat-api/internal/version.Version=${VERSION} \
+          -X github.com/open-cli-collective/slack-chat-api/internal/version.Commit=${COMMIT} \
+          -X github.com/open-cli-collective/slack-chat-api/internal/version.Date=${DATE}" \
+        ./cmd/slck

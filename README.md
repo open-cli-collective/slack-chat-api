@@ -24,24 +24,84 @@ This project is **not** affiliated with Slack or Salesforce. If you're looking t
 
 ## Installation
 
-### Homebrew (macOS/Linux)
+### macOS
+
+**Homebrew (recommended)**
 
 ```bash
-brew tap open-cli-collective/tap
-brew install --cask slack-chat-cli
+brew install open-cli-collective/tap/slack-chat-cli
 ```
 
-### Chocolatey (Windows)
+> Note: This installs from our third-party tap.
+
+---
+
+### Windows
+
+**Chocolatey**
 
 ```powershell
 choco install slack-chat-cli
 ```
 
-### Winget (Windows)
+**Winget**
 
 ```powershell
 winget install OpenCLICollective.slack-chat-cli
 ```
+
+---
+
+### Linux
+
+**Snap**
+
+```bash
+sudo snap install ocli-slack
+```
+
+> Note: After installation, the command is available as `slck`.
+
+**APT (Debian/Ubuntu)**
+
+```bash
+# Add the GPG key
+curl -fsSL https://open-cli-collective.github.io/linux-packages/keys/gpg.asc | sudo gpg --dearmor -o /usr/share/keyrings/open-cli-collective.gpg
+
+# Add the repository
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/open-cli-collective.gpg] https://open-cli-collective.github.io/linux-packages/apt stable main" | sudo tee /etc/apt/sources.list.d/open-cli-collective.list
+
+# Install
+sudo apt update
+sudo apt install slck
+```
+
+> Note: This is our third-party APT repository, not official Debian/Ubuntu repos.
+
+**DNF/YUM (Fedora/RHEL/CentOS)**
+
+```bash
+# Add the repository
+sudo tee /etc/yum.repos.d/open-cli-collective.repo << 'EOF'
+[open-cli-collective]
+name=Open CLI Collective
+baseurl=https://open-cli-collective.github.io/linux-packages/rpm
+enabled=1
+gpgcheck=1
+gpgkey=https://open-cli-collective.github.io/linux-packages/keys/gpg.asc
+EOF
+
+# Install
+sudo dnf install slck
+```
+
+> Note: This is our third-party RPM repository, not official Fedora/RHEL repos.
+
+**Binary download**
+
+Download `.deb`, `.rpm`, or `.tar.gz` from the [Releases page](https://github.com/open-cli-collective/slack-chat-api/releases).
+
+---
 
 ### From Source
 
