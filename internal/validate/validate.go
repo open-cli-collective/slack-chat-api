@@ -6,6 +6,10 @@ import (
 	"strings"
 )
 
+// slackURLTimestampRegex matches Slack message URLs and captures the p-prefixed timestamp
+// Example: https://workspace.slack.com/archives/C123/p1234567890123456
+var slackURLTimestampRegex = regexp.MustCompile(`/p(\d{16})(?:\?|$)`)
+
 var (
 	channelIDRegex = regexp.MustCompile(`^[CG][A-Z0-9]+$`)
 	userIDRegex    = regexp.MustCompile(`^[UW][A-Z0-9]+$`)
@@ -30,11 +34,51 @@ func UserID(id string) error {
 	return nil
 }
 
+// NormalizeTimestamp converts various Slack timestamp formats to the standard API format.
+// Accepts:
+//   - Standard API format: "1234567890.123456" (returned as-is)
+//   - P-prefixed format: "p1234567890123456" (from Slack URLs)
+//   - Full Slack URL: "https://workspace.slack.com/archives/C123/p1234567890123456"
+//
+// Returns the normalized timestamp in API format, or the original input if no conversion applies.
+func NormalizeTimestamp(input string) string {
+	input = strings.TrimSpace(input)
+
+	// Check for full Slack URL containing /p<timestamp>
+	if strings.Contains(input, "/p") {
+		if matches := slackURLTimestampRegex.FindStringSubmatch(input); len(matches) == 2 {
+			digits := matches[1] // 16 digits without 'p'
+			return digits[:10] + "." + digits[10:]
+		}
+	}
+
+	// Check for p-prefixed format (p + 16 digits)
+	if strings.HasPrefix(input, "p") && len(input) == 17 {
+		digits := input[1:] // Remove 'p'
+		// Verify all characters are digits
+		allDigits := true
+		for _, c := range digits {
+			if c < '0' || c > '9' {
+				allDigits = false
+				break
+			}
+		}
+		if allDigits {
+			return digits[:10] + "." + digits[10:]
+		}
+	}
+
+	// Return as-is (already in API format or invalid - validation will catch it)
+	return input
+}
+
 // Timestamp validates that the given string is a valid Slack message timestamp.
 // Timestamps are in the format "1234567890.123456".
+// Also accepts p-prefixed format and full Slack URLs, which are normalized first.
 func Timestamp(ts string) error {
-	if !timestampRegex.MatchString(ts) {
-		return fmt.Errorf("invalid timestamp %q: must be format 1234567890.123456", ts)
+	normalized := NormalizeTimestamp(ts)
+	if !timestampRegex.MatchString(normalized) {
+		return fmt.Errorf("invalid timestamp %q: must be format 1234567890.123456, p1234567890123456, or a Slack message URL", ts)
 	}
 	return nil
 }

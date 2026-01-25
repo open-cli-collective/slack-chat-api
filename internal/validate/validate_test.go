@@ -54,19 +54,66 @@ func TestUserID(t *testing.T) {
 	}
 }
 
+func TestNormalizeTimestamp(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		// API format (pass-through)
+		{"api format", "1234567890.123456", "1234567890.123456"},
+		{"api format with whitespace", "  1234567890.123456  ", "1234567890.123456"},
+
+		// P-prefixed format
+		{"p-prefixed", "p1234567890123456", "1234567890.123456"},
+		{"p-prefixed different digits", "p1609459200000000", "1609459200.000000"},
+
+		// Full Slack URLs
+		{"slack url", "https://myworkspace.slack.com/archives/C1234567890/p1234567890123456", "1234567890.123456"},
+		{"slack url with query params", "https://myworkspace.slack.com/archives/C1234567890/p1234567890123456?thread_ts=1234567890.123456", "1234567890.123456"},
+		{"slack url enterprise", "https://company.enterprise.slack.com/archives/G9876543210/p1609459200000000", "1609459200.000000"},
+
+		// Invalid formats (returned as-is for validation to catch)
+		{"invalid p-prefix too short", "p123456789012345", "p123456789012345"},
+		{"invalid p-prefix too long", "p12345678901234567", "p12345678901234567"},
+		{"invalid p-prefix with letters", "p123456789012345a", "p123456789012345a"},
+		{"random string", "not-a-timestamp", "not-a-timestamp"},
+		{"empty string", "", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := NormalizeTimestamp(tt.input)
+			if got != tt.want {
+				t.Errorf("NormalizeTimestamp(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestTimestamp(t *testing.T) {
 	tests := []struct {
 		name    string
 		ts      string
 		wantErr bool
 	}{
+		// Standard API format
 		{"valid timestamp", "1234567890.123456", false},
 		{"valid short", "123.456", false},
+
+		// P-prefixed format (normalized)
+		{"p-prefixed valid", "p1234567890123456", false},
+
+		// Full Slack URL (normalized)
+		{"slack url valid", "https://myworkspace.slack.com/archives/C123/p1234567890123456", false},
+
+		// Invalid formats
 		{"missing decimal", "1234567890", true},
 		{"empty string", "", true},
 		{"letters", "abc.def", true},
 		{"no digits after decimal", "123.", true},
 		{"no digits before decimal", ".123", true},
+		{"invalid p-prefix", "p12345", true},
 	}
 
 	for _, tt := range tests {

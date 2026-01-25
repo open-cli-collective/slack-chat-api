@@ -82,11 +82,12 @@ func runSend(channel, text string, opts *sendOptions, c *client.Client) error {
 		return err
 	}
 
-	// Validate thread timestamp if provided
+	// Validate and normalize thread timestamp if provided
 	if opts.threadTS != "" {
 		if err := validate.Timestamp(opts.threadTS); err != nil {
 			return err
 		}
+		opts.threadTS = validate.NormalizeTimestamp(opts.threadTS)
 	}
 
 	// Validate mutually exclusive blocks options

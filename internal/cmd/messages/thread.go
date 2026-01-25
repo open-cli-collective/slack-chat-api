@@ -5,6 +5,7 @@ import (
 
 	"github.com/open-cli-collective/slack-chat-api/internal/client"
 	"github.com/open-cli-collective/slack-chat-api/internal/output"
+	"github.com/open-cli-collective/slack-chat-api/internal/validate"
 )
 
 type threadOptions struct {
@@ -29,6 +30,9 @@ func newThreadCmd() *cobra.Command {
 }
 
 func runThread(channel, threadTS string, opts *threadOptions, c *client.Client) error {
+	// Normalize thread timestamp (accepts API format, p-prefixed, or full URL)
+	threadTS = validate.NormalizeTimestamp(threadTS)
+
 	if c == nil {
 		var err error
 		c, err = client.New()
