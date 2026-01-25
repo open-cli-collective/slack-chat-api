@@ -18,7 +18,7 @@ if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') {
     throw "32-bit Windows is not supported. slck requires 64-bit Windows."
 }
 
-$baseUrl = "https://github.com/open-cli-collective/slck/releases/download/v${version}"
+$baseUrl = "https://github.com/open-cli-collective/slack-chat-api/releases/download/v${version}"
 $zipFile = "slck_v${version}_windows_${arch}.zip"
 $url = "${baseUrl}/${zipFile}"
 
