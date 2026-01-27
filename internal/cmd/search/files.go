@@ -10,18 +10,19 @@ import (
 )
 
 type filesOptions struct {
-	count     int
-	page      int
-	sort      string
-	sortDir   string
-	highlight bool
-	scope     string
-	inChannel string
-	fromUser  string
-	after     string
-	before    string
-	fileType  string
-	hasPin    bool
+	count       int
+	page        int
+	sort        string
+	sortDir     string
+	highlight   bool
+	scope       string
+	inChannel   string
+	fromUser    string
+	after       string
+	before      string
+	fileType    string
+	hasPin      bool
+	includeBots bool
 }
 
 func newFilesCmd() *cobra.Command {
@@ -67,6 +68,7 @@ Examples:
 	cmd.Flags().StringVar(&opts.before, "before", "", "Files before date (YYYY-MM-DD)")
 	cmd.Flags().StringVar(&opts.fileType, "type", "", "Filter by file type (pdf, doc, image, etc.)")
 	cmd.Flags().BoolVar(&opts.hasPin, "has-pin", false, "Files that are pinned")
+	cmd.Flags().BoolVar(&opts.includeBots, "include-bots", false, "Include bot messages in results")
 
 	return cmd
 }
@@ -100,7 +102,7 @@ func runSearchFiles(query string, opts *filesOptions, c *client.Client) error {
 	}
 	finalQuery := BuildQuery(query, queryOpts)
 
-	result, err := c.SearchFiles(finalQuery, opts.count, opts.page, opts.sort, opts.sortDir, opts.highlight)
+	result, err := c.SearchFiles(finalQuery, opts.count, opts.page, opts.sort, opts.sortDir, opts.highlight, opts.includeBots)
 	if err != nil {
 		return err
 	}
