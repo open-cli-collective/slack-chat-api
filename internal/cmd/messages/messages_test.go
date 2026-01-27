@@ -359,19 +359,45 @@ func TestRunDelete_Success(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func mockUserInfoHandler(w http.ResponseWriter, r *http.Request) {
+	userID := r.URL.Query().Get("user")
+	names := map[string]string{
+		"U001": "alice",
+		"U002": "bob",
+	}
+	name := names[userID]
+	if name == "" {
+		name = userID
+	}
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"ok": true,
+		"user": map[string]interface{}{
+			"id":        userID,
+			"name":      name,
+			"real_name": name,
+			"profile": map[string]interface{}{
+				"display_name": name,
+			},
+		},
+	})
+}
+
 func TestRunHistory_Success(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "/conversations.history", r.URL.Path)
-		assert.Equal(t, "C123", r.URL.Query().Get("channel"))
-		assert.Equal(t, "20", r.URL.Query().Get("limit"))
-
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{
-			"ok": true,
-			"messages": []map[string]interface{}{
-				{"ts": "1234567890.123456", "user": "U001", "text": "Hello"},
-				{"ts": "1234567890.123457", "user": "U002", "text": "World"},
-			},
-		})
+		switch r.URL.Path {
+		case "/conversations.history":
+			assert.Equal(t, "C123", r.URL.Query().Get("channel"))
+			assert.Equal(t, "20", r.URL.Query().Get("limit"))
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"ok": true,
+				"messages": []map[string]interface{}{
+					{"ts": "1234567890.123456", "user": "U001", "text": "Hello"},
+					{"ts": "1234567890.123457", "user": "U002", "text": "World"},
+				},
+			})
+		case "/users.info":
+			mockUserInfoHandler(w, r)
+		}
 	}))
 	defer server.Close()
 
@@ -384,13 +410,17 @@ func TestRunHistory_Success(t *testing.T) {
 
 func TestRunHistory_WithTimeRange(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "1234567890.000000", r.URL.Query().Get("oldest"))
-		assert.Equal(t, "1234567899.000000", r.URL.Query().Get("latest"))
-
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{
-			"ok":       true,
-			"messages": []map[string]interface{}{},
-		})
+		switch r.URL.Path {
+		case "/conversations.history":
+			assert.Equal(t, "1234567890.000000", r.URL.Query().Get("oldest"))
+			assert.Equal(t, "1234567899.000000", r.URL.Query().Get("latest"))
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"ok":       true,
+				"messages": []map[string]interface{}{},
+			})
+		case "/users.info":
+			mockUserInfoHandler(w, r)
+		}
 	}))
 	defer server.Close()
 
@@ -407,10 +437,15 @@ func TestRunHistory_WithTimeRange(t *testing.T) {
 
 func TestRunHistory_Empty(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{
-			"ok":       true,
-			"messages": []map[string]interface{}{},
-		})
+		switch r.URL.Path {
+		case "/conversations.history":
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"ok":       true,
+				"messages": []map[string]interface{}{},
+			})
+		case "/users.info":
+			mockUserInfoHandler(w, r)
+		}
 	}))
 	defer server.Close()
 
@@ -423,18 +458,21 @@ func TestRunHistory_Empty(t *testing.T) {
 
 func TestRunThread_Success(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "/conversations.replies", r.URL.Path)
-		assert.Equal(t, "C123", r.URL.Query().Get("channel"))
-		assert.Equal(t, "1234567890.123456", r.URL.Query().Get("ts"))
-		assert.Equal(t, "100", r.URL.Query().Get("limit"))
-
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{
-			"ok": true,
-			"messages": []map[string]interface{}{
-				{"ts": "1234567890.123456", "user": "U001", "text": "Original"},
-				{"ts": "1234567890.123457", "user": "U002", "text": "Reply 1"},
-			},
-		})
+		switch r.URL.Path {
+		case "/conversations.replies":
+			assert.Equal(t, "C123", r.URL.Query().Get("channel"))
+			assert.Equal(t, "1234567890.123456", r.URL.Query().Get("ts"))
+			assert.Equal(t, "100", r.URL.Query().Get("limit"))
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"ok": true,
+				"messages": []map[string]interface{}{
+					{"ts": "1234567890.123456", "user": "U001", "text": "Original"},
+					{"ts": "1234567890.123457", "user": "U002", "text": "Reply 1"},
+				},
+			})
+		case "/users.info":
+			mockUserInfoHandler(w, r)
+		}
 	}))
 	defer server.Close()
 
