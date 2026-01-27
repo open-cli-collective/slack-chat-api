@@ -246,12 +246,9 @@ func uploadFiles(c *client.Client, channel, text string, opts *sendOptions) erro
 		}
 
 		err = c.UploadFileToURL(uploadResp.UploadURL, f)
-		closeErr := f.Close()
+		_ = f.Close()
 		if err != nil {
 			return client.WrapError("upload file", err)
-		}
-		if closeErr != nil {
-			return fmt.Errorf("closing file %s: %w", filePath, closeErr)
 		}
 
 		title := opts.fileTitle
