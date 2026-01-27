@@ -1168,3 +1168,111 @@ func TestRunUpdate_UnfurlEnabled(t *testing.T) {
 	assert.Equal(t, true, receivedBody["unfurl_links"])
 	assert.Equal(t, true, receivedBody["unfurl_media"])
 }
+
+func TestRunSend_FileUpload(t *testing.T) {
+	tmpFile, err := os.CreateTemp(t.TempDir(), "test-upload-*.txt")
+	require.NoError(t, err)
+	_, err = tmpFile.WriteString("hello world")
+	require.NoError(t, err)
+	tmpFile.Close()
+
+	step := 0
+
+	uploadServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer uploadServer.Close()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		switch {
+		case strings.Contains(r.URL.Path, "files.getUploadURLExternal"):
+			step++
+			resp := map[string]interface{}{
+				"ok":         true,
+				"upload_url": uploadServer.URL + "/upload",
+				"file_id":    "F123",
+			}
+			json.NewEncoder(w).Encode(resp)
+		case strings.Contains(r.URL.Path, "files.completeUploadExternal"):
+			step++
+			resp := map[string]interface{}{"ok": true}
+			json.NewEncoder(w).Encode(resp)
+		default:
+			t.Errorf("unexpected request to %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	c := client.NewWithConfig(server.URL, "test-token", nil)
+	opts := &sendOptions{
+		files: []string{tmpFile.Name()},
+	}
+
+	err = runSend("C123456789", "", opts, c)
+	require.NoError(t, err)
+	assert.Equal(t, 2, step, "should complete both API calls")
+}
+
+func TestRunSend_FileUpload_WithComment(t *testing.T) {
+	tmpFile, err := os.CreateTemp(t.TempDir(), "test-upload-*.txt")
+	require.NoError(t, err)
+	_, err = tmpFile.WriteString("content")
+	require.NoError(t, err)
+	tmpFile.Close()
+
+	var completeBody map[string]interface{}
+
+	uploadServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer uploadServer.Close()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		switch {
+		case strings.Contains(r.URL.Path, "files.getUploadURLExternal"):
+			resp := map[string]interface{}{
+				"ok":         true,
+				"upload_url": uploadServer.URL + "/upload",
+				"file_id":    "F456",
+			}
+			json.NewEncoder(w).Encode(resp)
+		case strings.Contains(r.URL.Path, "files.completeUploadExternal"):
+			json.NewDecoder(r.Body).Decode(&completeBody)
+			resp := map[string]interface{}{"ok": true}
+			json.NewEncoder(w).Encode(resp)
+		}
+	}))
+	defer server.Close()
+
+	c := client.NewWithConfig(server.URL, "test-token", nil)
+	opts := &sendOptions{
+		files:     []string{tmpFile.Name()},
+		fileTitle: "My Report",
+	}
+
+	err = runSend("C123456789", "Here's the report", opts, c)
+	require.NoError(t, err)
+
+	assert.Equal(t, "C123456789", completeBody["channel_id"])
+	assert.Equal(t, "Here's the report", completeBody["initial_comment"])
+}
+
+func TestRunSend_FileUpload_NonexistentFile(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("should not make API calls for nonexistent file")
+	}))
+	defer server.Close()
+
+	c := client.NewWithConfig(server.URL, "test-token", nil)
+	opts := &sendOptions{
+		files: []string{"/nonexistent/file.txt"},
+	}
+
+	err := runSend("C123456789", "", opts, c)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot access file")
+}
