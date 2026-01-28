@@ -717,6 +717,78 @@ func (c *Client) InviteToChannel(channel string, users []string) error {
 	return err
 }
 
+// --- File Upload Methods ---
+
+// UploadURLResponse contains the response from files.getUploadURLExternal
+type UploadURLResponse struct {
+	UploadURL string `json:"upload_url"`
+	FileID    string `json:"file_id"`
+}
+
+// GetUploadURLExternal gets a presigned URL for file upload
+func (c *Client) GetUploadURLExternal(filename string, length int64) (*UploadURLResponse, error) {
+	params := url.Values{}
+	params.Set("filename", filename)
+	params.Set("length", fmt.Sprintf("%d", length))
+
+	body, err := c.get("files.getUploadURLExternal", params)
+	if err != nil {
+		return nil, err
+	}
+
+	var result UploadURLResponse
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
+// UploadFileToURL uploads file bytes to the presigned URL
+func (c *Client) UploadFileToURL(uploadURL string, data io.Reader) error {
+	req, err := http.NewRequest("POST", uploadURL, data)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/octet-stream")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("upload failed with status %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	return nil
+}
+
+// CompleteUploadExternalFile represents a file in the complete upload request
+type CompleteUploadExternalFile struct {
+	ID    string `json:"id"`
+	Title string `json:"title,omitempty"`
+}
+
+// CompleteUploadExternal finalizes the file upload and shares to channels/threads
+func (c *Client) CompleteUploadExternal(files []CompleteUploadExternalFile, channelID, threadTS, initialComment string) error {
+	data := map[string]interface{}{
+		"files":      files,
+		"channel_id": channelID,
+	}
+	if threadTS != "" {
+		data["thread_ts"] = threadTS
+	}
+	if initialComment != "" {
+		data["initial_comment"] = initialComment
+	}
+
+	_, err := c.post("files.completeUploadExternal", data)
+	return err
+}
+
 // --- Search Methods (require user token) ---
 
 // SearchMessages searches for messages matching a query
