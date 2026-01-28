@@ -720,7 +720,7 @@ func (c *Client) InviteToChannel(channel string, users []string) error {
 // --- Search Methods (require user token) ---
 
 // SearchMessages searches for messages matching a query
-func (c *Client) SearchMessages(query string, count, page int, sort, sortDir string, highlight bool) (*SearchResult, error) {
+func (c *Client) SearchMessages(query string, count, page int, sort, sortDir string, highlight, includeBots bool) (*SearchResult, error) {
 	params := url.Values{}
 	params.Set("query", query)
 	params.Set("count", fmt.Sprintf("%d", count))
@@ -729,6 +729,9 @@ func (c *Client) SearchMessages(query string, count, page int, sort, sortDir str
 	params.Set("sort_dir", sortDir)
 	if highlight {
 		params.Set("highlight", "true")
+	}
+	if includeBots {
+		params.Set("search_exclude_bots", "false")
 	}
 
 	body, err := c.get("search.messages", params)
@@ -745,7 +748,7 @@ func (c *Client) SearchMessages(query string, count, page int, sort, sortDir str
 }
 
 // SearchFiles searches for files matching a query
-func (c *Client) SearchFiles(query string, count, page int, sort, sortDir string, highlight bool) (*SearchResult, error) {
+func (c *Client) SearchFiles(query string, count, page int, sort, sortDir string, highlight, includeBots bool) (*SearchResult, error) {
 	params := url.Values{}
 	params.Set("query", query)
 	params.Set("count", fmt.Sprintf("%d", count))
@@ -754,6 +757,9 @@ func (c *Client) SearchFiles(query string, count, page int, sort, sortDir string
 	params.Set("sort_dir", sortDir)
 	if highlight {
 		params.Set("highlight", "true")
+	}
+	if includeBots {
+		params.Set("search_exclude_bots", "false")
 	}
 
 	body, err := c.get("search.files", params)
@@ -770,7 +776,7 @@ func (c *Client) SearchFiles(query string, count, page int, sort, sortDir string
 }
 
 // SearchAll searches for both messages and files matching a query
-func (c *Client) SearchAll(query string, count, page int, sort, sortDir string, highlight bool) (*SearchResult, error) {
+func (c *Client) SearchAll(query string, count, page int, sort, sortDir string, highlight, includeBots bool) (*SearchResult, error) {
 	params := url.Values{}
 	params.Set("query", query)
 	params.Set("count", fmt.Sprintf("%d", count))
@@ -779,6 +785,9 @@ func (c *Client) SearchAll(query string, count, page int, sort, sortDir string, 
 	params.Set("sort_dir", sortDir)
 	if highlight {
 		params.Set("highlight", "true")
+	}
+	if includeBots {
+		params.Set("search_exclude_bots", "false")
 	}
 
 	body, err := c.get("search.all", params)

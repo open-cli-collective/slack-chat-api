@@ -706,6 +706,70 @@ func TestSearchMessages_WithHighlight(t *testing.T) {
 	}
 }
 
+func TestSearchMessages_WithIncludeBots(t *testing.T) {
+	response := map[string]interface{}{
+		"ok": true,
+		"messages": map[string]interface{}{
+			"total":   0,
+			"paging":  map[string]interface{}{"count": 20, "total": 0, "page": 1, "pages": 0},
+			"matches": []map[string]interface{}{},
+		},
+	}
+
+	c, server := newTestClient(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("search_exclude_bots") != "false" {
+			t.Errorf("expected search_exclude_bots=false, got %s", r.URL.Query().Get("search_exclude_bots"))
+		}
+		json.NewEncoder(w).Encode(response)
+	})
+	defer server.Close()
+
+	opts := &messagesOptions{
+		count:       20,
+		page:        1,
+		sort:        "score",
+		sortDir:     "desc",
+		includeBots: true,
+	}
+
+	err := runSearchMessages("bot-alert", opts, c)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestSearchMessages_WithoutIncludeBots(t *testing.T) {
+	response := map[string]interface{}{
+		"ok": true,
+		"messages": map[string]interface{}{
+			"total":   0,
+			"paging":  map[string]interface{}{"count": 20, "total": 0, "page": 1, "pages": 0},
+			"matches": []map[string]interface{}{},
+		},
+	}
+
+	c, server := newTestClient(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("search_exclude_bots") != "" {
+			t.Errorf("expected search_exclude_bots to be absent, got %s", r.URL.Query().Get("search_exclude_bots"))
+		}
+		json.NewEncoder(w).Encode(response)
+	})
+	defer server.Close()
+
+	opts := &messagesOptions{
+		count:       20,
+		page:        1,
+		sort:        "score",
+		sortDir:     "desc",
+		includeBots: false,
+	}
+
+	err := runSearchMessages("test", opts, c)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
 func TestSearchMessages_WithSortOptions(t *testing.T) {
 	response := map[string]interface{}{
 		"ok": true,
