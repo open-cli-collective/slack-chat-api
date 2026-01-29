@@ -973,7 +973,7 @@ func TestClient_SearchMessages_Success(t *testing.T) {
 	defer server.Close()
 
 	client := NewWithConfig(server.URL, "test-token", nil)
-	result, err := client.SearchMessages("test query", 20, 1, "score", "desc", false)
+	result, err := client.SearchMessages("test query", 20, 1, "score", "desc", false, false)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -1015,7 +1015,7 @@ func TestClient_SearchMessages_WithHighlight(t *testing.T) {
 	defer server.Close()
 
 	client := NewWithConfig(server.URL, "test-token", nil)
-	_, err := client.SearchMessages("test", 20, 1, "score", "desc", true)
+	_, err := client.SearchMessages("test", 20, 1, "score", "desc", true, false)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -1034,7 +1034,7 @@ func TestClient_SearchMessages_APIError(t *testing.T) {
 	defer server.Close()
 
 	client := NewWithConfig(server.URL, "test-token", nil)
-	_, err := client.SearchMessages("test", 20, 1, "score", "desc", false)
+	_, err := client.SearchMessages("test", 20, 1, "score", "desc", false, false)
 
 	if err == nil {
 		t.Error("expected error for API failure")
@@ -1079,7 +1079,7 @@ func TestClient_SearchFiles_Success(t *testing.T) {
 	defer server.Close()
 
 	client := NewWithConfig(server.URL, "test-token", nil)
-	result, err := client.SearchFiles("document", 20, 1, "score", "desc", false)
+	result, err := client.SearchFiles("document", 20, 1, "score", "desc", false, false)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -1153,7 +1153,7 @@ func TestClient_SearchAll_Success(t *testing.T) {
 	defer server.Close()
 
 	client := NewWithConfig(server.URL, "test-token", nil)
-	result, err := client.SearchAll("report", 20, 1, "timestamp", "asc", false)
+	result, err := client.SearchAll("report", 20, 1, "timestamp", "asc", false, false)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
