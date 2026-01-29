@@ -13,7 +13,7 @@ func newSetTopicCmd() *cobra.Command {
 	opts := &setTopicOptions{}
 
 	return &cobra.Command{
-		Use:   "set-topic <channel-id> <topic>",
+		Use:   "set-topic <channel> <topic>",
 		Short: "Set channel topic",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -22,7 +22,7 @@ func newSetTopicCmd() *cobra.Command {
 	}
 }
 
-func runSetTopic(channelID, topic string, opts *setTopicOptions, c *client.Client) error {
+func runSetTopic(channel, topic string, opts *setTopicOptions, c *client.Client) error {
 	if c == nil {
 		var err error
 		c, err = client.New()
@@ -31,10 +31,16 @@ func runSetTopic(channelID, topic string, opts *setTopicOptions, c *client.Clien
 		}
 	}
 
+	// Resolve channel name to ID if needed
+	channelID, err := c.ResolveChannel(channel)
+	if err != nil {
+		return err
+	}
+
 	if err := c.SetChannelTopic(channelID, topic); err != nil {
 		return err
 	}
 
-	output.Printf("Set topic for channel %s\n", channelID)
+	output.Printf("Set topic for channel %s\n", channel)
 	return nil
 }

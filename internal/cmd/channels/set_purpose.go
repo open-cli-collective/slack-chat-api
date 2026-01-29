@@ -13,7 +13,7 @@ func newSetPurposeCmd() *cobra.Command {
 	opts := &setPurposeOptions{}
 
 	return &cobra.Command{
-		Use:   "set-purpose <channel-id> <purpose>",
+		Use:   "set-purpose <channel> <purpose>",
 		Short: "Set channel purpose",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -22,7 +22,7 @@ func newSetPurposeCmd() *cobra.Command {
 	}
 }
 
-func runSetPurpose(channelID, purpose string, opts *setPurposeOptions, c *client.Client) error {
+func runSetPurpose(channel, purpose string, opts *setPurposeOptions, c *client.Client) error {
 	if c == nil {
 		var err error
 		c, err = client.New()
@@ -31,10 +31,16 @@ func runSetPurpose(channelID, purpose string, opts *setPurposeOptions, c *client
 		}
 	}
 
+	// Resolve channel name to ID if needed
+	channelID, err := c.ResolveChannel(channel)
+	if err != nil {
+		return err
+	}
+
 	if err := c.SetChannelPurpose(channelID, purpose); err != nil {
 		return err
 	}
 
-	output.Printf("Set purpose for channel %s\n", channelID)
+	output.Printf("Set purpose for channel %s\n", channel)
 	return nil
 }

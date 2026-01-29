@@ -15,7 +15,7 @@ func newUnarchiveCmd() *cobra.Command {
 	opts := &unarchiveOptions{}
 
 	return &cobra.Command{
-		Use:   "unarchive <channel-id>",
+		Use:   "unarchive <channel>",
 		Short: "Unarchive a channel",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -24,13 +24,19 @@ func newUnarchiveCmd() *cobra.Command {
 	}
 }
 
-func runUnarchive(channelID string, opts *unarchiveOptions, c *client.Client) error {
+func runUnarchive(channel string, opts *unarchiveOptions, c *client.Client) error {
 	if c == nil {
 		var err error
 		c, err = client.New()
 		if err != nil {
 			return err
 		}
+	}
+
+	// Resolve channel name to ID if needed
+	channelID, err := c.ResolveChannel(channel)
+	if err != nil {
+		return err
 	}
 
 	if err := c.UnarchiveChannel(channelID); err != nil {
@@ -43,6 +49,6 @@ func runUnarchive(channelID string, opts *unarchiveOptions, c *client.Client) er
 		return err
 	}
 
-	output.Printf("Unarchived channel: %s\n", channelID)
+	output.Printf("Unarchived channel: %s\n", channel)
 	return nil
 }

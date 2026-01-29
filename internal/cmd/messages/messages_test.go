@@ -726,11 +726,20 @@ func TestRunUpdate_UnescapesShellChars(t *testing.T) {
 	assert.Equal(t, "Updated! Text!", receivedText)
 }
 
-func TestRunSend_InvalidChannelID(t *testing.T) {
+func TestRunSend_ChannelNotFound(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"ok":       true,
+			"channels": []map[string]interface{}{},
+		})
+	}))
+	defer server.Close()
+
+	c := client.NewWithConfig(server.URL, "test-token", nil)
 	opts := &sendOptions{simple: true}
-	err := runSend("invalid", "Hello", opts, nil)
+	err := runSend("nonexistent-channel", "Hello", opts, c)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid channel ID")
+	assert.Contains(t, err.Error(), "not found")
 }
 
 func TestRunSend_InvalidThreadTimestamp(t *testing.T) {
@@ -740,11 +749,20 @@ func TestRunSend_InvalidThreadTimestamp(t *testing.T) {
 	assert.Contains(t, err.Error(), "invalid timestamp")
 }
 
-func TestRunDelete_InvalidChannelID(t *testing.T) {
+func TestRunDelete_ChannelNotFound(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"ok":       true,
+			"channels": []map[string]interface{}{},
+		})
+	}))
+	defer server.Close()
+
+	c := client.NewWithConfig(server.URL, "test-token", nil)
 	opts := &deleteOptions{force: true}
-	err := runDelete("invalid", "1234567890.123456", opts, nil)
+	err := runDelete("nonexistent-channel", "1234567890.123456", opts, c)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid channel ID")
+	assert.Contains(t, err.Error(), "not found")
 }
 
 func TestRunDelete_InvalidTimestamp(t *testing.T) {
@@ -754,11 +772,20 @@ func TestRunDelete_InvalidTimestamp(t *testing.T) {
 	assert.Contains(t, err.Error(), "invalid timestamp")
 }
 
-func TestRunReact_InvalidChannelID(t *testing.T) {
+func TestRunReact_ChannelNotFound(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"ok":       true,
+			"channels": []map[string]interface{}{},
+		})
+	}))
+	defer server.Close()
+
+	c := client.NewWithConfig(server.URL, "test-token", nil)
 	opts := &reactOptions{}
-	err := runReact("invalid", "1234567890.123456", "thumbsup", opts, nil)
+	err := runReact("nonexistent-channel", "1234567890.123456", "thumbsup", opts, c)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid channel ID")
+	assert.Contains(t, err.Error(), "not found")
 }
 
 func TestRunReact_InvalidTimestamp(t *testing.T) {
@@ -768,11 +795,20 @@ func TestRunReact_InvalidTimestamp(t *testing.T) {
 	assert.Contains(t, err.Error(), "invalid timestamp")
 }
 
-func TestRunUnreact_InvalidChannelID(t *testing.T) {
+func TestRunUnreact_ChannelNotFound(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"ok":       true,
+			"channels": []map[string]interface{}{},
+		})
+	}))
+	defer server.Close()
+
+	c := client.NewWithConfig(server.URL, "test-token", nil)
 	opts := &unreactOptions{}
-	err := runUnreact("invalid", "1234567890.123456", "thumbsup", opts, nil)
+	err := runUnreact("nonexistent-channel", "1234567890.123456", "thumbsup", opts, c)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid channel ID")
+	assert.Contains(t, err.Error(), "not found")
 }
 
 func TestRunUnreact_InvalidTimestamp(t *testing.T) {

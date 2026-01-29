@@ -26,10 +26,7 @@ func newReactCmd() *cobra.Command {
 }
 
 func runReact(channel, timestamp, emoji string, opts *reactOptions, c *client.Client) error {
-	// Validate inputs
-	if err := validate.ChannelID(channel); err != nil {
-		return err
-	}
+	// Validate timestamp
 	if err := validate.Timestamp(timestamp); err != nil {
 		return err
 	}
@@ -45,7 +42,13 @@ func runReact(channel, timestamp, emoji string, opts *reactOptions, c *client.Cl
 		}
 	}
 
-	if err := c.AddReaction(channel, timestamp, emoji); err != nil {
+	// Resolve channel name to ID if needed
+	channelID, err := c.ResolveChannel(channel)
+	if err != nil {
+		return err
+	}
+
+	if err := c.AddReaction(channelID, timestamp, emoji); err != nil {
 		return client.WrapError(fmt.Sprintf("add reaction :%s:", emoji), err)
 	}
 

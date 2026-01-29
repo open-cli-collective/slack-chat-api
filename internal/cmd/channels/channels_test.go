@@ -342,27 +342,38 @@ func TestRunArchive_Confirmation(t *testing.T) {
 
 // Validation tests for archive command
 
-func TestRunArchive_InvalidChannelID(t *testing.T) {
-	tests := []struct {
-		name      string
-		channelID string
-		wantErr   string
-	}{
-		{"invalid prefix", "D123456789", "invalid channel ID"},
-		{"lowercase prefix", "c123456789", "invalid channel ID"},
-		{"empty string", "", "invalid channel ID"},
-		{"just prefix", "C", "invalid channel ID"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			opts := &archiveOptions{force: true}
-			// Pass nil client - validation should fail before client is needed
-			err := runArchive(tt.channelID, opts, nil)
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), tt.wantErr)
+func TestRunArchive_EmptyChannel(t *testing.T) {
+	opts := &archiveOptions{force: true}
+	// Mock client that returns empty channels list for name lookup
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"ok":       true,
+			"channels": []map[string]interface{}{},
 		})
-	}
+	}))
+	defer server.Close()
+
+	c := client.NewWithConfig(server.URL, "test-token", nil)
+	err := runArchive("", opts, c)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot be empty")
+}
+
+func TestRunArchive_ChannelNotFound(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"ok":       true,
+			"channels": []map[string]interface{}{},
+		})
+	}))
+	defer server.Close()
+
+	c := client.NewWithConfig(server.URL, "test-token", nil)
+	opts := &archiveOptions{force: true}
+
+	err := runArchive("nonexistent-channel", opts, c)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not found")
 }
 
 func TestRunUnarchive_NotInChannel(t *testing.T) {

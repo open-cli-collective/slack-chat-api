@@ -41,7 +41,13 @@ func runThread(channel, threadTS string, opts *threadOptions, c *client.Client) 
 		}
 	}
 
-	messages, err := c.GetThreadReplies(channel, threadTS, opts.limit)
+	// Resolve channel name to ID if needed
+	channelID, err := c.ResolveChannel(channel)
+	if err != nil {
+		return err
+	}
+
+	messages, err := c.GetThreadReplies(channelID, threadTS, opts.limit)
 	if err != nil {
 		return err
 	}

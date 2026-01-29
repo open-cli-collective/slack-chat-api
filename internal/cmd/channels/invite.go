@@ -13,7 +13,7 @@ func newInviteCmd() *cobra.Command {
 	opts := &inviteOptions{}
 
 	return &cobra.Command{
-		Use:   "invite <channel-id> <user-id>...",
+		Use:   "invite <channel> <user-id>...",
 		Short: "Invite users to a channel",
 		Args:  cobra.MinimumNArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -22,7 +22,7 @@ func newInviteCmd() *cobra.Command {
 	}
 }
 
-func runInvite(channelID string, userIDs []string, opts *inviteOptions, c *client.Client) error {
+func runInvite(channel string, userIDs []string, opts *inviteOptions, c *client.Client) error {
 	if c == nil {
 		var err error
 		c, err = client.New()
@@ -31,10 +31,16 @@ func runInvite(channelID string, userIDs []string, opts *inviteOptions, c *clien
 		}
 	}
 
+	// Resolve channel name to ID if needed
+	channelID, err := c.ResolveChannel(channel)
+	if err != nil {
+		return err
+	}
+
 	if err := c.InviteToChannel(channelID, userIDs); err != nil {
 		return err
 	}
 
-	output.Printf("Invited %d user(s) to channel %s\n", len(userIDs), channelID)
+	output.Printf("Invited %d user(s) to channel %s\n", len(userIDs), channel)
 	return nil
 }

@@ -11,7 +11,6 @@ import (
 
 	"github.com/open-cli-collective/slack-chat-api/internal/client"
 	"github.com/open-cli-collective/slack-chat-api/internal/output"
-	"github.com/open-cli-collective/slack-chat-api/internal/validate"
 )
 
 type archiveOptions struct {
@@ -23,7 +22,7 @@ func newArchiveCmd() *cobra.Command {
 	opts := &archiveOptions{}
 
 	cmd := &cobra.Command{
-		Use:   "archive <channel-id>",
+		Use:   "archive <channel>",
 		Short: "Archive a channel",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -36,12 +35,7 @@ func newArchiveCmd() *cobra.Command {
 	return cmd
 }
 
-func runArchive(channelID string, opts *archiveOptions, c *client.Client) error {
-	// Validate channel ID
-	if err := validate.ChannelID(channelID); err != nil {
-		return err
-	}
-
+func runArchive(channel string, opts *archiveOptions, c *client.Client) error {
 	// Prompt for confirmation unless --force
 	if !opts.force {
 		reader := opts.stdin
@@ -49,7 +43,7 @@ func runArchive(channelID string, opts *archiveOptions, c *client.Client) error 
 			reader = os.Stdin
 		}
 
-		output.Printf("About to archive channel: %s\n", channelID)
+		output.Printf("About to archive channel: %s\n", channel)
 		output.Printf("Are you sure? [y/N]: ")
 
 		scanner := bufio.NewScanner(reader)
@@ -70,10 +64,16 @@ func runArchive(channelID string, opts *archiveOptions, c *client.Client) error 
 		}
 	}
 
-	if err := c.ArchiveChannel(channelID); err != nil {
-		return client.WrapError(fmt.Sprintf("archive channel %s", channelID), err)
+	// Resolve channel name to ID if needed
+	channelID, err := c.ResolveChannel(channel)
+	if err != nil {
+		return err
 	}
 
-	output.Printf("Archived channel: %s\n", channelID)
+	if err := c.ArchiveChannel(channelID); err != nil {
+		return client.WrapError(fmt.Sprintf("archive channel %s", channel), err)
+	}
+
+	output.Printf("Archived channel: %s\n", channel)
 	return nil
 }
