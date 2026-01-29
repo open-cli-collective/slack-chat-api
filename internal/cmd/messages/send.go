@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 
@@ -21,6 +22,8 @@ type sendOptions struct {
 	blocksStdin bool
 	simple      bool
 	noUnfurl    bool
+	files       []string
+	fileTitle   string
 	stdin       io.Reader // For testing
 }
 
@@ -55,7 +58,20 @@ Text is optional when providing blocks via any of these methods:
 Examples:
   slck messages send C1234567890 --blocks '[{"type":"section",...}]'
   slck messages send C1234567890 --blocks-file ./report.json
-  generate-report | slck messages send C1234567890 --blocks-stdin`,
+  generate-report | slck messages send C1234567890 --blocks-stdin
+
+FILE UPLOADS
+
+  --file            Upload a file to the channel. Can be specified multiple
+                    times to upload several files.
+  --file-title      Custom title for uploaded file(s).
+
+Examples:
+  slck messages send C1234567890 --file ./report.pdf
+  slck messages send C1234567890 "Here's the report" --file ./report.pdf
+  slck messages send C1234567890 --file ./report.pdf --thread 1234567890.123456
+  slck messages send C1234567890 --file ./report.pdf --file-title "Monthly Report"
+  slck messages send C1234567890 --file ./a.csv --file ./b.csv`,
 		Args: cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			text := ""
@@ -72,6 +88,8 @@ Examples:
 	cmd.Flags().BoolVar(&opts.blocksStdin, "blocks-stdin", false, "Read blocks from stdin (for piping from other tools)")
 	cmd.Flags().BoolVar(&opts.simple, "simple", false, "Send as plain text without block formatting")
 	cmd.Flags().BoolVar(&opts.noUnfurl, "no-unfurl", false, "Disable link preview unfurling")
+	cmd.Flags().StringArrayVar(&opts.files, "file", nil, "File(s) to upload (can be specified multiple times)")
+	cmd.Flags().StringVar(&opts.fileTitle, "file-title", "", "Custom title for uploaded file(s)")
 
 	return cmd
 }
@@ -155,10 +173,11 @@ func runSend(channel, text string, opts *sendOptions, c *client.Client) error {
 		blocksSource = string(lines)
 	}
 
-	// Validate: must have text or blocks (or both)
+	// Validate: must have text, blocks, or files
 	hasBlocks := blocksSource != ""
-	if text == "" && !hasBlocks {
-		return fmt.Errorf("message text cannot be empty (or provide blocks via --blocks, --blocks-file, or --blocks-stdin)")
+	hasFiles := len(opts.files) > 0
+	if text == "" && !hasBlocks && !hasFiles {
+		return fmt.Errorf("message text cannot be empty (or provide blocks via --blocks, --blocks-file, --blocks-stdin, or files via --file)")
 	}
 
 	if c == nil {
@@ -173,6 +192,11 @@ func runSend(channel, text string, opts *sendOptions, c *client.Client) error {
 	channelID, err := c.ResolveChannel(channel)
 	if err != nil {
 		return err
+	}
+
+	// Handle file uploads
+	if hasFiles {
+		return uploadFiles(c, channelID, text, opts)
 	}
 
 	var blocks []interface{}
@@ -195,5 +219,61 @@ func runSend(channel, text string, opts *sendOptions, c *client.Client) error {
 	}
 
 	output.Printf("Message sent (ts: %s)\n", msg.TS)
+	return nil
+}
+
+func uploadFiles(c *client.Client, channelID, text string, opts *sendOptions) error {
+	var uploadedFiles []client.CompleteUploadExternalFile
+
+	for _, filePath := range opts.files {
+		info, err := os.Stat(filePath)
+		if err != nil {
+			return fmt.Errorf("cannot access file %s: %w", filePath, err)
+		}
+
+		filename := filepath.Base(filePath)
+		output.Printf("Uploading %s (%d bytes)...\n", filename, info.Size())
+
+		// Step 1: Get upload URL
+		uploadResp, err := c.GetUploadURLExternal(filename, info.Size())
+		if err != nil {
+			return client.WrapError("get upload URL", err)
+		}
+
+		// Step 2: Upload file bytes
+		f, err := os.Open(filePath)
+		if err != nil {
+			return fmt.Errorf("opening file %s: %w", filePath, err)
+		}
+
+		err = c.UploadFileToURL(uploadResp.UploadURL, f)
+		_ = f.Close()
+		if err != nil {
+			return client.WrapError("upload file", err)
+		}
+
+		title := opts.fileTitle
+		if title == "" {
+			title = filename
+		}
+
+		uploadedFiles = append(uploadedFiles, client.CompleteUploadExternalFile{
+			ID:    uploadResp.FileID,
+			Title: title,
+		})
+	}
+
+	// Step 3: Complete upload and share to channel/thread
+	err := c.CompleteUploadExternal(uploadedFiles, channelID, opts.threadTS, text)
+	if err != nil {
+		return client.WrapError("complete upload", err)
+	}
+
+	if len(uploadedFiles) == 1 {
+		output.Printf("File uploaded to channel %s\n", channelID)
+	} else {
+		output.Printf("%d files uploaded to channel %s\n", len(uploadedFiles), channelID)
+	}
+
 	return nil
 }
