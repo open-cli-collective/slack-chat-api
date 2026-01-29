@@ -143,28 +143,72 @@ make build
 
 1. Go to [api.slack.com/apps](https://api.slack.com/apps) → **Create New App** → **From an app manifest**
 2. Select your workspace
-3. Paste this manifest (YAML tab):
+3. Paste this manifest (JSON tab recommended):
+   ```json
+   {
+     "display_information": {
+       "name": "Slack Chat API"
+     },
+     "features": {
+       "bot_user": {
+         "display_name": "Slack Chat API",
+         "always_online": false
+       }
+     },
+     "oauth_config": {
+       "scopes": {
+         "bot": [
+           "channels:history",
+           "channels:manage",
+           "channels:read",
+           "chat:write",
+           "groups:history",
+           "groups:read",
+           "reactions:write",
+           "team:read",
+           "users:read"
+         ],
+         "user": [
+           "search:read"
+         ]
+       }
+     },
+     "settings": {
+       "org_deploy_enabled": false,
+       "socket_mode_enabled": false
+     }
+   }
+   ```
+
+   <details>
+   <summary>YAML alternative (if you prefer)</summary>
+
    ```yaml
    display_information:
      name: Slack Chat API
+   features:
+     bot_user:
+       display_name: Slack Chat API
+       always_online: false
    oauth_config:
      scopes:
        bot:
-         - channels:history
-         - channels:manage
-         - channels:read
-         - chat:write
-         - groups:history
-         - groups:read
-         - reactions:write
-         - team:read
-         - users:read
+         - "channels:history"
+         - "channels:manage"
+         - "channels:read"
+         - "chat:write"
+         - "groups:history"
+         - "groups:read"
+         - "reactions:write"
+         - "team:read"
+         - "users:read"
        user:
-         - search:read
+         - "search:read"
    settings:
      org_deploy_enabled: false
      socket_mode_enabled: false
    ```
+   </details>
 4. Click **Create** → **Install to Workspace** → **Allow**
 5. Copy the **Bot User OAuth Token** (starts with `xoxb-`)
 6. Run:
