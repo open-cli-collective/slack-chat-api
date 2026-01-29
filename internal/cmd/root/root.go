@@ -11,6 +11,7 @@ import (
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/messages"
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/search"
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/users"
+	"github.com/open-cli-collective/slack-chat-api/internal/cmd/whoami"
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/workspace"
 	"github.com/open-cli-collective/slack-chat-api/internal/output"
 	"github.com/open-cli-collective/slack-chat-api/internal/version"
@@ -63,5 +64,6 @@ func init() {
 	rootCmd.AddCommand(messages.NewCmd())
 	rootCmd.AddCommand(search.NewCmd())
 	rootCmd.AddCommand(workspace.NewCmd())
+	rootCmd.AddCommand(whoami.NewCmd())
 	rootCmd.AddCommand(config.NewCmd())
 }
