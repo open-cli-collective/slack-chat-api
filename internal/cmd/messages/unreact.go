@@ -26,10 +26,7 @@ func newUnreactCmd() *cobra.Command {
 }
 
 func runUnreact(channel, timestamp, emoji string, opts *unreactOptions, c *client.Client) error {
-	// Validate inputs
-	if err := validate.ChannelID(channel); err != nil {
-		return err
-	}
+	// Validate timestamp
 	if err := validate.Timestamp(timestamp); err != nil {
 		return err
 	}
@@ -45,7 +42,13 @@ func runUnreact(channel, timestamp, emoji string, opts *unreactOptions, c *clien
 		}
 	}
 
-	if err := c.RemoveReaction(channel, timestamp, emoji); err != nil {
+	// Resolve channel name to ID if needed
+	channelID, err := c.ResolveChannel(channel)
+	if err != nil {
+		return err
+	}
+
+	if err := c.RemoveReaction(channelID, timestamp, emoji); err != nil {
 		return client.WrapError(fmt.Sprintf("remove reaction :%s:", emoji), err)
 	}
 

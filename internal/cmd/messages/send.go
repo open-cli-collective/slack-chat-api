@@ -77,11 +77,6 @@ Examples:
 }
 
 func runSend(channel, text string, opts *sendOptions, c *client.Client) error {
-	// Validate channel ID
-	if err := validate.ChannelID(channel); err != nil {
-		return err
-	}
-
 	// Validate and normalize thread timestamp if provided
 	if opts.threadTS != "" {
 		if err := validate.Timestamp(opts.threadTS); err != nil {
@@ -174,6 +169,12 @@ func runSend(channel, text string, opts *sendOptions, c *client.Client) error {
 		}
 	}
 
+	// Resolve channel name to ID if needed
+	channelID, err := c.ResolveChannel(channel)
+	if err != nil {
+		return err
+	}
+
 	var blocks []interface{}
 	if blocksSource != "" {
 		if err := json.Unmarshal([]byte(blocksSource), &blocks); err != nil {
@@ -184,7 +185,7 @@ func runSend(channel, text string, opts *sendOptions, c *client.Client) error {
 		blocks = buildDefaultBlocks(text)
 	}
 
-	msg, err := c.SendMessage(channel, text, opts.threadTS, blocks, !opts.noUnfurl)
+	msg, err := c.SendMessage(channelID, text, opts.threadTS, blocks, !opts.noUnfurl)
 	if err != nil {
 		return client.WrapError("send message", err)
 	}

@@ -41,7 +41,13 @@ func runHistory(channel string, opts *historyOptions, c *client.Client) error {
 		}
 	}
 
-	messages, err := c.GetChannelHistory(channel, opts.limit, opts.oldest, opts.latest)
+	// Resolve channel name to ID if needed
+	channelID, err := c.ResolveChannel(channel)
+	if err != nil {
+		return err
+	}
+
+	messages, err := c.GetChannelHistory(channelID, opts.limit, opts.oldest, opts.latest)
 	if err != nil {
 		return err
 	}

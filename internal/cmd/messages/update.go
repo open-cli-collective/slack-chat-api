@@ -51,6 +51,12 @@ func runUpdate(channel, timestamp, text string, opts *updateOptions, c *client.C
 		}
 	}
 
+	// Resolve channel name to ID if needed
+	channelID, err := c.ResolveChannel(channel)
+	if err != nil {
+		return err
+	}
+
 	var blocks []interface{}
 	if opts.blocksJSON != "" {
 		if err := json.Unmarshal([]byte(opts.blocksJSON), &blocks); err != nil {
@@ -61,7 +67,7 @@ func runUpdate(channel, timestamp, text string, opts *updateOptions, c *client.C
 		blocks = buildDefaultBlocks(text)
 	}
 
-	if err := c.UpdateMessage(channel, timestamp, text, blocks, !opts.noUnfurl); err != nil {
+	if err := c.UpdateMessage(channelID, timestamp, text, blocks, !opts.noUnfurl); err != nil {
 		return err
 	}
 
