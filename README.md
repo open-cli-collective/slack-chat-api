@@ -309,8 +309,27 @@ These flags are available on all commands:
 |------|-------|---------|-------------|
 | `--output` | `-o` | `text` | Output format: `text`, `json`, or `table` |
 | `--no-color` | | `false` | Disable colored output |
+| `--as-user` | | `false` | Use user token |
+| `--as-bot` | | `false` | Use bot token |
 | `--version` | `-v` | | Show version information |
 | `--help` | `-h` | | Show help for any command |
+
+### Choosing Between Bot and User Tokens
+
+By default, all commands other than search use your bot token. You can set the `SLCK_AS_USER` env var to `true` to make your user token the default. You can also use flags to specify which token to use for any specific command (and this will override the default behavior set by your env var).
+
+```bash
+# Send a message as yourself (using user token)
+slck messages send --as-user C1234567890 "Hey team!"
+
+# Set default to user token via environment variable
+export SLCK_AS_USER=true
+slck messages send C1234567890 "Uses user token by default"
+
+# If the default is user token, you can override back to bot token for a specific command
+export SLCK_AS_USER=true
+slck messages send --as-bot C1234567890 "Uses bot token"
+```
 
 ## Usage
 
@@ -606,6 +625,7 @@ Commands have convenient aliases:
 |----------|-------------|
 | `SLACK_API_TOKEN` | Bot token (overrides stored bot token) |
 | `SLACK_USER_TOKEN` | User token for search (overrides stored user token) |
+| `SLCK_AS_USER` | Set to `true` or `1` to default to user token instead of bot token |
 | `NO_COLOR` | Disable colored output when set |
 | `XDG_CONFIG_HOME` | Custom config directory (default: `~/.config`) |
 
