@@ -2,19 +2,28 @@
 
 ## [Unreleased]
 
+### Added
+- `whoami` command for quick identity check (#101)
+- Channel name resolution - accept channel names in addition to IDs (#102)
+- File upload support in `messages send` command (#96)
+- User ID to display name resolution in message output (#98)
+- `config init` wizard for guided setup (#95)
+- `config clear` command to remove credentials (#95)
+- `--include-bots` flag for search commands (#94)
+- Slack URL format support for thread timestamps (#89)
+- Linux distribution support via Snap, APT, and RPM packages (#82)
+- Block Kit ergonomics improvements for message formatting (#50)
+- `--no-unfurl` flag for `messages send` and `messages update` commands to prevent link previews ([#74](https://github.com/open-cli-collective/slack-chat-api/pull/74))
+- Enhanced search capabilities: user search, scope filters, query builder flags ([#48](https://github.com/open-cli-collective/slack-chat-api/pull/48))
+
 ### Changed
 
 * **Binary renamed to `slck`** - The CLI binary is now `slck` (short for slack-chat-cli). Install via `brew install slack-chat-cli`, run with `slck`. ([#78](https://github.com/open-cli-collective/slack-chat-api/pull/78))
 * Module path migrated to `github.com/open-cli-collective/slack-chat-api` ([#76](https://github.com/open-cli-collective/slack-chat-api/pull/76))
 
-### Added
-
-* `--no-unfurl` flag for `messages send` and `messages update` commands to prevent link previews ([#74](https://github.com/open-cli-collective/slack-chat-api/pull/74))
-* Enhanced search capabilities: user search, scope filters, query builder flags ([#48](https://github.com/open-cli-collective/slack-chat-api/pull/48))
-
 ### Fixed
-
-* Unescape shell-escaped exclamation marks in message text ([#47](https://github.com/open-cli-collective/slack-chat-api/pull/47))
+- Chocolatey install script GitHub releases URL (#88)
+- Unescape shell-escaped exclamation marks in message text ([#47](https://github.com/open-cli-collective/slack-chat-api/pull/47))
 
 ## [3.0.1](https://github.com/open-cli-collective/slack-chat-api/compare/v3.0.0...v3.0.1) (2026-01-12)
 
