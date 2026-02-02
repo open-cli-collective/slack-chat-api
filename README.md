@@ -219,6 +219,8 @@ make build
 
 Your token is stored securely in macOS Keychain, or in a config file on Linux and Windows.
 
+**NOTE:** If you plan on sending messages or taking actions using your user token _(See: Choosing Between Bot and User Tokens)_, you'll need to adjust the manifest above to have all the same scopes configured for your user as your bot (with the exception of the `"channels:manage"` scope, which only applies to bots).
+
 ### Alternative: Environment Variable
 
 ```bash
