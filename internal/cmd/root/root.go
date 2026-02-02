@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/open-cli-collective/slack-chat-api/internal/client"
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/channels"
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/config"
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/initcmd"
@@ -19,6 +20,8 @@ import (
 )
 
 var outputFormat string
+var asUser bool
+var asBot bool
 
 var rootCmd = &cobra.Command{
 	Use:   "slck",
@@ -40,6 +43,18 @@ Or set the SLACK_API_TOKEN environment variable.`,
 			return err
 		}
 		output.OutputFormat = format
+
+		// If flag was provided to determine which token to use, set it in the client
+		if asUser && asBot {
+			return fmt.Errorf("cannot use both --as-user and --as-bot flags together")
+		}
+		if asBot {
+			client.SetAsUser(false)
+		}
+		if asUser {
+			client.SetAsUser(true)
+		}
+
 		return nil
 	},
 }
@@ -55,6 +70,8 @@ func Execute() {
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&outputFormat, "output", "o", "text", "Output format: text, json, or table")
 	rootCmd.PersistentFlags().BoolVar(&output.NoColor, "no-color", false, "Disable colored output")
+	rootCmd.PersistentFlags().BoolVar(&asUser, "as-user", false, "Use user token")
+	rootCmd.PersistentFlags().BoolVar(&asBot, "as-bot", false, "Use bot token")
 
 	// Set custom version template to include commit and build date
 	rootCmd.SetVersionTemplate("slck " + version.Info() + "\n")

@@ -7,12 +7,30 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"time"
 
 	"github.com/open-cli-collective/slack-chat-api/internal/keychain"
 )
 
 const defaultBaseURL = "https://slack.com/api"
+
+// useUserToken stores which token to use, set by root command
+// nil = not explicitly set (check environment variable)
+// pointer to false = explicitly use bot token
+// pointer to true = explicitly use user token
+var useUserToken *bool
+
+// SetAsUser sets the token mode based on user preference
+// true = user token, false = bot token (explicit)
+func SetAsUser(value bool) {
+	useUserToken = &value
+}
+
+// ResetTokenMode resets to unset state (for testing)
+func ResetTokenMode() {
+	useUserToken = nil
+}
 
 // Client handles Slack API interactions
 type Client struct {
@@ -21,8 +39,8 @@ type Client struct {
 	baseURL    string
 }
 
-// New creates a new Slack client
-func New() (*Client, error) {
+// NewBotClient creates a new Slack client using the bot token
+func NewBotClient() (*Client, error) {
 	token, err := keychain.GetAPIToken()
 	if err != nil {
 		return nil, err
@@ -33,6 +51,29 @@ func New() (*Client, error) {
 		token:      token,
 		baseURL:    defaultBaseURL,
 	}, nil
+}
+
+// Priority order:
+// 1. If either --as-bot or --as-user flag is set, uses that token
+// 3. If SLCK_AS_USER env var is "true" or "1", uses user token
+// 4. Default: uses bot token
+func New() (*Client, error) {
+	// If flag was explicitly set (not nil), use that
+	if useUserToken != nil {
+		if *useUserToken {
+			return NewUserClient()
+		}
+		return NewBotClient()
+	}
+
+	// Not explicitly set, check environment variable
+	envValue := os.Getenv("SLCK_AS_USER")
+	if envValue == "true" || envValue == "1" {
+		return NewUserClient()
+	}
+
+	// Default to bot token
+	return NewBotClient()
 }
 
 // NewWithConfig creates a new Slack client with custom configuration.
