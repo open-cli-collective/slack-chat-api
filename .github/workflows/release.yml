@@ -308,6 +308,13 @@ jobs:
           ref: ${{ env.TAG }}
           fetch-depth: 0
 
+      - name: Set snap version from tag
+        run: |
+          VERSION="${TAG#v}"
+          sed -i "s/^version: git$/version: '${VERSION}'/" snap/snapcraft.yaml
+          echo "Snap version: ${VERSION}"
+          grep '^version:' snap/snapcraft.yaml
+
       - name: Build snap
         uses: snapcore/action-build@v1
         id: build
