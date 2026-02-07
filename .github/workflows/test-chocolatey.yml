@@ -42,10 +42,6 @@ jobs:
 
           # Binary is already in tools/ from CI build
           Write-Host "slack-chat-cli installed from local build for testing"
-
-          # Exclude non-executables from shimming
-          New-Item "$toolsDir\LICENSE.ignore" -Type File -Force | Out-Null
-          New-Item "$toolsDir\README.md.ignore" -Type File -Force | Out-Null
           '@ | Set-Content tools/chocolateyInstall.ps1
 
       - name: Pack Chocolatey package
