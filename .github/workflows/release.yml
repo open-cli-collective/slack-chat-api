@@ -85,9 +85,11 @@ jobs:
 
           mkdir -p Casks
 
-          cat > Casks/slack-chat-cli.rb << CASKEOF
-          cask "slack-chat-cli" do
-            name "slack-chat-cli"
+          # Write both cask files so users who installed via either name get updates
+          for CASK_NAME in slck slack-chat-cli; do
+            cat > "Casks/${CASK_NAME}.rb" << CASKEOF
+          cask "${CASK_NAME}" do
+            name "${CASK_NAME}"
             desc "Command-line interface for Slack"
             homepage "https://github.com/open-cli-collective/slack-chat-api"
             version "${VERSION}"
@@ -129,6 +131,7 @@ jobs:
             EOS
           end
           CASKEOF
+          done
 
           # Remove old formula/cask if it exists
           rm -f Formula/slack-chat-api.rb
@@ -137,7 +140,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "Update slack-chat-cli to ${VERSION}"
+          git commit -m "Update slck and slack-chat-cli to ${VERSION}"
           git push
 
   chocolatey:
