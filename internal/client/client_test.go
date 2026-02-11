@@ -483,6 +483,107 @@ func TestClient_GetThreadReplies_Success(t *testing.T) {
 	}
 }
 
+func TestClient_GetThreadReplies_WithReactions(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resp := map[string]interface{}{
+			"ok": true,
+			"messages": []map[string]interface{}{
+				{
+					"ts":   "1234567890.123456",
+					"text": "Original",
+					"user": "U123",
+					"reactions": []map[string]interface{}{
+						{"name": "thumbsup", "count": 2, "users": []string{"U123", "U456"}},
+						{"name": "heart", "count": 1, "users": []string{"U789"}},
+					},
+				},
+				{
+					"ts":   "1234567890.123457",
+					"text": "Reply without reactions",
+					"user": "U456",
+				},
+			},
+			"response_metadata": map[string]string{"next_cursor": ""},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	client := NewWithConfig(server.URL, "test-token", nil)
+	messages, err := client.GetThreadReplies("C123", "1234567890.123456", 100)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(messages) != 2 {
+		t.Fatalf("expected 2 messages, got %d", len(messages))
+	}
+
+	// First message should have reactions
+	if len(messages[0].Reactions) != 2 {
+		t.Fatalf("expected 2 reactions on first message, got %d", len(messages[0].Reactions))
+	}
+	if messages[0].Reactions[0].Name != "thumbsup" {
+		t.Errorf("expected reaction name 'thumbsup', got %s", messages[0].Reactions[0].Name)
+	}
+	if messages[0].Reactions[0].Count != 2 {
+		t.Errorf("expected reaction count 2, got %d", messages[0].Reactions[0].Count)
+	}
+	if len(messages[0].Reactions[0].Users) != 2 {
+		t.Errorf("expected 2 users on thumbsup reaction, got %d", len(messages[0].Reactions[0].Users))
+	}
+	if messages[0].Reactions[1].Name != "heart" {
+		t.Errorf("expected reaction name 'heart', got %s", messages[0].Reactions[1].Name)
+	}
+
+	// Second message should have no reactions
+	if len(messages[1].Reactions) != 0 {
+		t.Errorf("expected 0 reactions on second message, got %d", len(messages[1].Reactions))
+	}
+}
+
+func TestClient_GetChannelHistory_WithReactions(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resp := map[string]interface{}{
+			"ok": true,
+			"messages": []map[string]interface{}{
+				{
+					"ts":   "1234567890.123456",
+					"text": "Hello",
+					"user": "U123",
+					"reactions": []map[string]interface{}{
+						{"name": "wave", "count": 3, "users": []string{"U1", "U2", "U3"}},
+					},
+				},
+			},
+			"response_metadata": map[string]string{"next_cursor": ""},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	client := NewWithConfig(server.URL, "test-token", nil)
+	messages, err := client.GetChannelHistory("C123", 20, "", "")
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(messages) != 1 {
+		t.Fatalf("expected 1 message, got %d", len(messages))
+	}
+	if len(messages[0].Reactions) != 1 {
+		t.Fatalf("expected 1 reaction, got %d", len(messages[0].Reactions))
+	}
+	if messages[0].Reactions[0].Name != "wave" {
+		t.Errorf("expected reaction name 'wave', got %s", messages[0].Reactions[0].Name)
+	}
+	if messages[0].Reactions[0].Count != 3 {
+		t.Errorf("expected reaction count 3, got %d", messages[0].Reactions[0].Count)
+	}
+}
+
 func TestClient_AddReaction_Success(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !strings.Contains(r.URL.Path, "reactions.add") {

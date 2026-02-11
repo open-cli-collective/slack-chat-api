@@ -223,14 +223,22 @@ type User struct {
 	} `json:"profile"`
 }
 
+// Reaction represents an emoji reaction on a Slack message
+type Reaction struct {
+	Name  string   `json:"name"`
+	Count int      `json:"count"`
+	Users []string `json:"users"`
+}
+
 // Message represents a Slack message
 type Message struct {
-	Type       string `json:"type"`
-	User       string `json:"user"`
-	Text       string `json:"text"`
-	TS         string `json:"ts"`
-	ThreadTS   string `json:"thread_ts,omitempty"`
-	ReplyCount int    `json:"reply_count,omitempty"`
+	Type       string     `json:"type"`
+	User       string     `json:"user"`
+	Text       string     `json:"text"`
+	TS         string     `json:"ts"`
+	ThreadTS   string     `json:"thread_ts,omitempty"`
+	ReplyCount int        `json:"reply_count,omitempty"`
+	Reactions  []Reaction `json:"reactions,omitempty"`
 }
 
 // Team represents workspace info
