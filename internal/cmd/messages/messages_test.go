@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/open-cli-collective/slack-chat-api/internal/client"
+	"github.com/open-cli-collective/slack-chat-api/internal/output"
 )
 
 func TestFormatTimestamp(t *testing.T) {
@@ -481,6 +482,115 @@ func TestRunThread_Success(t *testing.T) {
 
 	err := runThread("C123", "1234567890.123456", opts, c)
 	require.NoError(t, err)
+}
+
+func TestRunThread_JSONIncludesReactions(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/conversations.replies":
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"ok": true,
+				"messages": []map[string]interface{}{
+					{
+						"ts":   "1234567890.123456",
+						"user": "U001",
+						"text": "Original",
+						"reactions": []map[string]interface{}{
+							{"name": "thumbsup", "count": 2, "users": []string{"U001", "U002"}},
+						},
+					},
+					{
+						"ts":   "1234567890.123457",
+						"user": "U002",
+						"text": "Reply without reactions",
+					},
+				},
+			})
+		case "/users.info":
+			mockUserInfoHandler(w, r)
+		}
+	}))
+	defer server.Close()
+
+	c := client.NewWithConfig(server.URL, "test-token", nil)
+	opts := &threadOptions{limit: 100}
+
+	// Capture JSON output
+	output.OutputFormat = output.FormatJSON
+	defer func() { output.OutputFormat = output.FormatText }()
+
+	var buf strings.Builder
+	output.Writer = &buf
+	defer func() { output.Writer = os.Stdout }()
+
+	err := runThread("C123", "1234567890.123456", opts, c)
+	require.NoError(t, err)
+
+	// Parse the JSON output
+	var messages []client.Message
+	err = json.Unmarshal([]byte(buf.String()), &messages)
+	require.NoError(t, err)
+
+	require.Len(t, messages, 2)
+
+	// First message should have reactions
+	require.Len(t, messages[0].Reactions, 1)
+	assert.Equal(t, "thumbsup", messages[0].Reactions[0].Name)
+	assert.Equal(t, 2, messages[0].Reactions[0].Count)
+	assert.Equal(t, []string{"U001", "U002"}, messages[0].Reactions[0].Users)
+
+	// Second message should have no reactions
+	assert.Empty(t, messages[1].Reactions)
+}
+
+func TestRunHistory_JSONIncludesReactions(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/conversations.history":
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"ok": true,
+				"messages": []map[string]interface{}{
+					{
+						"ts":   "1234567890.123456",
+						"user": "U001",
+						"text": "Hello",
+						"reactions": []map[string]interface{}{
+							{"name": "wave", "count": 1, "users": []string{"U002"}},
+							{"name": "heart", "count": 3, "users": []string{"U001", "U002", "U003"}},
+						},
+					},
+				},
+			})
+		case "/users.info":
+			mockUserInfoHandler(w, r)
+		}
+	}))
+	defer server.Close()
+
+	c := client.NewWithConfig(server.URL, "test-token", nil)
+	opts := &historyOptions{limit: 20}
+
+	// Capture JSON output
+	output.OutputFormat = output.FormatJSON
+	defer func() { output.OutputFormat = output.FormatText }()
+
+	var buf strings.Builder
+	output.Writer = &buf
+	defer func() { output.Writer = os.Stdout }()
+
+	err := runHistory("C123", opts, c)
+	require.NoError(t, err)
+
+	// Parse the JSON output
+	var messages []client.Message
+	err = json.Unmarshal([]byte(buf.String()), &messages)
+	require.NoError(t, err)
+
+	require.Len(t, messages, 1)
+	require.Len(t, messages[0].Reactions, 2)
+	assert.Equal(t, "wave", messages[0].Reactions[0].Name)
+	assert.Equal(t, "heart", messages[0].Reactions[1].Name)
+	assert.Equal(t, 3, messages[0].Reactions[1].Count)
 }
 
 func TestRunReact_Success(t *testing.T) {
