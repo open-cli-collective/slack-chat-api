@@ -137,6 +137,15 @@ make build
 
 **Note:** On Linux and Windows, credentials are stored in a file with restricted permissions (0600). While not as secure as macOS Keychain, this is standard practice for CLI tools.
 
+### Credential Resolution
+
+Credentials are resolved in this order (first match wins):
+
+1. **Environment variables** (highest priority) — `SLACK_API_TOKEN`, `SLACK_USER_TOKEN`
+2. **Stored credentials** — Keychain (macOS) or config file (Linux/Windows)
+
+This means environment variables always override stored credentials, allowing automation tools to inject their own tokens without conflicting with locally stored ones.
+
 ## Authentication
 
 ### Quick Setup (2 minutes)
