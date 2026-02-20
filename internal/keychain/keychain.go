@@ -15,17 +15,16 @@ const (
 	userTokenKey = "user_token"
 )
 
-// GetAPIToken retrieves the Slack API token from keychain/config or environment
+// GetAPIToken retrieves the Slack API token from environment or keychain/config
 func GetAPIToken() (string, error) {
-	// Try secure storage first (keychain on macOS, config file on Linux)
-	token, err := getCredential(apiTokenKey)
-	if err == nil && token != "" {
+	// Check environment variable first (allows override for automation)
+	if token := os.Getenv("SLACK_API_TOKEN"); token != "" {
 		return token, nil
 	}
 
-	// Fallback to environment variable
-	token = os.Getenv("SLACK_API_TOKEN")
-	if token != "" {
+	// Fallback to secure storage (keychain on macOS, config file on Linux)
+	token, err := getCredential(apiTokenKey)
+	if err == nil && token != "" {
 		return token, nil
 	}
 
@@ -55,14 +54,14 @@ func HasStoredToken() bool {
 
 // GetTokenSource returns where the current token is stored
 func GetTokenSource() string {
+	if os.Getenv("SLACK_API_TOKEN") != "" {
+		return "environment variable"
+	}
 	if token, err := getCredential(apiTokenKey); err == nil && token != "" {
 		if runtime.GOOS == "darwin" {
 			return "Keychain"
 		}
 		return "config file"
-	}
-	if os.Getenv("SLACK_API_TOKEN") != "" {
-		return "environment variable"
 	}
 	return ""
 }
