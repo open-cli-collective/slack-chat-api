@@ -852,6 +852,51 @@ func (c *Client) CompleteUploadExternal(files []CompleteUploadExternalFile, chan
 	return err
 }
 
+// --- File Info & Download Methods ---
+
+// GetFileInfo returns metadata for a file by ID
+func (c *Client) GetFileInfo(fileID string) (*File, error) {
+	params := url.Values{}
+	params.Set("file", fileID)
+
+	body, err := c.get("files.info", params)
+	if err != nil {
+		return nil, err
+	}
+
+	var result struct {
+		File File `json:"file"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, err
+	}
+
+	return &result.File, nil
+}
+
+// DownloadFile downloads a file from a Slack private URL to the given writer
+func (c *Client) DownloadFile(downloadURL string, w io.Writer) error {
+	req, err := http.NewRequest("GET", downloadURL, nil)
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.token)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("download failed with status %d", resp.StatusCode)
+	}
+
+	_, err = io.Copy(w, resp.Body)
+	return err
+}
+
 // --- Search Methods (require user token) ---
 
 // SearchMessages searches for messages matching a query
