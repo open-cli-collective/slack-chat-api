@@ -543,6 +543,79 @@ func TestRunThread_JSONIncludesReactions(t *testing.T) {
 	assert.Empty(t, messages[1].Reactions)
 }
 
+func TestRunThread_JSONIncludesFiles(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/conversations.replies":
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"ok": true,
+				"messages": []map[string]interface{}{
+					{
+						"ts":   "1234567890.123456",
+						"user": "U001",
+						"text": "See the screenshot below",
+						"files": []map[string]interface{}{
+							{
+								"id":                   "F0123ABC",
+								"name":                 "screenshot.png",
+								"title":                "Screenshot",
+								"mimetype":             "image/png",
+								"filetype":             "png",
+								"size":                 54321,
+								"url_private":          "https://files.slack.com/files-pri/T123-F0123ABC/screenshot.png",
+								"url_private_download": "https://files.slack.com/files-pri/T123-F0123ABC/download/screenshot.png",
+								"permalink":            "https://example.slack.com/files/U001/F0123ABC/screenshot.png",
+							},
+						},
+					},
+					{
+						"ts":   "1234567890.123457",
+						"user": "U002",
+						"text": "Plain reply without files",
+					},
+				},
+			})
+		case "/users.info":
+			mockUserInfoHandler(w, r)
+		}
+	}))
+	defer server.Close()
+
+	c := client.NewWithConfig(server.URL, "test-token", nil)
+	opts := &threadOptions{limit: 100}
+
+	// Capture JSON output
+	output.OutputFormat = output.FormatJSON
+	defer func() { output.OutputFormat = output.FormatText }()
+
+	var buf strings.Builder
+	output.Writer = &buf
+	defer func() { output.Writer = os.Stdout }()
+
+	err := runThread("C123", "1234567890.123456", opts, c)
+	require.NoError(t, err)
+
+	// Parse the JSON output
+	var messages []client.Message
+	err = json.Unmarshal([]byte(buf.String()), &messages)
+	require.NoError(t, err)
+
+	require.Len(t, messages, 2)
+
+	// First message should have files
+	require.Len(t, messages[0].Files, 1)
+	assert.Equal(t, "F0123ABC", messages[0].Files[0].ID)
+	assert.Equal(t, "screenshot.png", messages[0].Files[0].Name)
+	assert.Equal(t, "image/png", messages[0].Files[0].Mimetype)
+	assert.Equal(t, "png", messages[0].Files[0].Filetype)
+	assert.Equal(t, int64(54321), messages[0].Files[0].Size)
+	assert.Equal(t, "https://files.slack.com/files-pri/T123-F0123ABC/screenshot.png", messages[0].Files[0].URLPrivate)
+	assert.Equal(t, "https://example.slack.com/files/U001/F0123ABC/screenshot.png", messages[0].Files[0].Permalink)
+
+	// Second message should have no files
+	assert.Empty(t, messages[1].Files)
+}
+
 func TestRunHistory_JSONIncludesReactions(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
