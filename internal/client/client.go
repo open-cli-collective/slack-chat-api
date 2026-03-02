@@ -230,6 +230,19 @@ type Reaction struct {
 	Users []string `json:"users"`
 }
 
+// File represents a file attachment on a Slack message
+type File struct {
+	ID                 string `json:"id"`
+	Name               string `json:"name"`
+	Title              string `json:"title,omitempty"`
+	Mimetype           string `json:"mimetype,omitempty"`
+	Filetype           string `json:"filetype,omitempty"`
+	Size               int64  `json:"size,omitempty"`
+	URLPrivate         string `json:"url_private,omitempty"`
+	URLPrivateDownload string `json:"url_private_download,omitempty"`
+	Permalink          string `json:"permalink,omitempty"`
+}
+
 // Message represents a Slack message
 type Message struct {
 	Type       string     `json:"type"`
@@ -239,6 +252,7 @@ type Message struct {
 	ThreadTS   string     `json:"thread_ts,omitempty"`
 	ReplyCount int        `json:"reply_count,omitempty"`
 	Reactions  []Reaction `json:"reactions,omitempty"`
+	Files      []File     `json:"files,omitempty"`
 }
 
 // Team represents workspace info
