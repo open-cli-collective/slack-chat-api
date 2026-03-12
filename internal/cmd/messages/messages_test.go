@@ -181,59 +181,64 @@ func TestUnescapeShellChars(t *testing.T) {
 }
 
 func TestBuildDefaultBlocks(t *testing.T) {
-	tests := []struct {
-		name string
-		text string
-	}{
-		{
-			name: "simple text",
-			text: "Hello World",
-		},
-		{
-			name: "markdown text",
-			text: "*bold* _italic_ ~strike~",
-		},
-		{
-			name: "empty text",
-			text: "",
-		},
-		{
-			name: "text with special characters",
-			text: "Hello <@U123> in #general",
-		},
-	}
+	t.Run("simple text", func(t *testing.T) {
+		result := buildDefaultBlocks("Hello World")
+		assert.Len(t, result, 1)
+		block := result[0].(map[string]interface{})
+		assert.Equal(t, "section", block["type"])
+		textObj := block["text"].(map[string]interface{})
+		assert.Equal(t, "mrkdwn", textObj["type"])
+		assert.Equal(t, "Hello World", textObj["text"])
+	})
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := buildDefaultBlocks(tt.text)
+	t.Run("empty text", func(t *testing.T) {
+		result := buildDefaultBlocks("")
+		assert.Len(t, result, 1)
+		block := result[0].(map[string]interface{})
+		textObj := block["text"].(map[string]interface{})
+		assert.Equal(t, "", textObj["text"])
+	})
 
-			if len(result) != 1 {
-				t.Fatalf("expected 1 block, got %d", len(result))
+	t.Run("text exceeding 3000 chars splits into multiple blocks", func(t *testing.T) {
+		// Build text with lines that total > 3000 chars
+		var lines []string
+		for i := 0; i < 100; i++ {
+			lines = append(lines, strings.Repeat("x", 50))
+		}
+		text := strings.Join(lines, "\n") // 100 lines * 51 chars = 5100 chars
+
+		result := buildDefaultBlocks(text)
+		assert.Greater(t, len(result), 1, "should split into multiple blocks")
+
+		// Verify all blocks are valid section blocks with text under the limit
+		var reconstructed string
+		for i, b := range result {
+			block := b.(map[string]interface{})
+			assert.Equal(t, "section", block["type"])
+			textObj := block["text"].(map[string]interface{})
+			assert.Equal(t, "mrkdwn", textObj["type"])
+			chunk := textObj["text"].(string)
+			assert.LessOrEqual(t, len(chunk), maxSectionTextLen,
+				"block %d exceeds max section text length", i)
+			if i > 0 {
+				reconstructed += "\n"
 			}
+			reconstructed += chunk
+		}
+		assert.Equal(t, text, reconstructed, "reconstructed text should match original")
+	})
 
-			block, ok := result[0].(map[string]interface{})
-			if !ok {
-				t.Fatal("expected block to be map[string]interface{}")
-			}
+	t.Run("text at exactly 3000 chars stays as one block", func(t *testing.T) {
+		text := strings.Repeat("a", 3000)
+		result := buildDefaultBlocks(text)
+		assert.Len(t, result, 1)
+	})
 
-			if block["type"] != "section" {
-				t.Errorf("expected block type 'section', got %v", block["type"])
-			}
-
-			textObj, ok := block["text"].(map[string]interface{})
-			if !ok {
-				t.Fatal("expected text to be map[string]interface{}")
-			}
-
-			if textObj["type"] != "mrkdwn" {
-				t.Errorf("expected text type 'mrkdwn', got %v", textObj["type"])
-			}
-
-			if textObj["text"] != tt.text {
-				t.Errorf("expected text %q, got %v", tt.text, textObj["text"])
-			}
-		})
-	}
+	t.Run("text at 3001 chars splits", func(t *testing.T) {
+		text := strings.Repeat("a", 3001)
+		result := buildDefaultBlocks(text)
+		assert.Greater(t, len(result), 1)
+	})
 }
 
 // Command handler tests
