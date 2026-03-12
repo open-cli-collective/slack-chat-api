@@ -63,16 +63,49 @@ func unescapeShellChars(s string) string {
 	return s
 }
 
-// buildDefaultBlocks creates a Block Kit section block with mrkdwn formatting.
+// maxSectionTextLen is Slack's character limit for section block text fields.
+const maxSectionTextLen = 3000
+
+// buildDefaultBlocks creates Block Kit section blocks with mrkdwn formatting.
 // This provides a more refined appearance compared to plain text messages.
+// Text exceeding Slack's 3000-char section limit is split across multiple blocks,
+// breaking at the last newline before the limit to avoid splitting mid-line.
 func buildDefaultBlocks(text string) []interface{} {
-	return []interface{}{
-		map[string]interface{}{
+	if len(text) <= maxSectionTextLen {
+		return []interface{}{
+			map[string]interface{}{
+				"type": "section",
+				"text": map[string]interface{}{
+					"type": "mrkdwn",
+					"text": text,
+				},
+			},
+		}
+	}
+
+	var blocks []interface{}
+	remaining := text
+	for len(remaining) > 0 {
+		chunk := remaining
+		if len(chunk) > maxSectionTextLen {
+			chunk = remaining[:maxSectionTextLen]
+			// Break at last newline to avoid splitting mid-line
+			if idx := strings.LastIndex(chunk, "\n"); idx > 0 {
+				chunk = remaining[:idx]
+			}
+		}
+		blocks = append(blocks, map[string]interface{}{
 			"type": "section",
 			"text": map[string]interface{}{
 				"type": "mrkdwn",
-				"text": text,
+				"text": chunk,
 			},
-		},
+		})
+		remaining = remaining[len(chunk):]
+		// Skip the newline we broke at
+		if len(remaining) > 0 && remaining[0] == '\n' {
+			remaining = remaining[1:]
+		}
 	}
+	return blocks
 }
