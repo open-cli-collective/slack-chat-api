@@ -1,7 +1,6 @@
 package emoji
 
 import (
-	"fmt"
 	"sort"
 	"strings"
 
@@ -73,7 +72,7 @@ func runList(opts *listOptions, c *client.Client) error {
 	}
 
 	for _, name := range names {
-		fmt.Println(name)
+		output.Println(name)
 	}
 
 	return nil
