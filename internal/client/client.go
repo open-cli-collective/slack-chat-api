@@ -661,6 +661,24 @@ func (c *Client) RemoveReaction(channel, timestamp, name string) error {
 	return err
 }
 
+// ListEmoji returns a map of custom emoji names to their URLs.
+// Aliases have URLs prefixed with "alias:".
+func (c *Client) ListEmoji() (map[string]string, error) {
+	body, err := c.get("emoji.list", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var result struct {
+		Emoji map[string]string `json:"emoji"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, err
+	}
+
+	return result.Emoji, nil
+}
+
 // GetTeamInfo returns workspace info
 func (c *Client) GetTeamInfo() (*Team, error) {
 	body, err := c.get("team.info", nil)
