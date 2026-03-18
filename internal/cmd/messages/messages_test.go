@@ -1449,6 +1449,57 @@ func TestRunSend_FileUpload_WithComment(t *testing.T) {
 	assert.Equal(t, "Here's the report", completeBody["initial_comment"])
 }
 
+func TestSendCmd_ChannelFlag(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]interface{}
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		assert.Equal(t, "C123", body["channel"])
+		assert.Equal(t, "Hello", body["text"])
+
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"ok": true,
+			"ts": "1234567890.123456",
+		})
+	}))
+	defer server.Close()
+
+	c := client.NewWithConfig(server.URL, "test-token", nil)
+	opts := &sendOptions{channel: "C123", simple: true}
+
+	err := runSend("C123", "Hello", opts, c)
+	require.NoError(t, err)
+}
+
+func TestSendCmd_ChannelFlagWithMultipleArgs(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]interface{}
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		assert.Equal(t, "C123", body["channel"])
+		assert.Equal(t, "Hello World", body["text"])
+
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"ok": true,
+			"ts": "1234567890.123456",
+		})
+	}))
+	defer server.Close()
+
+	c := client.NewWithConfig(server.URL, "test-token", nil)
+	// Simulate what RunE does: join args when --channel is set
+	opts := &sendOptions{channel: "C123", simple: true}
+	text := strings.Join([]string{"Hello", "World"}, " ")
+
+	err := runSend("C123", text, opts, c)
+	require.NoError(t, err)
+}
+
+func TestSendCmd_NoChannelError(t *testing.T) {
+	cmd := newSendCmd()
+	cmd.SetArgs([]string{})
+	err := cmd.Execute()
+	assert.Error(t, err)
+}
+
 func TestRunSend_FileUpload_NonexistentFile(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Error("should not make API calls for nonexistent file")

@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -16,6 +17,7 @@ import (
 )
 
 type sendOptions struct {
+	channel     string
 	threadTS    string
 	blocksJSON  string
 	blocksFile  string
@@ -71,17 +73,34 @@ Examples:
   slck messages send C1234567890 "Here's the report" --file ./report.pdf
   slck messages send C1234567890 --file ./report.pdf --thread 1234567890.123456
   slck messages send C1234567890 --file ./report.pdf --file-title "Monthly Report"
-  slck messages send C1234567890 --file ./a.csv --file ./b.csv`,
-		Args: cobra.RangeArgs(1, 2),
+  slck messages send C1234567890 --file ./a.csv --file ./b.csv
+
+The channel can also be specified via --channel instead of as a positional argument:
+  slck messages send --channel general "Hello team"`,
+		Args: cobra.RangeArgs(0, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			channel := opts.channel
 			text := ""
-			if len(args) > 1 {
-				text = args[1]
+			switch {
+			case channel != "" && len(args) > 0:
+				// --channel provided, positional args are text
+				text = strings.Join(args, " ")
+			case channel != "":
+				// --channel provided, no positional args
+			case len(args) >= 1:
+				// Positional channel
+				channel = args[0]
+				if len(args) > 1 {
+					text = args[1]
+				}
+			default:
+				return fmt.Errorf("channel is required (as first argument or via --channel)")
 			}
-			return runSend(args[0], text, opts, nil)
+			return runSend(channel, text, opts, nil)
 		},
 	}
 
+	cmd.Flags().StringVar(&opts.channel, "channel", "", "Channel name or ID (alternative to positional argument)")
 	cmd.Flags().StringVar(&opts.threadTS, "thread", "", "Thread timestamp for reply")
 	cmd.Flags().StringVar(&opts.blocksJSON, "blocks", "", "Inline Block Kit JSON array (for simple blocks)")
 	cmd.Flags().StringVar(&opts.blocksFile, "blocks-file", "", "Read blocks from JSON file (recommended for complex payloads)")
