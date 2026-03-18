@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -82,8 +83,8 @@ The channel can also be specified via --channel instead of as a positional argum
 			text := ""
 			switch {
 			case channel != "" && len(args) > 0:
-				// --channel provided, all positional args are text
-				text = args[0]
+				// --channel provided, positional args are text
+				text = strings.Join(args, " ")
 			case channel != "":
 				// --channel provided, no positional args
 			case len(args) >= 1:
