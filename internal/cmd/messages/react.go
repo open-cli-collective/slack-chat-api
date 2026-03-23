@@ -49,6 +49,10 @@ func runReact(channel, timestamp, emoji string, opts *reactOptions, c *client.Cl
 	}
 
 	if err := c.AddReaction(channelID, timestamp, emoji); err != nil {
+		if client.IsSlackError(err, "already_reacted") {
+			output.Printf("Already reacted with :%s:\n", emoji)
+			return nil
+		}
 		return client.WrapError(fmt.Sprintf("add reaction :%s:", emoji), err)
 	}
 

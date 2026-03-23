@@ -71,6 +71,10 @@ func runArchive(channel string, opts *archiveOptions, c *client.Client) error {
 	}
 
 	if err := c.ArchiveChannel(channelID); err != nil {
+		if client.IsSlackError(err, "already_archived") {
+			output.Printf("Channel already archived: %s\n", channel)
+			return nil
+		}
 		return client.WrapError(fmt.Sprintf("archive channel %s", channel), err)
 	}
 

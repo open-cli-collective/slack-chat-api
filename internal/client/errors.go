@@ -26,6 +26,18 @@ var errorHints = map[string]string{
 	"is_archived":          "Cannot perform this action on an archived channel.",
 	"too_many_attachments": "Message has too many attachments. Reduce and try again.",
 	"msg_too_long":         "Message is too long. Maximum is 40,000 characters.",
+	"already_reacted":      "Reaction already exists on this message.",
+	"no_reaction":          "No matching reaction found on this message.",
+	"already_in_channel":   "User is already a member of this channel.",
+}
+
+// IsSlackError checks whether an error contains a specific Slack API error code.
+// Uses substring matching because Slack errors are wrapped as "slack API error: <code>".
+func IsSlackError(err error, code string) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(err.Error(), code)
 }
 
 // WrapError wraps a Slack API error with context and a helpful hint if available.

@@ -376,6 +376,70 @@ func TestRunArchive_ChannelNotFound(t *testing.T) {
 	assert.Contains(t, err.Error(), "not found")
 }
 
+func TestRunArchive_AlreadyArchived(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"ok":    false,
+			"error": "already_archived",
+		})
+	}))
+	defer server.Close()
+
+	c := client.NewWithConfig(server.URL, "test-token", nil)
+	opts := &archiveOptions{force: true}
+
+	err := runArchive("C123", opts, c)
+	require.NoError(t, err)
+}
+
+func TestRunUnarchive_NotArchived(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"ok":    false,
+			"error": "not_archived",
+		})
+	}))
+	defer server.Close()
+
+	c := client.NewWithConfig(server.URL, "test-token", nil)
+	opts := &unarchiveOptions{}
+
+	err := runUnarchive("C123", opts, c)
+	require.NoError(t, err)
+}
+
+func TestRunInvite_AlreadyInChannel(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"ok":    false,
+			"error": "already_in_channel",
+		})
+	}))
+	defer server.Close()
+
+	c := client.NewWithConfig(server.URL, "test-token", nil)
+	opts := &inviteOptions{}
+
+	err := runInvite("C123", []string{"U001"}, opts, c)
+	require.NoError(t, err)
+}
+
+func TestRunInvite_AlreadyInChannel_MultiUser(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"ok":    false,
+			"error": "already_in_channel",
+		})
+	}))
+	defer server.Close()
+
+	c := client.NewWithConfig(server.URL, "test-token", nil)
+	opts := &inviteOptions{}
+
+	err := runInvite("C123", []string{"U001", "U002"}, opts, c)
+	require.Error(t, err)
+}
+
 func TestRunUnarchive_NotInChannel(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/conversations.unarchive", r.URL.Path)

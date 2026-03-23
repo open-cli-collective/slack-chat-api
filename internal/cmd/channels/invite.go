@@ -1,6 +1,8 @@
 package channels
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
 
 	"github.com/open-cli-collective/slack-chat-api/internal/client"
@@ -38,7 +40,13 @@ func runInvite(channel string, userIDs []string, opts *inviteOptions, c *client.
 	}
 
 	if err := c.InviteToChannel(channelID, userIDs); err != nil {
-		return err
+		// Only treat as idempotent for single-user invites. Slack's API is all-or-nothing:
+		// multi-user invites fail entirely if any user is already in the channel.
+		if len(userIDs) == 1 && client.IsSlackError(err, "already_in_channel") {
+			output.Printf("User(s) already in channel %s\n", channel)
+			return nil
+		}
+		return client.WrapError(fmt.Sprintf("invite to channel %s", channel), err)
 	}
 
 	output.Printf("Invited %d user(s) to channel %s\n", len(userIDs), channel)

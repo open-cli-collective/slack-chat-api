@@ -72,6 +72,27 @@ func TestWrapError(t *testing.T) {
 			wantHint:   "Verify the channel ID is correct",
 			shouldHint: true,
 		},
+		{
+			name:       "already_reacted includes hint",
+			operation:  "add reaction",
+			inputErr:   fmt.Errorf("already_reacted"),
+			wantHint:   "Reaction already exists",
+			shouldHint: true,
+		},
+		{
+			name:       "no_reaction includes hint",
+			operation:  "remove reaction",
+			inputErr:   fmt.Errorf("no_reaction"),
+			wantHint:   "No matching reaction found",
+			shouldHint: true,
+		},
+		{
+			name:       "already_in_channel includes hint",
+			operation:  "invite user",
+			inputErr:   fmt.Errorf("already_in_channel"),
+			wantHint:   "already a member",
+			shouldHint: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -96,6 +117,53 @@ func TestWrapError(t *testing.T) {
 			} else {
 				assert.NotContains(t, errStr, "Hint:")
 			}
+		})
+	}
+}
+
+func TestIsSlackError(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		code string
+		want bool
+	}{
+		{
+			name: "nil error returns false",
+			err:  nil,
+			code: "already_reacted",
+			want: false,
+		},
+		{
+			name: "matching code returns true",
+			err:  fmt.Errorf("slack API error: already_reacted"),
+			code: "already_reacted",
+			want: true,
+		},
+		{
+			name: "non-matching code returns false",
+			err:  fmt.Errorf("slack API error: channel_not_found"),
+			code: "already_reacted",
+			want: false,
+		},
+		{
+			name: "code embedded in longer message",
+			err:  fmt.Errorf("something went wrong: no_reaction: details here"),
+			code: "no_reaction",
+			want: true,
+		},
+		{
+			name: "already_in_channel",
+			err:  fmt.Errorf("slack API error: already_in_channel"),
+			code: "already_in_channel",
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := IsSlackError(tt.err, tt.code)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
