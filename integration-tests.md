@@ -182,7 +182,7 @@ Using **TS₁** from step 3.1:
 |------|---------|----------|
 | 1 | `slck messages react $TEST_CHANNEL_ID <TS₁> thumbsup` | "Added :thumbsup: reaction" |
 | 2 | `slck messages react $TEST_CHANNEL_ID <TS₁> :heart:` | "Added :heart: reaction" (colons stripped) |
-| 3 | `slck messages react $TEST_CHANNEL_ID <TS₁> thumbsup` | Error: `already_reacted` |
+| 3 | `slck messages react $TEST_CHANNEL_ID <TS₁> thumbsup` | "Already reacted with :thumbsup:" (idempotent, exit 0) |
 | 4 | `slck messages unreact $TEST_CHANNEL_ID <TS₁> thumbsup` | "Removed :thumbsup: reaction" |
 | 5 | `slck messages unreact $TEST_CHANNEL_ID <TS₁> heart` | "Removed :heart: reaction" |
 
@@ -399,7 +399,7 @@ Skip if you didn't set `TEST_USER_ID`.
 
 | Step | Command | Expected |
 |------|---------|----------|
-| 1 | `slck channels invite $TEST_CHANNEL_ID $TEST_USER_ID` | "Invited 1 user(s)" or "already_in_channel" |
+| 1 | `slck channels invite $TEST_CHANNEL_ID $TEST_USER_ID` | "Invited 1 user(s)" or "User(s) already in channel" (idempotent, exit 0) |
 
 ### 4.4 Restore Original State
 
@@ -438,9 +438,9 @@ Using **NEW_CHANNEL_ID** from step 5.1:
 | Step | Command | Expected |
 |------|---------|----------|
 | 1 | `slck channels archive <NEW_CHANNEL_ID> --force` | "Archived channel" |
-| 2 | `slck channels archive <NEW_CHANNEL_ID>` | Error: `already_archived` |
+| 2 | `slck channels archive <NEW_CHANNEL_ID> --force` | "Channel already archived" (idempotent, exit 0) |
 | 3 | `slck channels unarchive <NEW_CHANNEL_ID>` | "Unarchived channel" |
-| 4 | `slck channels unarchive <NEW_CHANNEL_ID>` | Error: `not_archived` |
+| 4 | `slck channels unarchive <NEW_CHANNEL_ID>` | "Channel not archived" (idempotent, exit 0) |
 
 ### 5.4 Cleanup: Archive Test Channels
 

@@ -1006,6 +1006,38 @@ func TestRunUnreact_InvalidTimestamp(t *testing.T) {
 	assert.Contains(t, err.Error(), "invalid timestamp")
 }
 
+func TestRunReact_AlreadyReacted(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"ok":    false,
+			"error": "already_reacted",
+		})
+	}))
+	defer server.Close()
+
+	c := client.NewWithConfig(server.URL, "test-token", nil)
+	opts := &reactOptions{}
+
+	err := runReact("C123", "1234567890.123456", "thumbsup", opts, c)
+	require.NoError(t, err)
+}
+
+func TestRunUnreact_NoReaction(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"ok":    false,
+			"error": "no_reaction",
+		})
+	}))
+	defer server.Close()
+
+	c := client.NewWithConfig(server.URL, "test-token", nil)
+	opts := &unreactOptions{}
+
+	err := runUnreact("C123", "1234567890.123456", "thumbsup", opts, c)
+	require.NoError(t, err)
+}
+
 // Tests for blocks-file and blocks-stdin features
 
 func TestRunSend_BlocksOnly(t *testing.T) {

@@ -49,6 +49,10 @@ func runUnreact(channel, timestamp, emoji string, opts *unreactOptions, c *clien
 	}
 
 	if err := c.RemoveReaction(channelID, timestamp, emoji); err != nil {
+		if client.IsSlackError(err, "no_reaction") {
+			output.Printf("No :%s: reaction to remove\n", emoji)
+			return nil
+		}
 		return client.WrapError(fmt.Sprintf("remove reaction :%s:", emoji), err)
 	}
 
