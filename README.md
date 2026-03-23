@@ -171,6 +171,8 @@ This means environment variables always override stored credentials, allowing au
            "channels:manage",
            "channels:read",
            "chat:write",
+           "emoji:read",
+           "files:read",
            "groups:history",
            "groups:read",
            "reactions:write",
@@ -206,6 +208,8 @@ This means environment variables always override stored credentials, allowing au
          - "channels:manage"
          - "channels:read"
          - "chat:write"
+         - "emoji:read"
+         - "files:read"
          - "groups:history"
          - "groups:read"
          - "reactions:write"
@@ -268,6 +272,8 @@ The manifest above includes these scopes:
 | `channels:history` | Read message history from public channels |
 | `channels:manage` | Create, archive, set topic/purpose, invite users |
 | `chat:write` | Send, update, delete messages |
+| `emoji:read` | List custom workspace emoji |
+| `files:read` | Download files, get file info |
 | `groups:read` | List private channels |
 | `groups:history` | Read message history from private channels |
 | `reactions:write` | Add/remove reactions |
@@ -426,6 +432,9 @@ slck users search "bot" --include-bots
 # Send a message (uses Block Kit formatting by default)
 slck messages send C1234567890 "Hello, *world*!"
 
+# Send using --channel flag (alternative to positional arg)
+slck messages send --channel general "Hello team"
+
 # Send from stdin (use "-" as text argument)
 echo "Hello from stdin" | slck messages send C1234567890 -
 cat message.txt | slck messages send C1234567890 -
@@ -438,6 +447,10 @@ slck messages send C1234567890 "Fallback" --blocks '[{"type":"section","text":{"
 
 # Reply in a thread
 slck messages send C1234567890 "Thread reply" --thread 1234567890.123456
+
+# Upload files with a message
+slck messages send C1234567890 "Here's the report" --file ./report.csv
+slck messages send C1234567890 --file ./a.csv --file ./b.csv
 
 # Update a message
 slck messages update C1234567890 1234567890.123456 "Updated text"
@@ -465,7 +478,7 @@ slck messages unreact C1234567890 1234567890.123456 thumbsup
 
 | Command | Flags | Description |
 |---------|-------|-------------|
-| `send <channel> <text>` | `--thread`, `--blocks`, `--simple` | Send a message (use `-` for stdin) |
+| `send <channel> <text>` | `--thread`, `--blocks`, `--simple`, `--channel`, `--file` | Send a message (use `-` for stdin) |
 | `update <channel> <ts> <text>` | `--blocks`, `--simple` | Update a message |
 | `delete <channel> <ts>` | `--force` | Delete a message (prompts for confirmation) |
 | `history <channel>` | `--limit`, `--oldest`, `--latest` | Get channel history |
@@ -556,6 +569,48 @@ These flags provide an alternative to using modifiers in the query string:
 slck workspace info
 ```
 
+### Emoji
+
+```bash
+# List custom workspace emoji
+slck emoji list
+
+# Include aliases
+slck emoji list --include-aliases
+```
+
+#### Emoji Command Reference
+
+| Command | Flags | Description |
+|---------|-------|-------------|
+| `list` | `--include-aliases` | List custom workspace emoji |
+
+### Files
+
+```bash
+# Download a file by ID
+slck files download F0AHF3NUSQK
+
+# Download to a specific path
+slck files download F0AHF3NUSQK --output report.pdf
+
+# Download using a Slack file URL
+slck files download "https://files.slack.com/files-pri/T.../F0AHF3NUSQK/file.csv"
+```
+
+#### Files Command Reference
+
+| Command | Flags | Description |
+|---------|-------|-------------|
+| `download <file-id-or-url>` | `--output`, `-O` | Download a Slack file |
+
+### Identity
+
+```bash
+# Show authenticated identity (bot, user, workspace)
+slck whoami
+```
+
 ### Config
 
 ```bash
@@ -628,6 +683,7 @@ Commands have convenient aliases:
 | `users` | `u` |
 | `messages` | `msg`, `m` |
 | `search` | `s` |
+| `emoji` | `e` |
 | `workspace` | `ws`, `team` |
 
 ## Environment Variables

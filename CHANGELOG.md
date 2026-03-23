@@ -3,6 +3,11 @@
 ## [Unreleased]
 
 ### Added
+- Idempotent handling for react, unreact, archive, unarchive, and invite commands (#130)
+- `--channel` flag for `messages send` as alternative to positional argument (#126)
+- `emoji list` command for listing custom workspace emoji (#125)
+- `files download` command for downloading files by ID or URL (#122)
+- Files field in message JSON output (#120)
 - `whoami` command for quick identity check (#101)
 - Channel name resolution - accept channel names in addition to IDs (#102)
 - File upload support in `messages send` command (#96)
@@ -22,6 +27,7 @@
 * Module path migrated to `github.com/open-cli-collective/slack-chat-api` ([#76](https://github.com/open-cli-collective/slack-chat-api/pull/76))
 
 ### Fixed
+- Split Block Kit sections exceeding 3000-char limit (#123)
 - Chocolatey install script GitHub releases URL (#88)
 - Unescape shell-escaped exclamation marks in message text ([#47](https://github.com/open-cli-collective/slack-chat-api/pull/47))
 
