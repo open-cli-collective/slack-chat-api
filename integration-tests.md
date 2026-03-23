@@ -29,6 +29,8 @@ In **OAuth & Permissions**, add these **Bot Token Scopes**:
 | `reactions:write` | Add/remove reactions | Part 3 |
 | `channels:manage` | Create, archive, set topic/purpose, invite | Parts 4 & 5 |
 | `groups:write` | Topic/purpose/invite for private channels | Part 4 |
+| `emoji:read` | List custom workspace emoji | Part 7 |
+| `files:read` | Download files, get file info | Part 7 |
 
 **Note:** `channels:manage` is a superset that includes `channels:write.topic` and `channels:write.invites`. You can use the granular scopes instead if you want more limited permissions.
 
@@ -167,6 +169,7 @@ These tests create messages, then clean them up at the end.
 | 2 | `slck messages history $TEST_CHANNEL_ID --limit 1` | Shows your message |
 | 3 | `slck messages send $TEST_CHANNEL_ID "JSON test" -o json` | JSON with `ts` field | (verify only) |
 | 4 | `slck messages send $TEST_CHANNEL_ID "Plain text" --simple` | Message without Block Kit formatting |
+| 5 | `slck messages send --channel $TEST_CHANNEL_ID "Channel flag test"` | "Message sent" (--channel flag alternative) |
 
 ### 3.2 Multiline Message (stdin)
 
@@ -532,6 +535,45 @@ These can be run at any time to verify error handling.
 | 1 | `slck messages send $TEST_CHANNEL_ID "Hello 👋 世界"` | Unicode preserved |
 | 2 | `slck messages send $TEST_CHANNEL_ID 'Test <>&"'"'"' chars'` | Special chars escaped |
 | 3 | `slck channels create my-test-with-hyphens` | Works (clean up after) |
+
+---
+
+## Part 8: Emoji & Files Tests
+
+**Scopes required:** `emoji:read`, `files:read`
+
+These are read-only tests with no side effects.
+
+### 8.1 Emoji List
+
+| Step | Command | Expected |
+|------|---------|----------|
+| 1 | `slck emoji list` | Lists custom emoji names (or "No custom emoji found") |
+| 2 | `slck emoji list --include-aliases` | Includes alias entries (prefixed with `alias:` in JSON) |
+| 3 | `slck emoji list -o json` | Valid JSON map of emoji name → URL |
+
+### 8.2 Files Download
+
+> Requires a known file ID from your workspace. Upload a test file to Slack first, then note its file ID from the message JSON.
+
+| Step | Command | Expected |
+|------|---------|----------|
+| 1 | `slck files download <FILE_ID>` | "Downloaded <name> (<size> bytes) to <path>" |
+| 2 | `slck files download <FILE_ID> --output /tmp/test-download` | File saved to specified path |
+| 3 | `slck files download <FILE_ID> -o json` | JSON with file_id, name, size, path fields |
+
+---
+
+## Part 9: Identity Tests
+
+No additional scopes required (uses `auth.test` which works with any valid token).
+
+### 9.1 Whoami
+
+| Step | Command | Expected |
+|------|---------|----------|
+| 1 | `slck whoami` | Shows Bot name/ID, Workspace name |
+| 2 | `slck whoami -o json` | JSON with bot, workspace fields |
 
 ---
 
