@@ -40,6 +40,8 @@ func runInvite(channel string, userIDs []string, opts *inviteOptions, c *client.
 	}
 
 	if err := c.InviteToChannel(channelID, userIDs); err != nil {
+		// Only treat as idempotent for single-user invites. Slack's API is all-or-nothing:
+		// multi-user invites fail entirely if any user is already in the channel.
 		if len(userIDs) == 1 && client.IsSlackError(err, "already_in_channel") {
 			output.Printf("User(s) already in channel %s\n", channel)
 			return nil

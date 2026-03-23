@@ -32,6 +32,7 @@ var errorHints = map[string]string{
 }
 
 // IsSlackError checks whether an error contains a specific Slack API error code.
+// Uses substring matching because Slack errors are wrapped as "slack API error: <code>".
 func IsSlackError(err error, code string) bool {
 	if err == nil {
 		return false
