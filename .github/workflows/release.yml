@@ -333,6 +333,7 @@ jobs:
   linux-packages:
     needs: goreleaser
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
       - name: Trigger linux-packages repo update
         uses: peter-evans/repository-dispatch@v3
