@@ -586,7 +586,7 @@ func (c *Client) GetChannelHistory(channel string, limit int, oldest, latest str
 }
 
 // GetThreadReplies returns replies to a thread (handles pagination to reach requested limit)
-func (c *Client) GetThreadReplies(channel, threadTS string, limit int) ([]Message, error) {
+func (c *Client) GetThreadReplies(channel, threadTS string, limit int, oldest string) ([]Message, error) {
 	var allMessages []Message
 	cursor := ""
 	remaining := limit
@@ -601,6 +601,9 @@ func (c *Client) GetThreadReplies(channel, threadTS string, limit int) ([]Messag
 			batchSize = 200
 		}
 		params.Set("limit", fmt.Sprintf("%d", batchSize))
+		if oldest != "" {
+			params.Set("oldest", oldest)
+		}
 		if cursor != "" {
 			params.Set("cursor", cursor)
 		}

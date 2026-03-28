@@ -10,6 +10,7 @@ import (
 
 type threadOptions struct {
 	limit int
+	since string
 }
 
 func newThreadCmd() *cobra.Command {
@@ -25,6 +26,7 @@ func newThreadCmd() *cobra.Command {
 	}
 
 	cmd.Flags().IntVar(&opts.limit, "limit", 100, "Maximum replies to return")
+	cmd.Flags().StringVar(&opts.since, "since", "", "Only return messages after this timestamp")
 
 	return cmd
 }
@@ -47,7 +49,7 @@ func runThread(channel, threadTS string, opts *threadOptions, c *client.Client) 
 		return err
 	}
 
-	messages, err := c.GetThreadReplies(channelID, threadTS, opts.limit)
+	messages, err := c.GetThreadReplies(channelID, threadTS, opts.limit, opts.since)
 	if err != nil {
 		return err
 	}

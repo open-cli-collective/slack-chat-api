@@ -473,13 +473,42 @@ func TestClient_GetThreadReplies_Success(t *testing.T) {
 	defer server.Close()
 
 	client := NewWithConfig(server.URL, "test-token", nil)
-	messages, err := client.GetThreadReplies("C123", "1234567890.123456", 100)
+	messages, err := client.GetThreadReplies("C123", "1234567890.123456", 100, "")
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(messages) != 2 {
 		t.Errorf("expected 2 messages, got %d", len(messages))
+	}
+}
+
+func TestClient_GetThreadReplies_WithOldest(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("oldest") != "1700000050.000000" {
+			t.Errorf("expected oldest=1700000050.000000, got %s", r.URL.Query().Get("oldest"))
+		}
+
+		resp := map[string]interface{}{
+			"ok": true,
+			"messages": []map[string]interface{}{
+				{"ts": "1700000060.000000", "text": "New reply"},
+			},
+			"response_metadata": map[string]string{"next_cursor": ""},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	client := NewWithConfig(server.URL, "test-token", nil)
+	messages, err := client.GetThreadReplies("C123", "1700000000.000000", 100, "1700000050.000000")
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(messages) != 1 {
+		t.Errorf("expected 1 message, got %d", len(messages))
 	}
 }
 
@@ -511,7 +540,7 @@ func TestClient_GetThreadReplies_WithReactions(t *testing.T) {
 	defer server.Close()
 
 	client := NewWithConfig(server.URL, "test-token", nil)
-	messages, err := client.GetThreadReplies("C123", "1234567890.123456", 100)
+	messages, err := client.GetThreadReplies("C123", "1234567890.123456", 100, "")
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
