@@ -1010,3 +1010,80 @@ func (c *Client) SearchAll(query string, count, page int, sort, sortDir string, 
 	result.Query = query
 	return &result, nil
 }
+
+// CreateCanvas creates a standalone canvas with markdown content
+func (c *Client) CreateCanvas(title, markdown string) (string, error) {
+	data := map[string]interface{}{
+		"title": title,
+		"document_content": map[string]string{
+			"type":     "markdown",
+			"markdown": markdown,
+		},
+	}
+
+	body, err := c.post("canvases.create", data)
+	if err != nil {
+		return "", err
+	}
+
+	var result struct {
+		CanvasID string `json:"canvas_id"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return "", err
+	}
+	return result.CanvasID, nil
+}
+
+// CreateChannelCanvas creates a canvas pinned to a channel
+func (c *Client) CreateChannelCanvas(channelID, markdown string) (string, error) {
+	data := map[string]interface{}{
+		"channel_id": channelID,
+		"document_content": map[string]string{
+			"type":     "markdown",
+			"markdown": markdown,
+		},
+	}
+
+	body, err := c.post("conversations.canvases.create", data)
+	if err != nil {
+		return "", err
+	}
+
+	var result struct {
+		CanvasID string `json:"canvas_id"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return "", err
+	}
+	return result.CanvasID, nil
+}
+
+// EditCanvas replaces the content of an existing canvas
+func (c *Client) EditCanvas(canvasID, markdown string) error {
+	data := map[string]interface{}{
+		"canvas_id": canvasID,
+		"changes": []map[string]interface{}{
+			{
+				"operation": "replace",
+				"document_content": map[string]string{
+					"type":     "markdown",
+					"markdown": markdown,
+				},
+			},
+		},
+	}
+
+	_, err := c.post("canvases.edit", data)
+	return err
+}
+
+// DeleteCanvas deletes a canvas
+func (c *Client) DeleteCanvas(canvasID string) error {
+	data := map[string]interface{}{
+		"canvas_id": canvasID,
+	}
+
+	_, err := c.post("canvases.delete", data)
+	return err
+}

@@ -1358,3 +1358,99 @@ func TestClient_SearchAll_Success(t *testing.T) {
 		t.Errorf("expected files total 3, got %d", result.Files.Total)
 	}
 }
+
+func TestClient_CreateCanvas_Success(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.Contains(r.URL.Path, "canvases.create") {
+			t.Errorf("expected path canvases.create, got %s", r.URL.Path)
+		}
+
+		resp := map[string]interface{}{
+			"ok":        true,
+			"canvas_id": "F12345ABC",
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	client := NewWithConfig(server.URL, "test-token", nil)
+	canvasID, err := client.CreateCanvas("Test Canvas", "# Hello")
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if canvasID != "F12345ABC" {
+		t.Errorf("expected canvas ID F12345ABC, got %s", canvasID)
+	}
+}
+
+func TestClient_CreateChannelCanvas_Success(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.Contains(r.URL.Path, "conversations.canvases.create") {
+			t.Errorf("expected path conversations.canvases.create, got %s", r.URL.Path)
+		}
+
+		resp := map[string]interface{}{
+			"ok":        true,
+			"canvas_id": "F67890DEF",
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	client := NewWithConfig(server.URL, "test-token", nil)
+	canvasID, err := client.CreateChannelCanvas("C123", "# Channel Doc")
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if canvasID != "F67890DEF" {
+		t.Errorf("expected canvas ID F67890DEF, got %s", canvasID)
+	}
+}
+
+func TestClient_EditCanvas_Success(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.Contains(r.URL.Path, "canvases.edit") {
+			t.Errorf("expected path canvases.edit, got %s", r.URL.Path)
+		}
+
+		resp := map[string]interface{}{
+			"ok": true,
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	client := NewWithConfig(server.URL, "test-token", nil)
+	err := client.EditCanvas("F12345ABC", "# Updated")
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestClient_DeleteCanvas_Success(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.Contains(r.URL.Path, "canvases.delete") {
+			t.Errorf("expected path canvases.delete, got %s", r.URL.Path)
+		}
+
+		resp := map[string]interface{}{
+			"ok": true,
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	client := NewWithConfig(server.URL, "test-token", nil)
+	err := client.DeleteCanvas("F12345ABC")
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}

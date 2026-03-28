@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/open-cli-collective/slack-chat-api/internal/client"
+	"github.com/open-cli-collective/slack-chat-api/internal/cmd/canvas"
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/channels"
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/config"
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/emoji"
@@ -79,6 +80,7 @@ func init() {
 	rootCmd.SetVersionTemplate("slck " + version.Info() + "\n")
 
 	// Add subcommands
+	rootCmd.AddCommand(canvas.NewCmd())
 	rootCmd.AddCommand(channels.NewCmd())
 	rootCmd.AddCommand(users.NewCmd())
 	rootCmd.AddCommand(messages.NewCmd())
