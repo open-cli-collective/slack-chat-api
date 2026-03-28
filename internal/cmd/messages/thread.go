@@ -64,7 +64,7 @@ func runThread(channel, threadTS string, opts *threadOptions, c *client.Client) 
 	resolver := client.NewUserResolver(c)
 	for _, m := range messages {
 		ts := formatTimestamp(m.TS)
-		text := truncate(resolver.ResolveMentions(m.Text), 80)
+		text := flatten(resolver.ResolveMentions(m.Text))
 		name := resolver.Resolve(m.User)
 		output.Printf("[%s] %s: %s\n", ts, name, text)
 	}

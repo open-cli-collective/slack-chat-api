@@ -43,6 +43,12 @@ func formatTimestamp(ts string) string {
 	return t.Format("2006-01-02 15:04")
 }
 
+// flatten replaces newlines with spaces without truncating.
+// Used by detail views (thread) where full content should be visible.
+func flatten(s string) string {
+	return strings.ReplaceAll(s, "\n", " ")
+}
+
 // truncate shortens a string to maxLen, replacing newlines with spaces
 func truncate(s string, maxLen int) string {
 	// Replace newlines with spaces

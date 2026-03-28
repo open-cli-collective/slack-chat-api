@@ -66,6 +66,54 @@ func TestFormatTimestamp(t *testing.T) {
 	}
 }
 
+func TestFlatten(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "no newlines",
+			input:    "Hello World",
+			expected: "Hello World",
+		},
+		{
+			name:     "single newline",
+			input:    "Hello\nWorld",
+			expected: "Hello World",
+		},
+		{
+			name:     "multiple newlines",
+			input:    "Line1\nLine2\nLine3",
+			expected: "Line1 Line2 Line3",
+		},
+		{
+			name:     "empty string",
+			input:    "",
+			expected: "",
+		},
+		{
+			name:     "long string preserved",
+			input:    "This is a very long message that exceeds eighty characters and should not be truncated at all by the flatten function",
+			expected: "This is a very long message that exceeds eighty characters and should not be truncated at all by the flatten function",
+		},
+		{
+			name:     "long string with newlines preserved",
+			input:    "First line\nSecond line that is quite long\nThird line with more content that pushes past eighty characters total",
+			expected: "First line Second line that is quite long Third line with more content that pushes past eighty characters total",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := flatten(tt.input)
+			if result != tt.expected {
+				t.Errorf("flatten(%q) = %q, expected %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
 func TestTruncate(t *testing.T) {
 	tests := []struct {
 		name     string
