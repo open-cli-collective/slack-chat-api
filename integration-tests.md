@@ -196,8 +196,9 @@ Using **TS₁** from step 3.1:
 | Step | Command | Expected | Capture |
 |------|---------|----------|---------|
 | 1 | `slck messages send $TEST_CHANNEL_ID "Thread reply" --thread <TS₁>` | "Message sent" as thread reply | **Save TS₂** |
-| 2 | `slck messages thread $TEST_CHANNEL_ID <TS₁>` | Shows parent + reply |
+| 2 | `slck messages thread $TEST_CHANNEL_ID <TS₁>` | Shows parent + reply, full text (not truncated) |
 | 3 | `slck messages thread $TEST_CHANNEL_ID <TS₁> -o json` | JSON array of thread messages |
+| 4 | `slck messages thread $TEST_CHANNEL_ID <TS₁> --since <TS₁>` | Only replies after TS₁ (may exclude parent) |
 
 ### 3.5 Update Message
 
@@ -206,7 +207,9 @@ Using **TS₁** from step 3.1:
 | Step | Command | Expected |
 |------|---------|----------|
 | 1 | `slck messages update $TEST_CHANNEL_ID <TS₁> "Updated message text"` | "Message updated" |
-| 2 | `slck messages history $TEST_CHANNEL_ID --limit 1` | Shows updated text |
+| 2 | `slck messages history $TEST_CHANNEL_ID --limit 1` | Shows updated text with `[edited]` suffix |
+| 3 | `slck messages thread $TEST_CHANNEL_ID <TS₁>` | Updated message shows `[edited]` suffix |
+| 4 | `slck messages thread $TEST_CHANNEL_ID <TS₁> -o json` | Updated message has `"edited"` object with `user` and `ts` |
 
 ### 3.6 Cleanup: Delete Messages
 
@@ -577,6 +580,59 @@ No additional scopes required (uses `auth.test` which works with any valid token
 
 ---
 
+## Part 10: Canvas Tests
+
+**Scopes required:** Canvas API scopes (see [Slack Canvas API docs](https://docs.slack.dev/surfaces/canvases/))
+
+These tests create, edit, and delete canvases. Cleanup is included.
+
+### 10.1 Create Standalone Canvas
+
+| Step | Command | Expected | Capture |
+|------|---------|----------|---------|
+| 1 | `slck canvas create --title "Test Canvas" --text "# Hello\n\nIntegration test"` | "Created canvas: F..." | **Save CANVAS_ID₁** |
+| 2 | `slck canvas create --title "Test Canvas" --text "# Hello" -o json` | JSON with `canvas_id` and `title` | (verify only) |
+
+### 10.2 Create Canvas from File
+
+| Step | Command | Expected | Capture |
+|------|---------|----------|---------|
+| 1 | `echo "# From stdin" \| slck canvas create --title "Stdin Canvas" --file -` | "Created canvas: F..." | **Save CANVAS_ID₂** |
+
+### 10.3 Create Channel Canvas
+
+| Step | Command | Expected | Capture |
+|------|---------|----------|---------|
+| 1 | `slck canvas create --channel $TEST_CHANNEL_ID --text "# Channel Doc"` | "Created channel canvas: F..." | **Save CANVAS_ID₃** |
+
+### 10.4 Edit Canvas
+
+Using **CANVAS_ID₁** from step 10.1:
+
+| Step | Command | Expected |
+|------|---------|----------|
+| 1 | `slck canvas edit <CANVAS_ID₁> --text "# Updated\n\nNew content"` | "Updated canvas: F..." |
+| 2 | `slck canvas edit <CANVAS_ID₁> --text "# Updated again" -o json` | JSON with `canvas_id` and `status: "updated"` |
+
+### 10.5 Error Cases
+
+| Step | Command | Expected |
+|------|---------|----------|
+| 1 | `slck canvas create --text "no title"` | Error: `--title is required for standalone canvases` |
+| 2 | `slck canvas create --title "both" --channel C123 --text "x"` | Error: `--title is not used with --channel` |
+| 3 | `slck canvas create --title "no content"` | Error: `content required` |
+| 4 | `slck canvas edit F12345 ` | Error: `content required` |
+
+### 10.6 Cleanup: Delete Canvases
+
+| Step | Command | Expected |
+|------|---------|----------|
+| 1 | `slck canvas delete <CANVAS_ID₁>` | "Deleted canvas: F..." |
+| 2 | `slck canvas delete <CANVAS_ID₂>` | "Deleted canvas: F..." |
+| 3 | `slck canvas delete <CANVAS_ID₃>` | "Deleted canvas: F..." |
+
+---
+
 ## Troubleshooting
 
 | Error | Cause | Solution |
@@ -638,3 +694,4 @@ slck messages history $TEST_CHANNEL_ID --limit 5
 | Part 3 (Messaging) | Test messages TS₁, TS₂ | `messages delete` |
 | Part 3B (Search) | Search test message TS₃ | `messages delete` |
 | Part 5 (Destructive) | Test channels | `channels archive` |
+| Part 10 (Canvas) | Test canvases CANVAS_ID₁–₃ | `canvas delete` |

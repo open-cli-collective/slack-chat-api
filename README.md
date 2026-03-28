@@ -468,6 +468,7 @@ slck messages history C1234567890 --latest 1234567890.000000  # Before this time
 # Get thread replies
 slck messages thread C1234567890 1234567890.123456
 slck messages thread C1234567890 1234567890.123456 --limit 50
+slck messages thread C1234567890 1234567890.123456 --since 1234567890.000000  # Only newer replies
 
 # Add/remove reactions
 slck messages react C1234567890 1234567890.123456 thumbsup
@@ -482,7 +483,7 @@ slck messages unreact C1234567890 1234567890.123456 thumbsup
 | `update <channel> <ts> <text>` | `--blocks`, `--simple` | Update a message |
 | `delete <channel> <ts>` | `--force` | Delete a message (prompts for confirmation) |
 | `history <channel>` | `--limit`, `--oldest`, `--latest` | Get channel history |
-| `thread <channel> <ts>` | `--limit` | Get thread replies |
+| `thread <channel> <ts>` | `--limit`, `--since` | Get thread replies |
 | `react <channel> <ts> <emoji>` | | Add reaction |
 | `unreact <channel> <ts> <emoji>` | | Remove reaction |
 
@@ -604,6 +605,35 @@ slck files download "https://files.slack.com/files-pri/T.../F0AHF3NUSQK/file.csv
 |---------|-------|-------------|
 | `download <file-id-or-url>` | `--output`, `-O` | Download a Slack file |
 
+### Canvas
+
+```bash
+# Create a standalone canvas
+slck canvas create --title "Sprint Review" --text "# Sprint Review\n\nContent here"
+slck canvas create --title "Report" --file report.md
+echo "# Report" | slck canvas create --title "Report" --file -
+
+# Create a channel canvas (pinned to channel tab)
+slck canvas create --channel C1234567890 --file runbook.md
+
+# Edit a canvas
+slck canvas edit F12345ABC --text "# Updated content"
+slck canvas edit F12345ABC --file updated.md
+
+# Delete a canvas
+slck canvas delete F12345ABC
+```
+
+#### Canvas Command Reference
+
+| Command | Flags | Description |
+|---------|-------|-------------|
+| `create` | `--title`, `--text`, `--file`, `--channel` | Create a standalone or channel canvas |
+| `edit <canvas-id>` | `--text`, `--file` | Replace canvas content |
+| `delete <canvas-id>` | | Delete a canvas |
+
+> **Note:** Canvas commands require additional Slack app scopes not included in the default manifest. See [Slack Canvas API docs](https://docs.slack.dev/surfaces/canvases/) for required scopes.
+
 ### Identity
 
 ```bash
@@ -679,6 +709,7 @@ Commands have convenient aliases:
 
 | Command | Aliases |
 |---------|---------|
+| `canvas` | `cv` |
 | `channels` | `ch` |
 | `users` | `u` |
 | `messages` | `msg`, `m` |
