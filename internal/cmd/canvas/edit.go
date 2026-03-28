@@ -2,6 +2,7 @@ package canvas
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/spf13/cobra"
 
@@ -10,8 +11,9 @@ import (
 )
 
 type editOptions struct {
-	text string
-	file string
+	text  string
+	file  string
+	stdin io.Reader // For testing
 }
 
 func newEditCmd() *cobra.Command {
@@ -38,12 +40,12 @@ func newEditCmd() *cobra.Command {
 }
 
 func runEdit(canvasID string, opts *editOptions, c *client.Client) error {
-	markdown, err := resolveContent(opts.text, opts.file, nil)
+	markdown, err := resolveContent(opts.text, opts.file, opts.stdin)
 	if err != nil {
 		return err
 	}
 	if markdown == "" {
-		return fmt.Errorf("content required: use --text or --file")
+		return fmt.Errorf("content required: use --text, --file, or --file -")
 	}
 
 	if c == nil {

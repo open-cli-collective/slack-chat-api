@@ -1,7 +1,6 @@
 package canvas
 
 import (
-	"bufio"
 	"fmt"
 	"io"
 	"os"
@@ -40,7 +39,7 @@ Create a channel canvas (pinned to channel tab):
 		},
 	}
 
-	cmd.Flags().StringVar(&opts.title, "title", "", "Canvas title")
+	cmd.Flags().StringVar(&opts.title, "title", "", "Canvas title (standalone canvases only)")
 	cmd.Flags().StringVar(&opts.text, "text", "", "Markdown content as inline text")
 	cmd.Flags().StringVar(&opts.file, "file", "", "Read markdown content from file (use - for stdin)")
 	cmd.Flags().StringVar(&opts.channel, "channel", "", "Channel ID to create a channel canvas")
@@ -55,6 +54,14 @@ func runCreate(opts *createOptions, c *client.Client) error {
 	}
 	if markdown == "" {
 		return fmt.Errorf("content required: use --text, --file, or --file -")
+	}
+
+	// Validate flags before client init so users get clear errors without needing a valid token
+	if opts.channel == "" && opts.title == "" {
+		return fmt.Errorf("--title is required for standalone canvases")
+	}
+	if opts.channel != "" && opts.title != "" {
+		return fmt.Errorf("--title is not used with --channel (channel canvases don't have titles)")
 	}
 
 	if c == nil {
@@ -78,10 +85,6 @@ func runCreate(opts *createOptions, c *client.Client) error {
 		}
 		output.Printf("Created channel canvas: %s\n", canvasID)
 		return nil
-	}
-
-	if opts.title == "" {
-		return fmt.Errorf("--title is required for standalone canvases")
 	}
 
 	canvasID, err := c.CreateCanvas(opts.title, markdown)
@@ -124,16 +127,9 @@ func readStdin(r io.Reader) (string, error) {
 	if r == nil {
 		r = os.Stdin
 	}
-	scanner := bufio.NewScanner(r)
-	var lines []byte
-	for scanner.Scan() {
-		if len(lines) > 0 {
-			lines = append(lines, '\n')
-		}
-		lines = append(lines, scanner.Bytes()...)
-	}
-	if err := scanner.Err(); err != nil {
+	data, err := io.ReadAll(r)
+	if err != nil {
 		return "", fmt.Errorf("reading stdin: %w", err)
 	}
-	return string(lines), nil
+	return string(data), nil
 }
