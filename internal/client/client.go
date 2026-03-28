@@ -243,6 +243,12 @@ type File struct {
 	Permalink          string `json:"permalink,omitempty"`
 }
 
+// Edited represents the edit metadata for an edited Slack message
+type Edited struct {
+	User string `json:"user"`
+	TS   string `json:"ts"`
+}
+
 // Message represents a Slack message
 type Message struct {
 	Type       string     `json:"type"`
@@ -251,6 +257,7 @@ type Message struct {
 	TS         string     `json:"ts"`
 	ThreadTS   string     `json:"thread_ts,omitempty"`
 	ReplyCount int        `json:"reply_count,omitempty"`
+	Edited     *Edited    `json:"edited,omitempty"`
 	Reactions  []Reaction `json:"reactions,omitempty"`
 	Files      []File     `json:"files,omitempty"`
 }

@@ -66,7 +66,11 @@ func runHistory(channel string, opts *historyOptions, c *client.Client) error {
 		ts := formatTimestamp(m.TS)
 		text := truncate(resolver.ResolveMentions(m.Text), 80)
 		name := resolver.Resolve(m.User)
-		output.Printf("[%s] %s: %s\n", ts, name, text)
+		edited := ""
+		if m.Edited != nil {
+			edited = " [edited]"
+		}
+		output.Printf("[%s] %s: %s%s\n", ts, name, text, edited)
 	}
 
 	return nil

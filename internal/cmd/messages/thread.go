@@ -68,7 +68,11 @@ func runThread(channel, threadTS string, opts *threadOptions, c *client.Client) 
 		ts := formatTimestamp(m.TS)
 		text := flatten(resolver.ResolveMentions(m.Text))
 		name := resolver.Resolve(m.User)
-		output.Printf("[%s] %s: %s\n", ts, name, text)
+		edited := ""
+		if m.Edited != nil {
+			edited = " [edited]"
+		}
+		output.Printf("[%s] %s: %s%s\n", ts, name, text, edited)
 	}
 
 	return nil
