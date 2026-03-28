@@ -572,6 +572,63 @@ func TestClient_GetThreadReplies_WithReactions(t *testing.T) {
 	}
 }
 
+func TestClient_GetThreadReplies_WithEdited(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resp := map[string]interface{}{
+			"ok": true,
+			"messages": []map[string]interface{}{
+				{
+					"ts":   "1234567890.123456",
+					"text": "Updated text after edit",
+					"user": "U123",
+					"edited": map[string]interface{}{
+						"user": "U123",
+						"ts":   "1234567891.000000",
+					},
+				},
+				{
+					"ts":   "1234567890.123457",
+					"text": "Unedited reply",
+					"user": "U456",
+				},
+			},
+			"response_metadata": map[string]string{"next_cursor": ""},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	client := NewWithConfig(server.URL, "test-token", nil)
+	messages, err := client.GetThreadReplies("C123", "1234567890.123456", 100, "")
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(messages) != 2 {
+		t.Fatalf("expected 2 messages, got %d", len(messages))
+	}
+
+	// First message should have edited metadata
+	if messages[0].Edited == nil {
+		t.Fatal("expected edited metadata on first message, got nil")
+	}
+	if messages[0].Edited.User != "U123" {
+		t.Errorf("expected edited user 'U123', got %s", messages[0].Edited.User)
+	}
+	if messages[0].Edited.TS != "1234567891.000000" {
+		t.Errorf("expected edited ts '1234567891.000000', got %s", messages[0].Edited.TS)
+	}
+	if messages[0].Text != "Updated text after edit" {
+		t.Errorf("expected updated text, got %s", messages[0].Text)
+	}
+
+	// Second message should not have edited metadata
+	if messages[1].Edited != nil {
+		t.Errorf("expected no edited metadata on second message, got %+v", messages[1].Edited)
+	}
+}
+
 func TestClient_GetChannelHistory_WithReactions(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		resp := map[string]interface{}{
