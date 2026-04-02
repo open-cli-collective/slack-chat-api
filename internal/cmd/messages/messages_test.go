@@ -1599,20 +1599,22 @@ func TestRunSend_FileUpload_NonexistentFile(t *testing.T) {
 func TestValidateMessageLength(t *testing.T) {
 	tests := []struct {
 		name    string
-		length  int
+		text    string
 		wantErr bool
 	}{
-		{"under limit", 1000, false},
-		{"at limit", maxMessageTextLen, false},
-		{"over limit by one", maxMessageTextLen + 1, true},
-		{"well over limit", 50000, true},
-		{"empty", 0, false},
+		{"under limit", strings.Repeat("x", 1000), false},
+		{"at limit", strings.Repeat("x", maxMessageTextLen), false},
+		{"over limit by one", strings.Repeat("x", maxMessageTextLen+1), true},
+		{"well over limit", strings.Repeat("x", 50000), true},
+		{"empty", "", false},
+		{"multi-byte under limit", strings.Repeat("😀", 1000), false},
+		{"multi-byte at limit", strings.Repeat("😀", maxMessageTextLen), false},
+		{"multi-byte over limit", strings.Repeat("😀", maxMessageTextLen+1), true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			text := strings.Repeat("x", tt.length)
-			err := validateMessageLength(text)
+			err := validateMessageLength(tt.text, false)
 			if tt.wantErr {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), "exceeds Slack's 40000 character limit")
@@ -1623,6 +1625,14 @@ func TestValidateMessageLength(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestValidateMessageLength_UpdateOmitsFileHint(t *testing.T) {
+	text := strings.Repeat("x", maxMessageTextLen+1)
+	err := validateMessageLength(text, true)
+	require.Error(t, err)
+	assert.NotContains(t, err.Error(), "--file")
+	assert.Contains(t, err.Error(), "canvas create")
 }
 
 func TestRunSend_MessageTooLong(t *testing.T) {

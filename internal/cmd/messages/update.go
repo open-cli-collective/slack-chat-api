@@ -43,7 +43,7 @@ func runUpdate(channel, timestamp, text string, opts *updateOptions, c *client.C
 	// Unescape shell-escaped characters (e.g., \! from zsh)
 	text = unescapeShellChars(text)
 
-	if err := validateMessageLength(text); err != nil {
+	if err := validateMessageLength(text, true); err != nil {
 		return err
 	}
 

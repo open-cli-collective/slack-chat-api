@@ -201,7 +201,7 @@ func runSend(channel, text string, opts *sendOptions, c *client.Client) error {
 
 	// Validate message length (file uploads use a different API path with no text limit)
 	if !hasFiles {
-		if err := validateMessageLength(text); err != nil {
+		if err := validateMessageLength(text, false); err != nil {
 			return err
 		}
 	}

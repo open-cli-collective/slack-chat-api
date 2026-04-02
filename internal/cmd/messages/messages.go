@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/spf13/cobra"
 )
@@ -79,9 +80,21 @@ const maxSectionTextLen = 3000
 const maxMessageTextLen = 40000
 
 // validateMessageLength checks whether text exceeds Slack's message length limit.
-func validateMessageLength(text string) error {
-	if len(text) <= maxMessageTextLen {
+// The forUpdate parameter controls which alternatives are suggested in the error message.
+func validateMessageLength(text string, forUpdate bool) error {
+	charCount := utf8.RuneCountInString(text)
+	if charCount <= maxMessageTextLen {
 		return nil
+	}
+	if forUpdate {
+		return fmt.Errorf(
+			"message text is %d characters, which exceeds Slack's %d character limit\n"+
+				"The message would be silently truncated by Slack\n\n"+
+				"Alternative:\n"+
+				"  slck canvas create  Create a Slack canvas instead\n\n"+
+				"To split into multiple messages, write the content to a file and chunk it yourself",
+			charCount, maxMessageTextLen,
+		)
 	}
 	return fmt.Errorf(
 		"message text is %d characters, which exceeds Slack's %d character limit\n"+
@@ -90,7 +103,7 @@ func validateMessageLength(text string) error {
 			"  --file <path>       Upload as a file attachment (no length limit)\n"+
 			"  slck canvas create  Create a Slack canvas instead\n\n"+
 			"To split into multiple messages, write the content to a file and chunk it yourself",
-		len(text), maxMessageTextLen,
+		charCount, maxMessageTextLen,
 	)
 }
 
