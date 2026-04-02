@@ -1595,3 +1595,89 @@ func TestRunSend_FileUpload_NonexistentFile(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "cannot access file")
 }
+
+func TestValidateMessageLength(t *testing.T) {
+	tests := []struct {
+		name    string
+		length  int
+		wantErr bool
+	}{
+		{"under limit", 1000, false},
+		{"at limit", maxMessageTextLen, false},
+		{"over limit by one", maxMessageTextLen + 1, true},
+		{"well over limit", 50000, true},
+		{"empty", 0, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			text := strings.Repeat("x", tt.length)
+			err := validateMessageLength(text)
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), "exceeds Slack's 40000 character limit")
+				assert.Contains(t, err.Error(), "--file")
+				assert.Contains(t, err.Error(), "canvas create")
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestRunSend_MessageTooLong(t *testing.T) {
+	c := client.NewWithConfig("http://localhost", "test-token", nil)
+	opts := &sendOptions{simple: true}
+
+	longText := strings.Repeat("x", maxMessageTextLen+1)
+	err := runSend("C123", longText, opts, c)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "exceeds Slack's 40000 character limit")
+}
+
+func TestRunUpdate_MessageTooLong(t *testing.T) {
+	c := client.NewWithConfig("http://localhost", "test-token", nil)
+	opts := &updateOptions{simple: true}
+
+	longText := strings.Repeat("x", maxMessageTextLen+1)
+	err := runUpdate("C123", "1234567890.123456", longText, opts, c)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "exceeds Slack's 40000 character limit")
+}
+
+func TestRunSend_FileUpload_LongTextAllowed(t *testing.T) {
+	tmpFile, err := os.CreateTemp(t.TempDir(), "test-upload-*.txt")
+	require.NoError(t, err)
+	_, err = tmpFile.WriteString("content")
+	require.NoError(t, err)
+	tmpFile.Close()
+
+	uploadServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer uploadServer.Close()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case strings.Contains(r.URL.Path, "files.getUploadURLExternal"):
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"ok":         true,
+				"upload_url": uploadServer.URL + "/upload",
+				"file_id":    "F123",
+			})
+		case strings.Contains(r.URL.Path, "files.completeUploadExternal"):
+			json.NewEncoder(w).Encode(map[string]interface{}{"ok": true})
+		}
+	}))
+	defer server.Close()
+
+	c := client.NewWithConfig(server.URL, "test-token", nil)
+	longText := strings.Repeat("x", maxMessageTextLen+1)
+	opts := &sendOptions{
+		files: []string{tmpFile.Name()},
+	}
+
+	err = runSend("C123456789", longText, opts, c)
+	require.NoError(t, err)
+}

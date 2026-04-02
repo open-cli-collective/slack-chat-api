@@ -729,6 +729,13 @@ Commands have convenient aliases:
 
 ## Known Limitations
 
+### Message Length Limits
+
+Slack silently truncates messages exceeding 40,000 characters. `slck` validates message length before sending and returns an error with suggestions:
+
+- Upload as a file: `slck messages send C123 --file ./content.txt`
+- Create a canvas: `slck canvas create --title "Title" --file ./content.md`
+
 ### Unarchiving Channels
 
 Bot tokens (`xoxb-`) cannot unarchive channels due to a [Slack API limitation](https://api.slack.com/methods/conversations.unarchive). When a channel is archived, the bot is automatically removed from it, and bot tokens require membership to unarchive.

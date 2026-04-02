@@ -1,12 +1,20 @@
 # Changelog
 
-## [Unreleased]
+## [3.2.0]
 
 ### Added
 - `canvas` command group: create, edit, and delete Slack Canvases (#137)
 - `--since` flag for `messages thread` to filter replies by timestamp (#135)
 - `edited` metadata field on messages with `[edited]` text indicator (#136)
 - Idempotent handling for react, unreact, archive, unarchive, and invite commands (#130)
+- Pre-send message length validation — errors with helpful alternatives when text exceeds Slack's 40,000 character limit (#139)
+
+### Fixed
+- `messages thread` text output no longer truncates at 80 characters (#134)
+
+## [3.1.35]
+
+### Added
 - `--channel` flag for `messages send` as alternative to positional argument (#126)
 - `emoji list` command for listing custom workspace emoji (#125)
 - `files download` command for downloading files by ID or URL (#122)
@@ -30,7 +38,6 @@
 * Module path migrated to `github.com/open-cli-collective/slack-chat-api` ([#76](https://github.com/open-cli-collective/slack-chat-api/pull/76))
 
 ### Fixed
-- `messages thread` text output no longer truncates at 80 characters (#134)
 - Split Block Kit sections exceeding 3000-char limit (#123)
 - Chocolatey install script GitHub releases URL (#88)
 - Unescape shell-escaped exclamation marks in message text ([#47](https://github.com/open-cli-collective/slack-chat-api/pull/47))

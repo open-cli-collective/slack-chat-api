@@ -199,6 +199,13 @@ func runSend(channel, text string, opts *sendOptions, c *client.Client) error {
 		return fmt.Errorf("message text cannot be empty (or provide blocks via --blocks, --blocks-file, --blocks-stdin, or files via --file)")
 	}
 
+	// Validate message length (file uploads use a different API path with no text limit)
+	if !hasFiles {
+		if err := validateMessageLength(text); err != nil {
+			return err
+		}
+	}
+
 	if c == nil {
 		var err error
 		c, err = client.New()
