@@ -1,9 +1,11 @@
 package messages
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/spf13/cobra"
 )
@@ -71,6 +73,39 @@ func unescapeShellChars(s string) string {
 
 // maxSectionTextLen is Slack's character limit for section block text fields.
 const maxSectionTextLen = 3000
+
+// maxMessageTextLen is Slack's hard limit for the text field of a message.
+// Messages exceeding this limit are silently truncated by Slack.
+// See: https://docs.slack.dev/changelog/2018-truncating-really-long-messages/
+const maxMessageTextLen = 40000
+
+// validateMessageLength checks whether text exceeds Slack's message length limit.
+// The forUpdate parameter controls which alternatives are suggested in the error message.
+func validateMessageLength(text string, forUpdate bool) error {
+	charCount := utf8.RuneCountInString(text)
+	if charCount <= maxMessageTextLen {
+		return nil
+	}
+	if forUpdate {
+		return fmt.Errorf(
+			"message text is %d characters, which exceeds Slack's %d character limit\n"+
+				"The message would be silently truncated by Slack\n\n"+
+				"Alternative:\n"+
+				"  slck canvas create  Create a Slack canvas instead\n\n"+
+				"To split into multiple messages, write the content to a file and chunk it yourself",
+			charCount, maxMessageTextLen,
+		)
+	}
+	return fmt.Errorf(
+		"message text is %d characters, which exceeds Slack's %d character limit\n"+
+			"The message would be silently truncated by Slack\n\n"+
+			"Alternatives:\n"+
+			"  --file <path>       Upload as a file attachment (no length limit)\n"+
+			"  slck canvas create  Create a Slack canvas instead\n\n"+
+			"To split into multiple messages, write the content to a file and chunk it yourself",
+		charCount, maxMessageTextLen,
+	)
+}
 
 // buildDefaultBlocks creates Block Kit section blocks with mrkdwn formatting.
 // This provides a more refined appearance compared to plain text messages.
