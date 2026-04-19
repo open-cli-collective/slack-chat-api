@@ -64,7 +64,10 @@ func runHistory(channel string, opts *historyOptions, c *client.Client) error {
 	resolver := client.NewUserResolver(c)
 	for _, m := range messages {
 		ts := formatTimestamp(m.TS)
-		text := truncate(resolver.ResolveMentions(m.Text), 80)
+		// Compact view — truncation inherently flattens, so the
+		// blocks-vs-text distinction doesn't matter here.
+		body, _ := messageBody(m, resolver)
+		text := truncate(body, 80)
 		name := resolver.Resolve(m.User)
 		edited := ""
 		if m.Edited != nil {

@@ -63,6 +63,26 @@ func truncate(s string, maxLen int) string {
 	return s[:maxLen-3] + "..."
 }
 
+// messageBody chooses the right source for a message's textual content.
+// When blocks render non-empty, returns the rendered body with
+// fromBlocks=true; otherwise returns the mention-resolved m.Text with
+// fromBlocks=false. Callers use fromBlocks to decide whether to preserve
+// newlines (thread detail view) or flatten them (text-only path).
+func messageBody(m client.Message, resolver *client.UserResolver) (body string, fromBlocks bool) {
+	if rendered := client.RenderBlocks(m.Blocks, resolver); rendered != "" {
+		return rendered, true
+	}
+	return resolver.ResolveMentions(m.Text), false
+}
+
+// indentContinuation replaces interior newlines with "\n\t" so that every
+// line after the first is indented under the "[<ts>] <user>:" header.
+// Any trailing newline is trimmed first to avoid a dangling tab.
+func indentContinuation(s string) string {
+	s = strings.TrimRight(s, "\n")
+	return strings.ReplaceAll(s, "\n", "\n\t")
+}
+
 // renderFiles returns one tab-indented "[file] ..." line per attachment, each
 // terminated with "\n". Returns "" when files is empty. The format gives a
 // reader (human or agent) enough context to invoke `slck files download <id>`.

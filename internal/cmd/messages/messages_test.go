@@ -1814,6 +1814,378 @@ func TestRunThread_TextIncludesFileHints(t *testing.T) {
 	assert.Contains(t, out, "slck files download F0AT13FGVAT")
 }
 
+func TestRunThread_RendersRichTextBlocks(t *testing.T) {
+	// Message with empty text and a rich_text block containing a section.
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/conversations.replies":
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"ok": true,
+				"messages": []map[string]interface{}{
+					{
+						"ts":   "1234567890.123456",
+						"user": "U001",
+						"text": "",
+						"blocks": []map[string]interface{}{
+							{
+								"type": "rich_text",
+								"elements": []map[string]interface{}{
+									{
+										"type": "rich_text_section",
+										"elements": []map[string]interface{}{
+											{"type": "text", "text": "Account Number Check Number"},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			})
+		case "/users.info":
+			mockUserInfoHandler(w, r)
+		}
+	}))
+	defer server.Close()
+
+	c := client.NewWithConfig(server.URL, "test-token", nil)
+	opts := &threadOptions{limit: 100}
+
+	out := captureTextOutput(t, func() {
+		require.NoError(t, runThread("C123", "1234567890.123456", opts, c))
+	})
+	assert.Contains(t, out, "Account Number Check Number")
+}
+
+func TestRunThread_BlocksOverrideNonEmptyText(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/conversations.replies":
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"ok": true,
+				"messages": []map[string]interface{}{
+					{
+						"ts":   "1234567890.123456",
+						"user": "U001",
+						"text": "FALLBACK_TEXT_SENTINEL",
+						"blocks": []map[string]interface{}{
+							{
+								"type": "rich_text",
+								"elements": []map[string]interface{}{
+									{
+										"type": "rich_text_section",
+										"elements": []map[string]interface{}{
+											{"type": "text", "text": "FROM_BLOCKS"},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			})
+		case "/users.info":
+			mockUserInfoHandler(w, r)
+		}
+	}))
+	defer server.Close()
+
+	c := client.NewWithConfig(server.URL, "test-token", nil)
+	opts := &threadOptions{limit: 100}
+
+	out := captureTextOutput(t, func() {
+		require.NoError(t, runThread("C123", "1234567890.123456", opts, c))
+	})
+	assert.Contains(t, out, "FROM_BLOCKS")
+	assert.NotContains(t, out, "FALLBACK_TEXT_SENTINEL")
+}
+
+func TestRunThread_FallsBackToTextWhenSubBlocksUnrenderable(t *testing.T) {
+	// Blocks contain only unknown rich_text sub-types → renderer yields
+	// empty → fall back to m.Text.
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/conversations.replies":
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"ok": true,
+				"messages": []map[string]interface{}{
+					{
+						"ts":   "1234567890.123456",
+						"user": "U001",
+						"text": "FALLBACK_TEXT",
+						"blocks": []map[string]interface{}{
+							{
+								"type": "rich_text",
+								"elements": []map[string]interface{}{
+									{"type": "rich_text_future_kind", "elements": []map[string]interface{}{}},
+								},
+							},
+						},
+					},
+				},
+			})
+		case "/users.info":
+			mockUserInfoHandler(w, r)
+		}
+	}))
+	defer server.Close()
+
+	c := client.NewWithConfig(server.URL, "test-token", nil)
+	opts := &threadOptions{limit: 100}
+
+	out := captureTextOutput(t, func() {
+		require.NoError(t, runThread("C123", "1234567890.123456", opts, c))
+	})
+	assert.Contains(t, out, "FALLBACK_TEXT")
+}
+
+func TestRunThread_FallsBackToTextWhenInlineElementsUnrenderable(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/conversations.replies":
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"ok": true,
+				"messages": []map[string]interface{}{
+					{
+						"ts":   "1234567890.123456",
+						"user": "U001",
+						"text": "INLINE_FALLBACK",
+						"blocks": []map[string]interface{}{
+							{
+								"type": "rich_text",
+								"elements": []map[string]interface{}{
+									{
+										"type": "rich_text_section",
+										"elements": []map[string]interface{}{
+											{"type": "future_inline", "text": "ignored"},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			})
+		case "/users.info":
+			mockUserInfoHandler(w, r)
+		}
+	}))
+	defer server.Close()
+
+	c := client.NewWithConfig(server.URL, "test-token", nil)
+	opts := &threadOptions{limit: 100}
+
+	out := captureTextOutput(t, func() {
+		require.NoError(t, runThread("C123", "1234567890.123456", opts, c))
+	})
+	assert.Contains(t, out, "INLINE_FALLBACK")
+}
+
+func TestRunThread_FallsBackToTextWhenBlocksNil(t *testing.T) {
+	// No regression on the common path: no blocks → m.Text renders as before.
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/conversations.replies":
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"ok": true,
+				"messages": []map[string]interface{}{
+					{"ts": "1234567890.123456", "user": "U001", "text": "plain old text"},
+				},
+			})
+		case "/users.info":
+			mockUserInfoHandler(w, r)
+		}
+	}))
+	defer server.Close()
+
+	c := client.NewWithConfig(server.URL, "test-token", nil)
+	opts := &threadOptions{limit: 100}
+
+	out := captureTextOutput(t, func() {
+		require.NoError(t, runThread("C123", "1234567890.123456", opts, c))
+	})
+	assert.Contains(t, out, "plain old text")
+}
+
+func TestRunThread_MultilineBlocksIndentContinuationLines(t *testing.T) {
+	// A rich_text block with two sections renders as two lines; the
+	// second line must be indented with \t under the header.
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/conversations.replies":
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"ok": true,
+				"messages": []map[string]interface{}{
+					{
+						"ts":   "1234567890.123456",
+						"user": "U001",
+						"text": "",
+						"blocks": []map[string]interface{}{
+							{
+								"type": "rich_text",
+								"elements": []map[string]interface{}{
+									{
+										"type": "rich_text_section",
+										"elements": []map[string]interface{}{
+											{"type": "text", "text": "line1"},
+										},
+									},
+									{
+										"type": "rich_text_section",
+										"elements": []map[string]interface{}{
+											{"type": "text", "text": "line2"},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			})
+		case "/users.info":
+			mockUserInfoHandler(w, r)
+		}
+	}))
+	defer server.Close()
+
+	c := client.NewWithConfig(server.URL, "test-token", nil)
+	opts := &threadOptions{limit: 100}
+
+	out := captureTextOutput(t, func() {
+		require.NoError(t, runThread("C123", "1234567890.123456", opts, c))
+	})
+	assert.Contains(t, out, "line1\n\tline2", "expected continuation line indented with tab")
+}
+
+func TestRunThread_PreservesFlattenForTextOnlyMultilineMessage(t *testing.T) {
+	// Regression guard: plain-text messages with newlines should still be
+	// flattened when no blocks are present.
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/conversations.replies":
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"ok": true,
+				"messages": []map[string]interface{}{
+					{"ts": "1234567890.123456", "user": "U001", "text": "line1\nline2"},
+				},
+			})
+		case "/users.info":
+			mockUserInfoHandler(w, r)
+		}
+	}))
+	defer server.Close()
+
+	c := client.NewWithConfig(server.URL, "test-token", nil)
+	opts := &threadOptions{limit: 100}
+
+	out := captureTextOutput(t, func() {
+		require.NoError(t, runThread("C123", "1234567890.123456", opts, c))
+	})
+	assert.Contains(t, out, "line1 line2")
+	assert.NotContains(t, out, "line1\nline2")
+	assert.NotContains(t, out, "line1\n\tline2")
+}
+
+func TestRunHistory_BlocksTruncatedToEightyChars(t *testing.T) {
+	// History's compact view must still respect the 80-char cap even when
+	// content comes from blocks.
+	longText := strings.Repeat("x", 200)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/conversations.history":
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"ok": true,
+				"messages": []map[string]interface{}{
+					{
+						"ts":   "1234567890.123456",
+						"user": "U001",
+						"text": "",
+						"blocks": []map[string]interface{}{
+							{
+								"type": "rich_text",
+								"elements": []map[string]interface{}{
+									{
+										"type": "rich_text_section",
+										"elements": []map[string]interface{}{
+											{"type": "text", "text": longText},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			})
+		case "/users.info":
+			mockUserInfoHandler(w, r)
+		}
+	}))
+	defer server.Close()
+
+	c := client.NewWithConfig(server.URL, "test-token", nil)
+	opts := &historyOptions{limit: 20}
+
+	out := captureTextOutput(t, func() {
+		require.NoError(t, runHistory("C123", opts, c))
+	})
+	// truncate() caps at 80 chars including "...", so the body must not
+	// contain more than 77 x's in a row plus "...".
+	assert.Contains(t, out, "xxx...")
+	assert.NotContains(t, out, strings.Repeat("x", 100))
+}
+
+func TestRunThread_JSONIncludesBlocks(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/conversations.replies":
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"ok": true,
+				"messages": []map[string]interface{}{
+					{
+						"ts":   "1234567890.123456",
+						"user": "U001",
+						"text": "",
+						"blocks": []map[string]interface{}{
+							{
+								"type": "rich_text",
+								"elements": []map[string]interface{}{
+									{
+										"type": "rich_text_section",
+										"elements": []map[string]interface{}{
+											{"type": "text", "text": "hello"},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			})
+		case "/users.info":
+			mockUserInfoHandler(w, r)
+		}
+	}))
+	defer server.Close()
+
+	c := client.NewWithConfig(server.URL, "test-token", nil)
+	opts := &threadOptions{limit: 100}
+
+	output.OutputFormat = output.FormatJSON
+	defer func() { output.OutputFormat = output.FormatText }()
+	var buf strings.Builder
+	output.Writer = &buf
+	defer func() { output.Writer = os.Stdout }()
+
+	err := runThread("C123", "1234567890.123456", opts, c)
+	require.NoError(t, err)
+
+	var messages []client.Message
+	require.NoError(t, json.Unmarshal([]byte(buf.String()), &messages))
+	require.Len(t, messages, 1)
+	require.Len(t, messages[0].Blocks, 1)
+	assert.Equal(t, "rich_text", messages[0].Blocks[0].Type)
+}
+
 func TestRunHistory_TextIncludesFileHints(t *testing.T) {
 	// Message text intentionally long to ensure file hint still renders in full
 	longText := "This is a very long message body that definitely exceeds eighty characters and will be truncated in history's compact view."

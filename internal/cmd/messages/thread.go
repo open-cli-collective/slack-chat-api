@@ -66,7 +66,16 @@ func runThread(channel, threadTS string, opts *threadOptions, c *client.Client) 
 	resolver := client.NewUserResolver(c)
 	for _, m := range messages {
 		ts := formatTimestamp(m.TS)
-		text := flatten(resolver.ResolveMentions(m.Text))
+		body, fromBlocks := messageBody(m, resolver)
+		var text string
+		if fromBlocks {
+			// Preserve newlines from rendered blocks; indent continuation
+			// lines so multi-line content stays visually grouped.
+			text = indentContinuation(body)
+		} else {
+			// Plain-text fallback keeps existing single-line behavior.
+			text = flatten(body)
+		}
 		name := resolver.Resolve(m.User)
 		edited := ""
 		if m.Edited != nil {

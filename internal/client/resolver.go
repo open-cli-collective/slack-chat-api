@@ -23,9 +23,12 @@ func NewUserResolver(c *Client) *UserResolver {
 }
 
 // Resolve returns a display name for the given user ID.
-// It returns the ID unchanged if the lookup fails.
+// It returns the ID unchanged if the lookup fails or the resolver is nil.
 func (r *UserResolver) Resolve(userID string) string {
 	if userID == "" {
+		return userID
+	}
+	if r == nil || r.client == nil {
 		return userID
 	}
 
@@ -60,7 +63,11 @@ func (r *UserResolver) Resolve(userID string) string {
 }
 
 // ResolveMentions replaces <@UXXXXX> mentions in text with display names.
+// Returns text unchanged if the resolver is nil.
 func (r *UserResolver) ResolveMentions(text string) string {
+	if r == nil {
+		return text
+	}
 	return mentionRegex.ReplaceAllStringFunc(text, func(match string) string {
 		sub := mentionRegex.FindStringSubmatch(match)
 		if len(sub) < 2 {

@@ -260,6 +260,7 @@ type Message struct {
 	Edited     *Edited    `json:"edited,omitempty"`
 	Reactions  []Reaction `json:"reactions,omitempty"`
 	Files      []File     `json:"files,omitempty"`
+	Blocks     []Block    `json:"blocks,omitempty"`
 }
 
 // Team represents workspace info
