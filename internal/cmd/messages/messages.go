@@ -96,6 +96,12 @@ func renderFiles(files []client.File) string {
 		if name == "" {
 			name = f.Name
 		}
+		if name == "" {
+			// Slack can return both title and name empty for anonymous
+			// snippets or certain file-sharing events. Fall back to the
+			// file ID so the line never renders as "[file]  (...)".
+			name = f.ID
+		}
 		b.WriteString("\t[file] ")
 		b.WriteString(name)
 		b.WriteString(" (")

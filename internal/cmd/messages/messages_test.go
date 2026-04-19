@@ -1791,6 +1791,17 @@ func TestRenderFiles(t *testing.T) {
 		assert.True(t, strings.HasPrefix(got, "\t"), "expected line to start with tab, got %q", got)
 	})
 
+	t.Run("empty name and title falls back to file ID", func(t *testing.T) {
+		got := renderFiles([]client.File{{
+			ID:       "F0ABC",
+			Filetype: "csv",
+			Size:     411,
+		}})
+		// Must NOT emit "[file]  (csv, 411 B)" with a blank display name.
+		assert.Equal(t, "\t[file] F0ABC (csv, 411 B) — slck files download F0ABC\n", got)
+		assert.NotContains(t, got, "[file]  (")
+	})
+
 	t.Run("empty filetype drops the type clause", func(t *testing.T) {
 		got := renderFiles([]client.File{{
 			ID:   "F0ABC",

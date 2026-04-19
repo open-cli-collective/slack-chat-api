@@ -433,6 +433,135 @@ func TestRenderBlocks_EmptySectionDoesNotEmitBlankLine(t *testing.T) {
 	assert.Equal(t, "visible", RenderBlocks(blocks, nil))
 }
 
+func TestRenderBlocks_QuoteWithEmptyBodySkipped(t *testing.T) {
+	// rich_text_quote whose every inline element is unknown should not
+	// emit a phantom "> " line — strings.Split("", "\n") yields [""] which
+	// would otherwise run the loop once.
+	blocks := mustBlocks(t, `[{
+		"type": "rich_text",
+		"elements": [
+			{"type": "rich_text_quote", "elements": [
+				{"type": "future_inline", "text": "dropped"}
+			]},
+			{"type": "rich_text_section", "elements": [
+				{"type": "text", "text": "after"}
+			]}
+		]
+	}]`)
+	got := RenderBlocks(blocks, nil)
+	assert.Equal(t, "after", got)
+	assert.NotContains(t, got, "> ")
+}
+
+func TestRenderBlocks_PreformattedWithEmptyBodySkipped(t *testing.T) {
+	blocks := mustBlocks(t, `[{
+		"type": "rich_text",
+		"elements": [
+			{"type": "rich_text_preformatted", "elements": [
+				{"type": "future_inline", "text": "dropped"}
+			]},
+			{"type": "rich_text_section", "elements": [
+				{"type": "text", "text": "after"}
+			]}
+		]
+	}]`)
+	got := RenderBlocks(blocks, nil)
+	assert.Equal(t, "after", got)
+	assert.NotContains(t, got, "```")
+}
+
+func TestRenderBlocks_ListItemWithEmptyBodySkipped(t *testing.T) {
+	blocks := mustBlocks(t, `[{
+		"type": "rich_text",
+		"elements": [
+			{"type": "rich_text_list", "style": "bullet", "elements": [
+				{"type": "rich_text_section", "elements": [
+					{"type": "future_inline", "text": "dropped"}
+				]},
+				{"type": "rich_text_section", "elements": [
+					{"type": "text", "text": "good"}
+				]}
+			]}
+		]
+	}]`)
+	got := RenderBlocks(blocks, nil)
+	// No phantom "- " line from the first item.
+	lines := strings.Split(got, "\n")
+	bulletLines := 0
+	for _, l := range lines {
+		if strings.HasPrefix(l, "- ") {
+			bulletLines++
+		}
+	}
+	assert.Equal(t, 1, bulletLines, "expected exactly one bullet line, got %q", got)
+}
+
+func TestRenderBlocks_OrderedListSkipPreservesNumbering(t *testing.T) {
+	// Ordered list with a malformed middle item: remaining items should
+	// number 1, 2 — not 1, 3 with a gap where the bad item was.
+	blocks := []Block{{
+		Type: "rich_text",
+		Elements: []json.RawMessage{
+			json.RawMessage(`{
+				"type": "rich_text_list",
+				"style": "ordered",
+				"elements": [
+					{"type": "rich_text_section", "elements": [{"type":"text","text":"first"}]},
+					"not-an-object",
+					{"type": "rich_text_section", "elements": [{"type":"text","text":"second"}]}
+				]
+			}`),
+		},
+	}}
+	got := RenderBlocks(blocks, nil)
+	assert.Contains(t, got, "1. first")
+	assert.Contains(t, got, "2. second", "expected contiguous numbering, got %q", got)
+	assert.NotContains(t, got, "3. ")
+}
+
+func TestRenderBlocks_PreformattedStripsInlineStyles(t *testing.T) {
+	// A bold text element inside a preformatted block should NOT emit
+	// markdown markers inside the fence — they'd render as literal text.
+	blocks := mustBlocks(t, `[{
+		"type": "rich_text",
+		"elements": [
+			{"type": "rich_text_preformatted", "elements": [
+				{"type": "text", "text": "shouty", "style": {"bold": true}}
+			]}
+		]
+	}]`)
+	got := RenderBlocks(blocks, nil)
+	assert.Equal(t, "```\nshouty\n```", got)
+	assert.NotContains(t, got, "**")
+}
+
+func TestBlock_JSONFidelityForNonRichTextBlocks(t *testing.T) {
+	// A section block carries "text" in a field the typed Block struct
+	// doesn't model. Round-tripping through unmarshal → marshal must
+	// preserve it verbatim so --output json consumers see the content.
+	raw := []byte(`{"type":"section","block_id":"B1","text":{"type":"mrkdwn","text":"hello *world*"}}`)
+	var b Block
+	require.NoError(t, json.Unmarshal(raw, &b))
+	assert.Equal(t, "section", b.Type)
+
+	out, err := json.Marshal(b)
+	require.NoError(t, err)
+	// The "text" field must survive even though Block doesn't model it.
+	assert.Contains(t, string(out), `"text":{"type":"mrkdwn","text":"hello *world*"}`)
+}
+
+func TestBlock_JSONFidelityForRichTextUsesTypedMarshal(t *testing.T) {
+	// rich_text blocks go through the typed marshal so
+	// RichTextElement.MarshalJSON preserves polymorphic style. Verify
+	// that path still works alongside the new raw-bytes path.
+	raw := []byte(`{"type":"rich_text","elements":[{"type":"rich_text_list","style":"ordered","elements":[]}]}`)
+	var b Block
+	require.NoError(t, json.Unmarshal(raw, &b))
+	out, err := json.Marshal(b)
+	require.NoError(t, err)
+	assert.Contains(t, string(out), `"style":"ordered"`)
+}
+
 func TestRenderBlocks_UnknownBlockAlongsideKnown(t *testing.T) {
 	// A slice with an unknown top-level block followed by a rich_text
 	// block must drop the unknown and still render the known content.

@@ -9,12 +9,39 @@ import (
 
 // Block is a top-level Slack Block Kit block. Only rich_text is rendered
 // today; other types (section, image, context, etc.) are preserved in the
-// JSON representation but yield empty output from RenderBlocks, letting
-// callers fall back to the message's m.Text plain-text fallback.
+// JSON representation via raw-bytes round-tripping, and yield empty output
+// from RenderBlocks so callers fall back to the message's m.Text
+// plain-text fallback.
 type Block struct {
 	Type     string            `json:"type"`
 	BlockID  string            `json:"block_id,omitempty"`
 	Elements []json.RawMessage `json:"elements,omitempty"`
+
+	// raw holds the verbatim JSON bytes captured during unmarshal so that
+	// non-rich_text blocks (section.text, image.image_url, header.text,
+	// etc.) round-trip through --output json without losing fields the
+	// typed struct doesn't model.
+	raw json.RawMessage
+}
+
+// UnmarshalJSON captures the raw bytes alongside the typed fields so that
+// non-rich_text blocks can be re-emitted without loss.
+func (b *Block) UnmarshalJSON(data []byte) error {
+	b.raw = append(b.raw[:0], data...)
+	type alias Block
+	return json.Unmarshal(data, (*alias)(b))
+}
+
+// MarshalJSON emits the original raw bytes for non-rich_text blocks (which
+// carry type-specific fields the struct does not model) and the typed form
+// for rich_text blocks (which preserves polymorphic-style re-emission
+// through RichTextElement.MarshalJSON).
+func (b Block) MarshalJSON() ([]byte, error) {
+	if b.Type != "rich_text" && len(b.raw) > 0 {
+		return b.raw, nil
+	}
+	type alias Block
+	return json.Marshal(alias(b))
 }
 
 // RichTextElement is one element inside a rich_text block. The zero value
@@ -147,15 +174,23 @@ func renderRichText(raws []json.RawMessage, resolver *UserResolver, baseIndent i
 			out.WriteString(inline)
 			out.WriteString("\n")
 		case "rich_text_preformatted":
-			// Trim trailing newlines on the inner content so we emit
-			// "```\n<body>\n```" even if the inline text carries its own
-			// trailing "\n" (valid Slack payload).
-			inline := strings.TrimRight(renderInline(el.Elements, resolver), "\n")
+			// Preformatted blocks strip inline styles — markdown markers
+			// inside a fenced code block would render as literal text in
+			// downstream consumers.
+			inline := strings.TrimRight(renderInlineRaw(el.Elements, resolver), "\n")
+			if inline == "" {
+				continue
+			}
 			out.WriteString("```\n")
 			out.WriteString(inline)
 			out.WriteString("\n```\n")
 		case "rich_text_quote":
 			body := renderInline(el.Elements, resolver)
+			if body == "" {
+				// Skip quotes with no renderable content so we don't emit
+				// a phantom "> " line from the Split(\"\", \"\\n\") edge.
+				continue
+			}
 			for _, line := range strings.Split(strings.TrimRight(body, "\n"), "\n") {
 				out.WriteString("> ")
 				out.WriteString(line)
@@ -164,21 +199,28 @@ func renderRichText(raws []json.RawMessage, resolver *UserResolver, baseIndent i
 		case "rich_text_list":
 			indent := strings.Repeat("  ", baseIndent+el.Indent)
 			start := el.Offset
-			for i, itemRaw := range el.Elements {
+			// Track rendered items separately from the loop index so that
+			// skipped items (malformed JSON or empty body) don't leave
+			// numbering gaps in ordered lists.
+			rendered := 0
+			for _, itemRaw := range el.Elements {
 				var item RichTextElement
 				if err := json.Unmarshal(itemRaw, &item); err != nil {
 					continue
 				}
-				// List items are rich_text_section elements
 				body := renderInline(item.Elements, resolver)
+				if body == "" {
+					continue
+				}
 				out.WriteString(indent)
 				if el.ListStyle == "ordered" {
-					fmt.Fprintf(&out, "%d. ", start+i+1)
+					fmt.Fprintf(&out, "%d. ", start+rendered+1)
 				} else {
 					out.WriteString("- ")
 				}
 				out.WriteString(body)
 				out.WriteString("\n")
+				rendered++
 			}
 		default:
 			// Unknown sub-block type — drop silently.
@@ -187,8 +229,19 @@ func renderRichText(raws []json.RawMessage, resolver *UserResolver, baseIndent i
 	return out.String()
 }
 
+// renderInlineRaw is like renderInline but strips inline text styles, for
+// use inside rich_text_preformatted where markdown markers would render as
+// literal text rather than formatting.
+func renderInlineRaw(raws []json.RawMessage, resolver *UserResolver) string {
+	return renderInlineWithStyle(raws, resolver, false)
+}
+
 // renderInline walks the inline elements of a rich_text_section.
 func renderInline(raws []json.RawMessage, resolver *UserResolver) string {
+	return renderInlineWithStyle(raws, resolver, true)
+}
+
+func renderInlineWithStyle(raws []json.RawMessage, resolver *UserResolver, applyStyles bool) string {
 	var out strings.Builder
 	for _, raw := range raws {
 		var el RichTextElement
@@ -197,7 +250,11 @@ func renderInline(raws []json.RawMessage, resolver *UserResolver) string {
 		}
 		switch el.Type {
 		case "text":
-			out.WriteString(applyTextStyle(el.Text, el.TextStyle))
+			if applyStyles {
+				out.WriteString(applyTextStyle(el.Text, el.TextStyle))
+			} else {
+				out.WriteString(el.Text)
+			}
 		case "link":
 			if el.Text != "" {
 				fmt.Fprintf(&out, "[%s](%s)", el.Text, el.URL)
