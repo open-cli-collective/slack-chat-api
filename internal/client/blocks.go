@@ -33,9 +33,12 @@ func (b *Block) UnmarshalJSON(data []byte) error {
 }
 
 // MarshalJSON emits the original raw bytes for non-rich_text blocks (which
-// carry type-specific fields the struct does not model) and the typed form
-// for rich_text blocks (which preserves polymorphic-style re-emission
-// through RichTextElement.MarshalJSON).
+// carry type-specific fields the struct does not model). For rich_text
+// blocks it re-emits via the typed alias; Elements is []json.RawMessage
+// so each element's original bytes pass through unchanged, which is what
+// preserves the polymorphic "style" field on rich_text_list items and
+// inline text runs. RichTextElement.UnmarshalJSON/MarshalJSON are only
+// invoked when a caller explicitly unmarshals an individual element.
 func (b Block) MarshalJSON() ([]byte, error) {
 	if b.Type != "rich_text" && len(b.raw) > 0 {
 		return b.raw, nil

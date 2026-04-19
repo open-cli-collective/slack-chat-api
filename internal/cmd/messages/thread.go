@@ -1,6 +1,8 @@
 package messages
 
 import (
+	"strings"
+
 	"github.com/spf13/cobra"
 
 	"github.com/open-cli-collective/slack-chat-api/internal/client"
@@ -80,6 +82,15 @@ func runThread(channel, threadTS string, opts *threadOptions, c *client.Client) 
 		edited := ""
 		if m.Edited != nil {
 			edited = " [edited]"
+		}
+		// For multi-line bodies, place [edited] on the first line so it
+		// annotates the whole message rather than appearing to annotate
+		// only the final continuation line.
+		if edited != "" {
+			if idx := strings.Index(text, "\n"); idx >= 0 {
+				text = text[:idx] + edited + text[idx:]
+				edited = ""
+			}
 		}
 		output.Printf("[%s] %s: %s%s\n", ts, name, text, edited)
 		if files := renderFiles(m.Files); files != "" {

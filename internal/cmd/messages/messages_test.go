@@ -1725,21 +1725,24 @@ func TestMessageBody_NilResolverTextPath(t *testing.T) {
 
 func TestHumanSize(t *testing.T) {
 	tests := []struct {
+		name     string
 		n        int64
 		expected string
 	}{
-		{0, "0 B"},
-		{1, "1 B"},
-		{411, "411 B"},
-		{1023, "1023 B"},
-		{1024, "1.0 KB"},
-		{12345, "12.1 KB"},
-		{1024 * 1024, "1.0 MB"},
-		{4_718_592, "4.5 MB"},
-		{1024 * 1024 * 1024, "1.0 GB"},
+		{"zero", 0, "0 B"},
+		{"one byte", 1, "1 B"},
+		{"411 B", 411, "411 B"},
+		{"1023 B boundary", 1023, "1023 B"},
+		{"1 KB boundary", 1024, "1.0 KB"},
+		{"KB mid-range", 12345, "12.1 KB"},
+		{"1 MB boundary", 1024 * 1024, "1.0 MB"},
+		{"MB mid-range", 4_718_592, "4.5 MB"},
+		{"1 GB boundary", 1024 * 1024 * 1024, "1.0 GB"},
+		{"negative one clamps to zero", -1, "0 B"},
+		{"negative large clamps to zero", -12345, "0 B"},
 	}
 	for _, tt := range tests {
-		t.Run(tt.expected, func(t *testing.T) {
+		t.Run(tt.name, func(t *testing.T) {
 			assert.Equal(t, tt.expected, humanSize(tt.n))
 		})
 	}
@@ -2108,6 +2111,81 @@ func TestRunThread_MultilineBlocksIndentContinuationLines(t *testing.T) {
 		require.NoError(t, runThread("C123", "1234567890.123456", opts, c))
 	})
 	assert.Contains(t, out, "line1\n\tline2", "expected continuation line indented with tab")
+}
+
+func TestRunThread_EditedMarkerOnFirstLineForMultilineBlocks(t *testing.T) {
+	// When a block-rendered message is edited, [edited] should land on
+	// the first line so it annotates the whole message — otherwise it
+	// looks like it's annotating only the final continuation line.
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/conversations.replies":
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"ok": true,
+				"messages": []map[string]interface{}{
+					{
+						"ts":     "1234567890.123456",
+						"user":   "U001",
+						"text":   "",
+						"edited": map[string]interface{}{"user": "U001", "ts": "1234567890.200000"},
+						"blocks": []map[string]interface{}{
+							{
+								"type": "rich_text",
+								"elements": []map[string]interface{}{
+									{"type": "rich_text_section", "elements": []map[string]interface{}{{"type": "text", "text": "line1"}}},
+									{"type": "rich_text_section", "elements": []map[string]interface{}{{"type": "text", "text": "line2"}}},
+								},
+							},
+						},
+					},
+				},
+			})
+		case "/users.info":
+			mockUserInfoHandler(w, r)
+		}
+	}))
+	defer server.Close()
+
+	c := client.NewWithConfig(server.URL, "test-token", nil)
+	opts := &threadOptions{limit: 100}
+
+	out := captureTextOutput(t, func() {
+		require.NoError(t, runThread("C123", "1234567890.123456", opts, c))
+	})
+	// [edited] should be on the header line ("line1 [edited]"), not after "line2".
+	assert.Contains(t, out, "line1 [edited]\n\tline2")
+	assert.NotContains(t, out, "line2 [edited]")
+}
+
+func TestRunThread_EditedMarkerUnchangedForSingleLineBody(t *testing.T) {
+	// No regression: single-line messages still get [edited] at the end.
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/conversations.replies":
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"ok": true,
+				"messages": []map[string]interface{}{
+					{
+						"ts":     "1234567890.123456",
+						"user":   "U001",
+						"text":   "plain body",
+						"edited": map[string]interface{}{"user": "U001", "ts": "1234567890.200000"},
+					},
+				},
+			})
+		case "/users.info":
+			mockUserInfoHandler(w, r)
+		}
+	}))
+	defer server.Close()
+
+	c := client.NewWithConfig(server.URL, "test-token", nil)
+	opts := &threadOptions{limit: 100}
+
+	out := captureTextOutput(t, func() {
+		require.NoError(t, runThread("C123", "1234567890.123456", opts, c))
+	})
+	assert.Contains(t, out, "plain body [edited]")
 }
 
 func TestRunThread_PreservesFlattenForTextOnlyMultilineMessage(t *testing.T) {

@@ -120,7 +120,12 @@ func renderFiles(files []client.File) string {
 }
 
 // humanSize formats a byte count as "411 B", "12.3 KB", "4.5 MB", etc.
+// Slack occasionally returns size=-1 for certain snippet types; clamp
+// negatives to 0 rather than render "-1 B".
 func humanSize(n int64) string {
+	if n < 0 {
+		n = 0
+	}
 	const (
 		kb = 1024
 		mb = 1024 * kb
