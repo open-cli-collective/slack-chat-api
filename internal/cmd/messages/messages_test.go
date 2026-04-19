@@ -1692,6 +1692,37 @@ func TestRunSend_FileUpload_LongTextAllowed(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestIndentContinuation(t *testing.T) {
+	tests := []struct {
+		name, input, expected string
+	}{
+		{"single line no-op", "hello", "hello"},
+		{"interior newline indents continuation", "line1\nline2", "line1\n\tline2"},
+		{"trailing newline trimmed", "line1\n", "line1"},
+		{"multiple interior newlines", "a\nb\nc", "a\n\tb\n\tc"},
+		{"trailing newline trimmed with interior newlines", "a\nb\n", "a\n\tb"},
+		{"empty string", "", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, indentContinuation(tt.input))
+		})
+	}
+}
+
+func TestMessageBody_NilResolverTextPath(t *testing.T) {
+	// Regression guard: the text-only path calls ResolveMentions on the
+	// resolver. If the nil-guard were ever removed from ResolveMentions,
+	// this test would panic. The blocks path is covered by
+	// TestRenderBlocks_NilResolverDoesNotPanic in the client package.
+	m := client.Message{Text: "hello <@U123>"}
+	body, fromBlocks := messageBody(m, nil)
+	assert.False(t, fromBlocks)
+	// Mentions are not resolved when the resolver is nil; the raw form
+	// survives.
+	assert.Equal(t, "hello <@U123>", body)
+}
+
 func TestHumanSize(t *testing.T) {
 	tests := []struct {
 		n        int64
@@ -2223,10 +2254,10 @@ func TestRunHistory_TextIncludesFileHints(t *testing.T) {
 		require.NoError(t, runHistory("C123", opts, c))
 	})
 
-	assert.Contains(t, out, "[file]")
-	assert.Contains(t, out, "IW Trailer.pdf")
-	assert.Contains(t, out, "pdf")
-	assert.Contains(t, out, "slck files download F0ATD4WJ70D")
-	// File hint must render in full even though the message body is truncated
+	// The full hint line must appear verbatim even when the message body
+	// has been truncated to 80 chars. A truncation bug that clipped the
+	// hint after a certain point would not be caught by Contains checks
+	// of the individual fragments alone.
+	assert.Contains(t, out, "\t[file] IW Trailer.pdf (pdf, 59.2 KB) — slck files download F0ATD4WJ70D\n")
 	assert.NotContains(t, out, "...F0ATD4WJ70D")
 }
