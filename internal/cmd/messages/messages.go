@@ -8,6 +8,8 @@ import (
 	"unicode/utf8"
 
 	"github.com/spf13/cobra"
+
+	"github.com/open-cli-collective/slack-chat-api/internal/client"
 )
 
 // NewCmd creates the messages command with all subcommands
@@ -59,6 +61,86 @@ func truncate(s string, maxLen int) string {
 		return s
 	}
 	return s[:maxLen-3] + "..."
+}
+
+// messageBody chooses the right source for a message's textual content.
+// When blocks render non-empty, returns the rendered body with
+// fromBlocks=true; otherwise returns the mention-resolved m.Text with
+// fromBlocks=false. Callers use fromBlocks to decide whether to preserve
+// newlines (thread detail view) or flatten them (text-only path).
+func messageBody(m client.Message, resolver *client.UserResolver) (body string, fromBlocks bool) {
+	if rendered := client.RenderBlocks(m.Blocks, resolver); rendered != "" {
+		return rendered, true
+	}
+	return resolver.ResolveMentions(m.Text), false
+}
+
+// indentContinuation replaces interior newlines with "\n\t" so that every
+// line after the first is indented under the "[<ts>] <user>:" header.
+// Any trailing newline is trimmed first to avoid a dangling tab.
+func indentContinuation(s string) string {
+	s = strings.TrimRight(s, "\n")
+	return strings.ReplaceAll(s, "\n", "\n\t")
+}
+
+// renderFiles returns one tab-indented "[file] ..." line per attachment, each
+// terminated with "\n". Returns "" when files is empty. The format gives a
+// reader (human or agent) enough context to invoke `slck files download <id>`.
+func renderFiles(files []client.File) string {
+	if len(files) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	for _, f := range files {
+		name := f.Title
+		if name == "" {
+			name = f.Name
+		}
+		if name == "" {
+			// Slack can return both title and name empty for anonymous
+			// snippets or certain file-sharing events. Fall back to the
+			// file ID so the line never renders as "[file]  (...)".
+			name = f.ID
+		}
+		b.WriteString("\t[file] ")
+		b.WriteString(name)
+		b.WriteString(" (")
+		// Slack occasionally omits filetype; drop the type clause rather
+		// than emit "(, 411 B)".
+		if f.Filetype != "" {
+			b.WriteString(f.Filetype)
+			b.WriteString(", ")
+		}
+		b.WriteString(humanSize(f.Size))
+		b.WriteString(") — slck files download ")
+		b.WriteString(f.ID)
+		b.WriteString("\n")
+	}
+	return b.String()
+}
+
+// humanSize formats a byte count as "411 B", "12.3 KB", "4.5 MB", etc.
+// Slack occasionally returns size=-1 for certain snippet types; clamp
+// negatives to 0 rather than render "-1 B".
+func humanSize(n int64) string {
+	if n < 0 {
+		n = 0
+	}
+	const (
+		kb = 1024
+		mb = 1024 * kb
+		gb = 1024 * mb
+	)
+	switch {
+	case n < kb:
+		return fmt.Sprintf("%d B", n)
+	case n < mb:
+		return fmt.Sprintf("%.1f KB", float64(n)/kb)
+	case n < gb:
+		return fmt.Sprintf("%.1f MB", float64(n)/mb)
+	default:
+		return fmt.Sprintf("%.1f GB", float64(n)/gb)
+	}
 }
 
 // unescapeShellChars removes backslash escaping from common shell-escaped characters.
