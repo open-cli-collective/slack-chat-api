@@ -8,9 +8,12 @@
 - `edited` metadata field on messages with `[edited]` text indicator (#136)
 - Idempotent handling for react, unreact, archive, unarchive, and invite commands (#130)
 - Pre-send message length validation — errors with helpful alternatives when text exceeds Slack's 40,000 character limit (#139)
+- `messages thread` and `messages history` now surface file attachments in text output as `[file] <name> (<type>, <size>) — slck files download <id>` hints, giving readers a valid download command inline (#141)
+- `messages thread` and `messages history` now render Slack rich-text blocks (previously dropped), so messages pasted as tables, lists, or formatted content are visible in the default text output (#141)
 
 ### Fixed
 - `messages thread` text output no longer truncates at 80 characters (#134)
+- `messages thread` / `messages history` no longer silently drop file attachments or rich-text block content (#141)
 
 ## [3.1.35]
 

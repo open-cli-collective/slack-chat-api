@@ -1790,6 +1790,17 @@ func TestRenderFiles(t *testing.T) {
 		got := renderFiles([]client.File{{ID: "F1", Name: "a.csv", Filetype: "csv", Size: 100}})
 		assert.True(t, strings.HasPrefix(got, "\t"), "expected line to start with tab, got %q", got)
 	})
+
+	t.Run("empty filetype drops the type clause", func(t *testing.T) {
+		got := renderFiles([]client.File{{
+			ID:   "F0ABC",
+			Name: "data",
+			Size: 411,
+		}})
+		// Must NOT emit "(, 411 B)" — drop the type clause entirely when Filetype is empty.
+		assert.Equal(t, "\t[file] data (411 B) — slck files download F0ABC\n", got)
+		assert.NotContains(t, got, "(, ")
+	})
 }
 
 // captureTextOutput captures text output for a test function and resets state.
@@ -2163,6 +2174,66 @@ func TestRunHistory_BlocksTruncatedToEightyChars(t *testing.T) {
 	// contain more than 77 x's in a row plus "...".
 	assert.Contains(t, out, "xxx...")
 	assert.NotContains(t, out, strings.Repeat("x", 100))
+}
+
+func TestRunHistory_MultiSectionBlocksStayOnOneLine(t *testing.T) {
+	// Regression guard: history's compact view must render multi-section
+	// rich_text blocks on one line even when the combined body is short
+	// enough that truncation would not trigger. truncate() flattens
+	// newlines unconditionally at its first step, and this test locks
+	// that behavior in.
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/conversations.history":
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"ok": true,
+				"messages": []map[string]interface{}{
+					{
+						"ts":   "1234567890.123456",
+						"user": "U001",
+						"text": "",
+						"blocks": []map[string]interface{}{
+							{
+								"type": "rich_text",
+								"elements": []map[string]interface{}{
+									{
+										"type": "rich_text_section",
+										"elements": []map[string]interface{}{
+											{"type": "text", "text": "first"},
+										},
+									},
+									{
+										"type": "rich_text_section",
+										"elements": []map[string]interface{}{
+											{"type": "text", "text": "second"},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			})
+		case "/users.info":
+			mockUserInfoHandler(w, r)
+		}
+	}))
+	defer server.Close()
+
+	c := client.NewWithConfig(server.URL, "test-token", nil)
+	opts := &historyOptions{limit: 20}
+
+	out := captureTextOutput(t, func() {
+		require.NoError(t, runHistory("C123", opts, c))
+	})
+	// The message line must contain both sections joined by a space on a
+	// single line — no embedded newline inside the rendered body.
+	assert.Contains(t, out, "first second")
+	assert.NotContains(t, out, "first\nsecond")
+	// Exactly one line for the single message (plus the trailing newline
+	// from output.Printf's \n format string).
+	lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
+	assert.Len(t, lines, 1, "expected single output line, got %d: %q", len(lines), out)
 }
 
 func TestRunThread_JSONIncludesBlocks(t *testing.T) {

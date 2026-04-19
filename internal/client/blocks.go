@@ -138,11 +138,21 @@ func renderRichText(raws []json.RawMessage, resolver *UserResolver, baseIndent i
 		}
 		switch el.Type {
 		case "rich_text_section":
-			out.WriteString(renderInline(el.Elements, resolver))
+			inline := renderInline(el.Elements, resolver)
+			if inline == "" {
+				// Skip empty sections (all inline elements unknown) so they
+				// don't emit blank indented lines in thread's multi-line view.
+				continue
+			}
+			out.WriteString(inline)
 			out.WriteString("\n")
 		case "rich_text_preformatted":
+			// Trim trailing newlines on the inner content so we emit
+			// "```\n<body>\n```" even if the inline text carries its own
+			// trailing "\n" (valid Slack payload).
+			inline := strings.TrimRight(renderInline(el.Elements, resolver), "\n")
 			out.WriteString("```\n")
-			out.WriteString(renderInline(el.Elements, resolver))
+			out.WriteString(inline)
 			out.WriteString("\n```\n")
 		case "rich_text_quote":
 			body := renderInline(el.Elements, resolver)

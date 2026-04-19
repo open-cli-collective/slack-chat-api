@@ -99,8 +99,12 @@ func renderFiles(files []client.File) string {
 		b.WriteString("\t[file] ")
 		b.WriteString(name)
 		b.WriteString(" (")
-		b.WriteString(f.Filetype)
-		b.WriteString(", ")
+		// Slack occasionally omits filetype; drop the type clause rather
+		// than emit "(, 411 B)".
+		if f.Filetype != "" {
+			b.WriteString(f.Filetype)
+			b.WriteString(", ")
+		}
 		b.WriteString(humanSize(f.Size))
 		b.WriteString(") — slck files download ")
 		b.WriteString(f.ID)

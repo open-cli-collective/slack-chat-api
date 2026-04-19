@@ -395,6 +395,44 @@ func TestRenderBlocks_DateZeroTimestampNoFallback(t *testing.T) {
 	assert.Equal(t, "", RenderBlocks(blocks, nil))
 }
 
+func TestRenderBlocks_PreformattedInnerTrailingNewlineTrimmed(t *testing.T) {
+	// If the inline content inside a preformatted block carries its own
+	// trailing newline, we must not emit a blank line before the closing
+	// fence.
+	blocks := mustBlocks(t, `[{
+		"type": "rich_text",
+		"elements": [
+			{"type": "rich_text_preformatted", "elements": [
+				{"type": "text", "text": "code\n"}
+			]}
+		]
+	}]`)
+	got := RenderBlocks(blocks, nil)
+	assert.Equal(t, "```\ncode\n```", got)
+	assert.NotContains(t, got, "\n\n```", "expected no blank line before closing fence")
+}
+
+func TestRenderBlocks_EmptySectionDoesNotEmitBlankLine(t *testing.T) {
+	// A rich_text_section whose every inline element is unknown should
+	// not emit a blank line — otherwise thread view's indentContinuation
+	// produces a visible "\n\t" artifact after the "[ts] user:" header.
+	// Here we pair an empty (unknown-only) section with a known one to
+	// prove the known one renders cleanly without a leading blank.
+	blocks := mustBlocks(t, `[{
+		"type": "rich_text",
+		"elements": [
+			{"type": "rich_text_section", "elements": [
+				{"type": "future_inline", "text": "dropped"}
+			]},
+			{"type": "rich_text_section", "elements": [
+				{"type": "text", "text": "visible"}
+			]}
+		]
+	}]`)
+	// Before the fix: "\nvisible". After: "visible".
+	assert.Equal(t, "visible", RenderBlocks(blocks, nil))
+}
+
 func TestRenderBlocks_UnknownBlockAlongsideKnown(t *testing.T) {
 	// A slice with an unknown top-level block followed by a rich_text
 	// block must drop the unknown and still render the known content.
