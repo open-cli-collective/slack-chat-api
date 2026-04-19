@@ -8,6 +8,8 @@ import (
 	"unicode/utf8"
 
 	"github.com/spf13/cobra"
+
+	"github.com/open-cli-collective/slack-chat-api/internal/client"
 )
 
 // NewCmd creates the messages command with all subcommands
@@ -59,6 +61,51 @@ func truncate(s string, maxLen int) string {
 		return s
 	}
 	return s[:maxLen-3] + "..."
+}
+
+// renderFiles returns one tab-indented "[file] ..." line per attachment, each
+// terminated with "\n". Returns "" when files is empty. The format gives a
+// reader (human or agent) enough context to invoke `slck files download <id>`.
+func renderFiles(files []client.File) string {
+	if len(files) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	for _, f := range files {
+		name := f.Title
+		if name == "" {
+			name = f.Name
+		}
+		b.WriteString("\t[file] ")
+		b.WriteString(name)
+		b.WriteString(" (")
+		b.WriteString(f.Filetype)
+		b.WriteString(", ")
+		b.WriteString(humanSize(f.Size))
+		b.WriteString(") — slck files download ")
+		b.WriteString(f.ID)
+		b.WriteString("\n")
+	}
+	return b.String()
+}
+
+// humanSize formats a byte count as "411 B", "12.3 KB", "4.5 MB", etc.
+func humanSize(n int64) string {
+	const (
+		kb = 1024
+		mb = 1024 * kb
+		gb = 1024 * mb
+	)
+	switch {
+	case n < kb:
+		return fmt.Sprintf("%d B", n)
+	case n < mb:
+		return fmt.Sprintf("%.1f KB", float64(n)/kb)
+	case n < gb:
+		return fmt.Sprintf("%.1f MB", float64(n)/mb)
+	default:
+		return fmt.Sprintf("%.1f GB", float64(n)/gb)
+	}
 }
 
 // unescapeShellChars removes backslash escaping from common shell-escaped characters.

@@ -73,6 +73,9 @@ func runThread(channel, threadTS string, opts *threadOptions, c *client.Client) 
 			edited = " [edited]"
 		}
 		output.Printf("[%s] %s: %s%s\n", ts, name, text, edited)
+		if files := renderFiles(m.Files); files != "" {
+			output.Printf("%s", files)
+		}
 	}
 
 	return nil

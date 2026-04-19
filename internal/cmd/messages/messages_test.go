@@ -1691,3 +1691,170 @@ func TestRunSend_FileUpload_LongTextAllowed(t *testing.T) {
 	err = runSend("C123456789", longText, opts, c)
 	require.NoError(t, err)
 }
+
+func TestHumanSize(t *testing.T) {
+	tests := []struct {
+		n        int64
+		expected string
+	}{
+		{0, "0 B"},
+		{1, "1 B"},
+		{411, "411 B"},
+		{1023, "1023 B"},
+		{1024, "1.0 KB"},
+		{12345, "12.1 KB"},
+		{1024 * 1024, "1.0 MB"},
+		{4_718_592, "4.5 MB"},
+		{1024 * 1024 * 1024, "1.0 GB"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.expected, func(t *testing.T) {
+			assert.Equal(t, tt.expected, humanSize(tt.n))
+		})
+	}
+}
+
+func TestRenderFiles(t *testing.T) {
+	t.Run("empty returns empty string", func(t *testing.T) {
+		assert.Equal(t, "", renderFiles(nil))
+		assert.Equal(t, "", renderFiles([]client.File{}))
+	})
+
+	t.Run("single file uses name when title is empty", func(t *testing.T) {
+		got := renderFiles([]client.File{{
+			ID:       "F0ABC",
+			Name:     "data.csv",
+			Filetype: "csv",
+			Size:     411,
+		}})
+		assert.Equal(t, "\t[file] data.csv (csv, 411 B) — slck files download F0ABC\n", got)
+	})
+
+	t.Run("title takes precedence over name", func(t *testing.T) {
+		got := renderFiles([]client.File{{
+			ID:       "F0ABC",
+			Name:     "raw_upload_12345.png",
+			Title:    "Screenshot",
+			Filetype: "png",
+			Size:     54321,
+		}})
+		assert.Contains(t, got, "Screenshot")
+		assert.NotContains(t, got, "raw_upload_12345.png")
+	})
+
+	t.Run("multiple files render one line each", func(t *testing.T) {
+		got := renderFiles([]client.File{
+			{ID: "F1", Name: "a.csv", Filetype: "csv", Size: 100},
+			{ID: "F2", Name: "b.pdf", Filetype: "pdf", Size: 2048},
+		})
+		lines := strings.Split(strings.TrimRight(got, "\n"), "\n")
+		require.Len(t, lines, 2)
+		assert.Contains(t, lines[0], "F1")
+		assert.Contains(t, lines[0], "a.csv")
+		assert.Contains(t, lines[1], "F2")
+		assert.Contains(t, lines[1], "b.pdf")
+	})
+
+	t.Run("each line starts with tab prefix", func(t *testing.T) {
+		got := renderFiles([]client.File{{ID: "F1", Name: "a.csv", Filetype: "csv", Size: 100}})
+		assert.True(t, strings.HasPrefix(got, "\t"), "expected line to start with tab, got %q", got)
+	})
+}
+
+// captureTextOutput captures text output for a test function and resets state.
+func captureTextOutput(t *testing.T, fn func()) string {
+	t.Helper()
+	var buf strings.Builder
+	origWriter := output.Writer
+	output.Writer = &buf
+	defer func() { output.Writer = origWriter }()
+	fn()
+	return buf.String()
+}
+
+func TestRunThread_TextIncludesFileHints(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/conversations.replies":
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"ok": true,
+				"messages": []map[string]interface{}{
+					{
+						"ts":   "1234567890.123456",
+						"user": "U001",
+						"text": "Here are the check files",
+						"files": []map[string]interface{}{
+							{
+								"id":       "F0AT13FGVAT",
+								"name":     "data.csv",
+								"filetype": "csv",
+								"size":     411,
+							},
+						},
+					},
+				},
+			})
+		case "/users.info":
+			mockUserInfoHandler(w, r)
+		}
+	}))
+	defer server.Close()
+
+	c := client.NewWithConfig(server.URL, "test-token", nil)
+	opts := &threadOptions{limit: 100}
+
+	out := captureTextOutput(t, func() {
+		require.NoError(t, runThread("C123", "1234567890.123456", opts, c))
+	})
+
+	assert.Contains(t, out, "[file]")
+	assert.Contains(t, out, "data.csv")
+	assert.Contains(t, out, "csv")
+	assert.Contains(t, out, "411 B")
+	assert.Contains(t, out, "slck files download F0AT13FGVAT")
+}
+
+func TestRunHistory_TextIncludesFileHints(t *testing.T) {
+	// Message text intentionally long to ensure file hint still renders in full
+	longText := "This is a very long message body that definitely exceeds eighty characters and will be truncated in history's compact view."
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/conversations.history":
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"ok": true,
+				"messages": []map[string]interface{}{
+					{
+						"ts":   "1234567890.123456",
+						"user": "U001",
+						"text": longText,
+						"files": []map[string]interface{}{
+							{
+								"id":       "F0ATD4WJ70D",
+								"name":     "IW Trailer.pdf",
+								"filetype": "pdf",
+								"size":     60646,
+							},
+						},
+					},
+				},
+			})
+		case "/users.info":
+			mockUserInfoHandler(w, r)
+		}
+	}))
+	defer server.Close()
+
+	c := client.NewWithConfig(server.URL, "test-token", nil)
+	opts := &historyOptions{limit: 20}
+
+	out := captureTextOutput(t, func() {
+		require.NoError(t, runHistory("C123", opts, c))
+	})
+
+	assert.Contains(t, out, "[file]")
+	assert.Contains(t, out, "IW Trailer.pdf")
+	assert.Contains(t, out, "pdf")
+	assert.Contains(t, out, "slck files download F0ATD4WJ70D")
+	// File hint must render in full even though the message body is truncated
+	assert.NotContains(t, out, "...F0ATD4WJ70D")
+}
