@@ -222,6 +222,89 @@ This means environment variables always override stored credentials, allowing au
      socket_mode_enabled: false
    ```
    </details>
+
+   <details>
+   <summary><strong>Extended manifest</strong> — every read scope slck can use, plus all writes (DMs, group DMs, file uploads, canvas CRUD, etc.)</summary>
+
+   Use this if you want maximum capability out of the box — reading DMs and group DMs, uploading file attachments to any channel/DM/group-DM, creating/editing/deleting canvases, resolving `@subteam` mentions, extended user profile data, etc. Every scope here is either needed by an existing slck command or unlocks a capability that commonly extends one (e.g. `im:history` so `slck messages thread` works on DMs, `files:write` for `slck messages send --file`, `canvases:write` for `slck canvas create`).
+
+   ```json
+   {
+     "display_information": {
+       "name": "Slack Chat API"
+     },
+     "features": {
+       "bot_user": {
+         "display_name": "Slack Chat API",
+         "always_online": false
+       }
+     },
+     "oauth_config": {
+       "scopes": {
+         "bot": [
+           "app_mentions:read",
+           "bookmarks:read",
+           "calls:read",
+           "canvases:read",
+           "canvases:write",
+           "channels:history",
+           "channels:manage",
+           "channels:read",
+           "chat:write",
+           "chat:write.public",
+           "dnd:read",
+           "emoji:read",
+           "files:read",
+           "files:write",
+           "groups:history",
+           "groups:read",
+           "groups:write",
+           "im:history",
+           "im:read",
+           "im:write",
+           "links:read",
+           "lists:read",
+           "metadata.message:read",
+           "mpim:history",
+           "mpim:read",
+           "mpim:write",
+           "pins:read",
+           "reactions:read",
+           "reactions:write",
+           "reminders:read",
+           "remote_files:read",
+           "search:read.files",
+           "search:read.mpim",
+           "search:read.public",
+           "search:read.users",
+           "team:read",
+           "usergroups:read",
+           "users.profile:read",
+           "users:read"
+         ],
+         "user": [
+           "search:read",
+           "search:read.files",
+           "search:read.im",
+           "search:read.mpim",
+           "search:read.private",
+           "search:read.public",
+           "search:read.users"
+         ]
+       },
+       "pkce_enabled": false
+     },
+     "settings": {
+       "org_deploy_enabled": false,
+       "socket_mode_enabled": false,
+       "token_rotation_enabled": false,
+       "is_mcp_enabled": false
+     }
+   }
+   ```
+
+   **Upgrading an existing install?** Paste the full manifest above into your app's **Features → App Manifest** tab (replacing the previous manifest), click **Save Changes**, then click **Install App → Reinstall to Workspace** to grant the new scopes. Copy the fresh `xoxb-…` token and run `slck config set-token`.
+   </details>
 4. Click **Create** → **Install to Workspace** → **Allow**
 5. Copy the **Bot User OAuth Token** (starts with `xoxb-`)
 6. Run:
@@ -280,6 +363,22 @@ The manifest above includes these scopes:
 | `team:read` | Get workspace info |
 | `users:read` | List users, get user info |
 | `search:read` | Search messages and files (user token only) |
+
+The **extended manifest** (see the collapsible section above) adds these capabilities on top of the default:
+
+| Scope | Unlocks |
+|-------|---------|
+| `im:history` / `im:read` / `im:write` | Read messages in DMs, list DMs, open new DMs to post to |
+| `mpim:history` / `mpim:read` / `mpim:write` | Same for multi-person DMs (group DMs) |
+| `files:write` | Upload files — `slck messages send --file` in any channel/DM/group-DM |
+| `canvases:write` | Create, edit, delete canvases — `slck canvas create/edit/delete` |
+| `groups:write` | Create/archive private channels |
+| `chat:write.public` | Post to public channels the bot isn't a member of |
+| `users.profile:read` | Extended user profile (status, timezone, custom fields) |
+| `usergroups:read` | Resolve `@subteam` / user-group mentions |
+| `app_mentions:read` | Receive @-mention events (needed for event subscriptions) |
+| `reactions:read` | List reactions on a message |
+| Other `*:read` scopes (`bookmarks`, `pins`, `reminders`, `links`, `lists`, `calls`, `dnd`, `metadata.message`, `remote_files`) | Read-only access to those domains; mostly forward-compat for commands that may use them |
 
 ### Token Types
 
