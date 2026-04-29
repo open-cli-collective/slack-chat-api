@@ -31,12 +31,49 @@ jobs:
         run: |
           Invoke-WebRequest https://aka.ms/wingetcreate/latest -OutFile wingetcreate.exe
 
+      - name: Sync winget-pkgs fork
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.WINGET_GITHUB_TOKEN }}
+        run: |
+          $owner = gh api user --jq .login
+          $repo = "$owner/winget-pkgs"
+          $branch = gh api repos/microsoft/winget-pkgs --jq .default_branch
+
+          gh api "repos/$repo" --silent 2>$null
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "Creating fork $repo"
+            gh api -X POST repos/microsoft/winget-pkgs/forks -F default_branch_only=true --silent
+
+            for ($i = 0; $i -lt 12; $i++) {
+              gh api "repos/$repo" --silent 2>$null
+              if ($LASTEXITCODE -eq 0) { break }
+              Start-Sleep -Seconds 5
+            }
+          } else {
+            $parent = gh api "repos/$repo" --jq '.parent.full_name // ""'
+            if ($parent -ne "microsoft/winget-pkgs") {
+              Write-Error "$repo exists but is not a fork of microsoft/winget-pkgs"
+              exit 1
+            }
+          }
+
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Unable to access $repo after creating fork"
+            exit 1
+          }
+
+          # The fork is only used as wingetcreate's submission workspace.
+          gh repo sync $repo --source microsoft/winget-pkgs --branch $branch --force
+
       - name: Check if manifest exists in winget-pkgs
         id: check-manifest
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          $response = Invoke-WebRequest -Uri "https://api.github.com/repos/microsoft/winget-pkgs/contents/manifests/o/OpenCLICollective/slack-chat-cli" -Method Head -SkipHttpErrorCheck
-          if ($response.StatusCode -eq 200) {
+          gh api repos/microsoft/winget-pkgs/contents/manifests/o/OpenCLICollective/slack-chat-cli --silent 2>$null
+          if ($LASTEXITCODE -eq 0) {
             Write-Host "Manifest exists - will use wingetcreate update"
             echo "exists=true" >> $env:GITHUB_OUTPUT
           } else {
@@ -65,20 +102,20 @@ jobs:
         if: steps.check-manifest.outputs.exists == 'true'
         shell: pwsh
         env:
-          WINGET_GITHUB_TOKEN: ${{ secrets.WINGET_GITHUB_TOKEN }}
+          WINGET_CREATE_GITHUB_TOKEN: ${{ secrets.WINGET_GITHUB_TOKEN }}
         run: |
           $version = "${{ inputs.version }}"
           $x64 = "https://github.com/open-cli-collective/slack-chat-api/releases/download/v${version}/slck_v${version}_windows_amd64.zip"
           $arm64 = "https://github.com/open-cli-collective/slack-chat-api/releases/download/v${version}/slck_v${version}_windows_arm64.zip"
 
           Write-Host "Updating existing manifest to version $version"
-          ./wingetcreate.exe update OpenCLICollective.slack-chat-cli --version $version --urls $x64 $arm64 --submit --token $env:WINGET_GITHUB_TOKEN
+          ./wingetcreate.exe update OpenCLICollective.slack-chat-cli --version $version --urls $x64 $arm64 --submit
 
       - name: Create manifest (new package)
         if: steps.check-manifest.outputs.exists == 'false'
         shell: pwsh
         env:
-          WINGET_GITHUB_TOKEN: ${{ secrets.WINGET_GITHUB_TOKEN }}
+          WINGET_CREATE_GITHUB_TOKEN: ${{ secrets.WINGET_GITHUB_TOKEN }}
         run: |
           $version = "${{ inputs.version }}"
           $manifestDir = "manifests"
@@ -114,4 +151,4 @@ jobs:
           Write-Host "Validation passed!"
 
           Write-Host "`nSubmitting new package to Winget..."
-          ./wingetcreate.exe submit --token $env:WINGET_GITHUB_TOKEN $manifestDir
+          ./wingetcreate.exe submit $manifestDir
