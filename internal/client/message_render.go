@@ -113,9 +113,12 @@ func RenderMessage(c MessageContent, resolver MentionResolver) RenderedMessage {
 }
 
 // textDuplicatesAnyPiece reports whether text matches (after whitespace
-// normalization) the rendering of any single richer piece. Per-piece
-// rather than aggregate comparison so a multi-surface message doesn't
-// double-print text that mirrors only the blocks rendering.
+// normalization) the rendering of any single richer piece OR the
+// newline-joined aggregate. Per-piece comparison handles the common
+// Block-Kit fallback case where text mirrors blocks while attachments
+// add separate content; aggregate comparison handles the multi-block
+// case where Slack's text fallback is the joined rendering of every
+// block.
 func textDuplicatesAnyPiece(text string, pieces []string) bool {
 	norm := normalizeWhitespace(text)
 	if norm == "" {
@@ -126,7 +129,7 @@ func textDuplicatesAnyPiece(text string, pieces []string) bool {
 			return true
 		}
 	}
-	return false
+	return normalizeWhitespace(strings.Join(pieces, "\n")) == norm
 }
 
 func normalizeWhitespace(s string) string {
@@ -180,6 +183,7 @@ func renderAttachment(a Attachment, resolver MentionResolver) string {
 	}
 
 	addTrimmed(a.Pretext)
+	addTrimmed(a.AuthorName)
 	addTrimmed(a.Title)
 	addTrimmed(a.Text)
 

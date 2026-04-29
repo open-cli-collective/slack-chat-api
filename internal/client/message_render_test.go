@@ -202,6 +202,31 @@ func TestRenderAttachments_FieldsAndNestedBlocks(t *testing.T) {
 	assert.Equal(t, expected, got.Body)
 }
 
+func TestRenderAttachments_AuthorNameRendered(t *testing.T) {
+	atts := mustAttachments(t, `[{"author_name": "deploy-bot", "text": "shipped v1.2.3"}]`)
+	got := RenderMessage(MessageContent{Attachments: atts}, nil)
+	assert.Equal(t, "deploy-bot\nshipped v1.2.3", got.Body)
+}
+
+func TestRenderAttachments_AuthorNameOnlyAttachmentDoesNotFallThroughToFallback(t *testing.T) {
+	atts := mustAttachments(t, `[{"author_name": "ci-bot", "fallback": "ci-bot says..."}]`)
+	got := RenderMessage(MessageContent{Attachments: atts}, nil)
+	// AuthorName renders, fallback is suppressed.
+	assert.Equal(t, "ci-bot", got.Body)
+}
+
+func TestRenderMessage_MultiBlockJoinedTextIsDuplicate(t *testing.T) {
+	// Slack populates m.Text as the newline-joined rendering of multiple
+	// blocks for Block Kit fallback. The aggregate comparison catches
+	// that case so text isn't double-printed.
+	blocks := mustBlocks(t, `[
+		{"type":"section","text":{"type":"mrkdwn","text":"line1"}},
+		{"type":"section","text":{"type":"mrkdwn","text":"line2"}}
+	]`)
+	got := RenderMessage(MessageContent{Text: "line1\nline2", Blocks: blocks}, nil)
+	assert.Equal(t, "line1\nline2", got.Body)
+}
+
 func TestRenderAttachments_FallbackUsedOnlyWhenEmpty(t *testing.T) {
 	atts := mustAttachments(t, `[{"fallback": "plain text version"}]`)
 	got := RenderMessage(MessageContent{Attachments: atts}, nil)
