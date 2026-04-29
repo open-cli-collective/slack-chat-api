@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/open-cli-collective/slack-chat-api/internal/client"
+	"github.com/open-cli-collective/slack-chat-api/internal/output"
 )
 
 // NewCmd creates the messages command with all subcommands
@@ -115,36 +116,12 @@ func renderFiles(files []client.File) string {
 			b.WriteString(f.Filetype)
 			b.WriteString(", ")
 		}
-		b.WriteString(humanSize(f.Size))
+		b.WriteString(output.HumanSize(f.Size))
 		b.WriteString(") — slck files download ")
 		b.WriteString(f.ID)
 		b.WriteString("\n")
 	}
 	return b.String()
-}
-
-// humanSize formats a byte count as "411 B", "12.3 KB", "4.5 MB", etc.
-// Slack occasionally returns size=-1 for certain snippet types; clamp
-// negatives to 0 rather than render "-1 B".
-func humanSize(n int64) string {
-	if n < 0 {
-		n = 0
-	}
-	const (
-		kb = 1024
-		mb = 1024 * kb
-		gb = 1024 * mb
-	)
-	switch {
-	case n < kb:
-		return fmt.Sprintf("%d B", n)
-	case n < mb:
-		return fmt.Sprintf("%.1f KB", float64(n)/kb)
-	case n < gb:
-		return fmt.Sprintf("%.1f MB", float64(n)/mb)
-	default:
-		return fmt.Sprintf("%.1f GB", float64(n)/gb)
-	}
 }
 
 // unescapeShellChars removes backslash escaping from common shell-escaped characters.

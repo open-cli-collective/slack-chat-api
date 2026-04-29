@@ -171,6 +171,30 @@ func truncateRunes(s string, max int) string {
 	return string(runes[:max-3]) + "..."
 }
 
+// HumanSize formats a byte count as "411 B", "12.3 KB", "4.5 MB", etc.
+// Slack occasionally returns size=-1 for certain snippet types; clamp
+// negatives to 0 rather than render "-1 B".
+func HumanSize(n int64) string {
+	if n < 0 {
+		n = 0
+	}
+	const (
+		kb = 1024
+		mb = 1024 * kb
+		gb = 1024 * mb
+	)
+	switch {
+	case n < kb:
+		return fmt.Sprintf("%d B", n)
+	case n < mb:
+		return fmt.Sprintf("%.1f KB", float64(n)/kb)
+	case n < gb:
+		return fmt.Sprintf("%.1f MB", float64(n)/mb)
+	default:
+		return fmt.Sprintf("%.1f GB", float64(n)/gb)
+	}
+}
+
 // KeyValue prints a single key-value pair
 func KeyValue(key string, value interface{}) {
 	_, _ = fmt.Fprintf(Writer, "%-12s  %v\n", key+":", value)

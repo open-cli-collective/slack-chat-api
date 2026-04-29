@@ -119,21 +119,39 @@ func runSearchFiles(query string, opts *filesOptions, c *client.Client) error {
 
 	output.Printf("Found %d files matching \"%s\"\n\n", result.Files.Total, query)
 
-	headers := []string{"NAME", "TYPE", "USER", "CREATED", "TITLE"}
+	headers := []string{"REF", "TYPE", "USER", "CREATED", "NAME"}
 	rows := make([][]string, 0, len(result.Files.Matches))
 	for _, f := range result.Files.Matches {
-		name := truncateText(f.Name, 30)
-		title := truncateText(f.Title, 40)
 		created := formatUnixTimestamp(f.Created)
-		rows = append(rows, []string{name, f.Filetype, f.User, created, title})
+		rows = append(rows, []string{f.ID, f.Filetype, f.User, created, fileLabel(f.Name, f.Title)})
 	}
-	output.Table(headers, rows)
+	output.SearchTable(headers, rows, 60)
 
 	paging := result.Files.Paging
 	output.Printf("\nPage %d of %d (showing %d of %d results)\n",
 		paging.Page, paging.Pages, len(result.Files.Matches), paging.Total)
+	if len(rows) > 0 {
+		output.Println("Get: slck files get <REF>")
+	}
 
 	return nil
+}
+
+// fileLabel joins file name and title with " · " when both are present and
+// distinct. Slack can return either as empty (anonymous snippets,
+// title-only attachments) so empty parts drop rather than render as a
+// leading or trailing separator.
+func fileLabel(name, title string) string {
+	switch {
+	case name == "" && title == "":
+		return ""
+	case name == "":
+		return title
+	case title == "" || title == name:
+		return name
+	default:
+		return name + " · " + title
+	}
 }
 
 func formatUnixTimestamp(ts int64) string {
