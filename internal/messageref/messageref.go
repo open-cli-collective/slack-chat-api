@@ -15,6 +15,13 @@ import (
 	"github.com/open-cli-collective/slack-chat-api/internal/validate"
 )
 
+// conversationIDPattern accepts the full set of Slack conversation IDs used as
+// the channel portion of a message ref: public channels (C), private/group
+// channels (G), and DMs (D). validate.ChannelID rejects D, which is correct
+// for channel-only commands but too narrow for refs sourced from search
+// (which can hit DMs with --in @user).
+var conversationIDPattern = regexp.MustCompile(`^[CGD][A-Z0-9]+$`)
+
 // Ref is a parsed message ref.
 type Ref struct {
 	ChannelID string // e.g. "C02DF3BEUGN"
@@ -47,7 +54,7 @@ func Parse(input string) (Ref, error) {
 		channel := m[1]
 		digits := m[2]
 		ts := digits[:10] + "." + digits[10:]
-		if err := validate.ChannelID(channel); err != nil {
+		if err := validateConversationID(channel); err != nil {
 			return Ref{}, err
 		}
 		if err := validate.Timestamp(ts); err != nil {
@@ -64,7 +71,7 @@ func Parse(input string) (Ref, error) {
 	channel := parts[0]
 	ts := validate.NormalizeTimestamp(parts[1])
 
-	if err := validate.ChannelID(channel); err != nil {
+	if err := validateConversationID(channel); err != nil {
 		return Ref{}, err
 	}
 	if err := validate.Timestamp(ts); err != nil {
@@ -72,4 +79,11 @@ func Parse(input string) (Ref, error) {
 	}
 
 	return Ref{ChannelID: channel, TS: ts}, nil
+}
+
+func validateConversationID(id string) error {
+	if !conversationIDPattern.MatchString(id) {
+		return fmt.Errorf("invalid conversation ID %q: must start with C, G, or D", id)
+	}
+	return nil
 }

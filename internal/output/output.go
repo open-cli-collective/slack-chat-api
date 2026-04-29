@@ -113,7 +113,7 @@ func Table(headers []string, rows [][]string) {
 // search output: "h1 | h2 | h3" / "v1 | v2 | v3".
 //
 // Cell rules (callers pass raw strings only):
-//   - internal newlines and CRs are collapsed to single spaces
+//   - internal newlines are collapsed to single spaces; carriage returns are stripped
 //   - literal '|' is replaced with U+00A6 '¦' so a downstream parser can
 //     split on " | " deterministically
 //   - only the LAST column is truncated, rune-based, when lastColMaxRunes > 0;

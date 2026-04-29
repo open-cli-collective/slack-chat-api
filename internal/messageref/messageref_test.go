@@ -12,6 +12,8 @@ func TestParse(t *testing.T) {
 	}{
 		{"api form", "C02DF3BEUGN/1777469221.721439", "C02DF3BEUGN", "1777469221.721439", false},
 		{"private channel api form", "G01234ABCDE/1234567890.123456", "G01234ABCDE", "1234567890.123456", false},
+		{"DM api form", "D01234ABCDE/1234567890.123456", "D01234ABCDE", "1234567890.123456", false},
+		{"DM permalink", "https://example.slack.com/archives/D01234ABCDE/p1234567890123456", "D01234ABCDE", "1234567890.123456", false},
 		{"p-prefixed ts", "C02DF3BEUGN/p1777469221721439", "C02DF3BEUGN", "1777469221.721439", false},
 		{"permalink", "https://example.slack.com/archives/C02DF3BEUGN/p1777469221721439", "C02DF3BEUGN", "1777469221.721439", false},
 		{"permalink with thread_ts query", "https://example.slack.com/archives/C02DF3BEUGN/p1777469221721439?thread_ts=1777469200.000000&cid=C02DF3BEUGN", "C02DF3BEUGN", "1777469221.721439", false},

@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/open-cli-collective/slack-chat-api/internal/client"
+	"github.com/open-cli-collective/slack-chat-api/internal/messageref"
 	"github.com/open-cli-collective/slack-chat-api/internal/output"
 )
 
@@ -136,7 +137,7 @@ func runSearchMessages(query string, opts *messagesOptions, c *client.Client) er
 			Files:       m.Files,
 		}, nil).Body
 		when := formatTimestamp(m.TS)
-		ref := m.Channel.ID + "/" + m.TS
+		ref := messageref.Ref{ChannelID: m.Channel.ID, TS: m.TS}.String()
 		rows = append(rows, []string{ref, m.Channel.Name, m.Username, when, body})
 	}
 	output.SearchTable(headers, rows, 60)
