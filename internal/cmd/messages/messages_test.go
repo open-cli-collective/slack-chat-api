@@ -2572,6 +2572,7 @@ func TestRunRead_Success(t *testing.T) {
 		if r.URL.Path == "/conversations.replies" {
 			assert.Equal(t, "C02DF3BEUGN", r.URL.Query().Get("channel"))
 			assert.Equal(t, "1777469221.721439", r.URL.Query().Get("ts"))
+			assert.Equal(t, "42", r.URL.Query().Get("limit"))
 			_ = json.NewEncoder(w).Encode(map[string]interface{}{
 				"ok": true,
 				"messages": []map[string]interface{}{
@@ -2592,7 +2593,7 @@ func TestRunRead_Success(t *testing.T) {
 	output.Writer = &buf
 	defer func() { output.Writer = orig }()
 
-	err := runRead("C02DF3BEUGN/1777469221.721439", &readOptions{limit: 100}, c)
+	err := runRead("C02DF3BEUGN/1777469221.721439", &readOptions{limit: 42}, c)
 	require.NoError(t, err)
 	out := buf.String()
 	assert.Contains(t, out, "parent body")
