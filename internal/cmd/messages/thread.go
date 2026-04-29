@@ -65,18 +65,21 @@ func runThread(channel, threadTS string, opts *threadOptions, c *client.Client) 
 		return nil
 	}
 
-	resolver := client.NewUserResolver(c)
+	renderMessageList(messages, client.NewUserResolver(c))
+	return nil
+}
+
+// renderMessageList prints "[ts] user: body" lines for each message, with
+// continuation indentation for multi-line bodies, edited markers, and file
+// attachment lines. Shared between `messages thread` and `messages read`.
+func renderMessageList(messages []client.Message, resolver *client.UserResolver) {
 	for _, m := range messages {
 		ts := formatTimestamp(m.TS)
 		body, preserveNewlines := messageBody(m, resolver)
 		var text string
 		if preserveNewlines {
-			// Body came from a richer surface (blocks/attachments/files);
-			// indent continuation lines so multi-line content stays
-			// visually grouped under the [ts] user: header.
 			text = indentContinuation(body)
 		} else {
-			// Plain-text fallback keeps existing single-line behavior.
 			text = flatten(body)
 		}
 		name := resolver.Resolve(m.User)
@@ -84,9 +87,6 @@ func runThread(channel, threadTS string, opts *threadOptions, c *client.Client) 
 		if m.Edited != nil {
 			edited = " [edited]"
 		}
-		// For multi-line bodies, place [edited] on the first line so it
-		// annotates the whole message rather than appearing to annotate
-		// only the final continuation line.
 		if edited != "" {
 			if idx := strings.Index(text, "\n"); idx >= 0 {
 				text = text[:idx] + edited + text[idx:]
@@ -98,6 +98,4 @@ func runThread(channel, threadTS string, opts *threadOptions, c *client.Client) 
 			output.Printf("%s", files)
 		}
 	}
-
-	return nil
 }

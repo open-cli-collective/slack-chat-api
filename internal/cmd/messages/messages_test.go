@@ -2566,3 +2566,130 @@ func TestRunHistory_TextIncludesFileHints(t *testing.T) {
 	assert.Contains(t, out, "\t[file] IW Trailer.pdf (pdf, 59.2 KB) — slck files download F0ATD4WJ70D\n")
 	assert.NotContains(t, out, "...F0ATD4WJ70D")
 }
+
+func TestRunRead_Success(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/conversations.replies" {
+			assert.Equal(t, "C02DF3BEUGN", r.URL.Query().Get("channel"))
+			assert.Equal(t, "1777469221.721439", r.URL.Query().Get("ts"))
+			assert.Equal(t, "42", r.URL.Query().Get("limit"))
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"ok": true,
+				"messages": []map[string]interface{}{
+					{"type": "message", "user": "U1", "text": "parent body", "ts": "1777469221.721439"},
+					{"type": "message", "user": "U2", "text": "first reply", "ts": "1777469300.000000"},
+				},
+			})
+			return
+		}
+		// User resolver lookups — return a minimal valid response.
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"ok": true, "user": map[string]interface{}{"id": "U?", "name": "u"}})
+	}))
+	defer server.Close()
+
+	c := client.NewWithConfig(server.URL, "test-token", nil)
+	var buf strings.Builder
+	orig := output.Writer
+	output.Writer = &buf
+	defer func() { output.Writer = orig }()
+
+	err := runRead("C02DF3BEUGN/1777469221.721439", &readOptions{limit: 42}, c)
+	require.NoError(t, err)
+	out := buf.String()
+	assert.Contains(t, out, "parent body")
+	assert.Contains(t, out, "first reply")
+}
+
+func TestRunRead_AcceptsPermalink(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/conversations.replies" {
+			assert.Equal(t, "C02DF3BEUGN", r.URL.Query().Get("channel"))
+			assert.Equal(t, "1777469221.721439", r.URL.Query().Get("ts"))
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"ok":       true,
+				"messages": []map[string]interface{}{{"type": "message", "user": "U1", "text": "hi", "ts": "1777469221.721439"}},
+			})
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"ok": true, "user": map[string]interface{}{"id": "U?", "name": "u"}})
+	}))
+	defer server.Close()
+
+	c := client.NewWithConfig(server.URL, "test-token", nil)
+	var buf strings.Builder
+	orig := output.Writer
+	output.Writer = &buf
+	defer func() { output.Writer = orig }()
+
+	err := runRead("https://example.slack.com/archives/C02DF3BEUGN/p1777469221721439", &readOptions{limit: 100}, c)
+	require.NoError(t, err)
+}
+
+func TestRunRead_NotInChannelHint(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"ok": false, "error": "not_in_channel"})
+	}))
+	defer server.Close()
+
+	c := client.NewWithConfig(server.URL, "test-token", nil)
+	err := runRead("C02DF3BEUGN/1777469221.721439", &readOptions{limit: 100}, c)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "slck --as-user messages read")
+	assert.Contains(t, err.Error(), "C02DF3BEUGN/1777469221.721439")
+}
+
+func TestRunRead_InvalidRef(t *testing.T) {
+	err := runRead("not-a-ref", &readOptions{limit: 100}, nil)
+	require.Error(t, err)
+}
+
+func TestRunRead_OtherErrorNoHint(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"ok": false, "error": "ratelimited"})
+	}))
+	defer server.Close()
+
+	c := client.NewWithConfig(server.URL, "test-token", nil)
+	err := runRead("C02DF3BEUGN/1777469221.721439", &readOptions{limit: 100}, c)
+	require.Error(t, err)
+	assert.NotContains(t, err.Error(), "--as-user")
+}
+
+func TestRunRead_JSONOutput(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"ok":       true,
+			"messages": []map[string]interface{}{{"type": "message", "user": "U1", "text": "hi", "ts": "1777469221.721439"}},
+		})
+	}))
+	defer server.Close()
+
+	c := client.NewWithConfig(server.URL, "test-token", nil)
+	var buf strings.Builder
+	orig := output.Writer
+	output.Writer = &buf
+	defer func() { output.Writer = orig }()
+	origFmt := output.OutputFormat
+	output.OutputFormat = output.FormatJSON
+	defer func() { output.OutputFormat = origFmt }()
+
+	err := runRead("C02DF3BEUGN/1777469221.721439", &readOptions{limit: 100}, c)
+	require.NoError(t, err)
+	assert.Contains(t, buf.String(), `"text": "hi"`)
+}
+
+func TestRunRead_EmptyMessages(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"ok": true, "messages": []map[string]interface{}{}})
+	}))
+	defer server.Close()
+	c := client.NewWithConfig(server.URL, "tok", nil)
+	var buf strings.Builder
+	orig := output.Writer
+	output.Writer = &buf
+	defer func() { output.Writer = orig }()
+
+	err := runRead("C02DF3BEUGN/1777469221.721439", &readOptions{limit: 100}, c)
+	require.NoError(t, err)
+	assert.Contains(t, buf.String(), "No messages found")
+}
