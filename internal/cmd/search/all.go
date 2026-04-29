@@ -141,6 +141,7 @@ func runSearchAll(query string, opts *allOptions, c *client.Client) error {
 		paging := result.Messages.Paging
 		output.Printf("\nPage %d of %d (showing %d of %d messages)\n",
 			paging.Page, paging.Pages, len(result.Messages.Matches), paging.Total)
+		output.Println("Read: slck --as-user messages read <REF>")
 	}
 
 	// Add spacing between sections
@@ -165,10 +166,6 @@ func runSearchAll(query string, opts *allOptions, c *client.Client) error {
 		paging := result.Files.Paging
 		output.Printf("\nPage %d of %d (showing %d of %d files)\n",
 			paging.Page, paging.Pages, len(result.Files.Matches), paging.Total)
-	}
-
-	if hasMessages {
-		output.Println("\nRead: slck --as-user messages read <REF>")
 	}
 
 	return nil

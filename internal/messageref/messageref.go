@@ -35,7 +35,7 @@ func (r Ref) String() string {
 
 // permalinkPattern matches Slack message permalinks.
 // Example: https://workspace.slack.com/archives/C02DF3BEUGN/p1777469221721439
-var permalinkPattern = regexp.MustCompile(`^https?://[^/]+/archives/([A-Z0-9]+)/p(\d{16})(?:\?.*)?$`)
+var permalinkPattern = regexp.MustCompile(`^https?://[^/]+/archives/([A-Z0-9]{2,})/p(\d{16})(?:\?.*)?$`)
 
 // Parse accepts either a permalink or "<channel_id>/<ts>" and returns a Ref.
 // The ts portion may be in API form (1234567890.123456) or p-prefixed form

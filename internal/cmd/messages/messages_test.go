@@ -2677,3 +2677,19 @@ func TestRunRead_JSONOutput(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), `"text": "hi"`)
 }
+
+func TestRunRead_EmptyMessages(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"ok": true, "messages": []map[string]interface{}{}})
+	}))
+	defer server.Close()
+	c := client.NewWithConfig(server.URL, "tok", nil)
+	var buf strings.Builder
+	orig := output.Writer
+	output.Writer = &buf
+	defer func() { output.Writer = orig }()
+
+	err := runRead("C02DF3BEUGN/1777469221.721439", &readOptions{limit: 100}, c)
+	require.NoError(t, err)
+	assert.Contains(t, buf.String(), "No messages found")
+}

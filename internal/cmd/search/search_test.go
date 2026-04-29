@@ -1041,3 +1041,33 @@ func TestRunSearchAll_FooterOnlyWithMessages(t *testing.T) {
 		t.Errorf("footer should be suppressed for file-only results; got:\n%s", out)
 	}
 }
+
+func TestRunSearchAll_FooterShownWithMessages(t *testing.T) {
+	response := map[string]interface{}{
+		"ok": true,
+		"messages": map[string]interface{}{
+			"total":  1,
+			"paging": map[string]interface{}{"count": 20, "total": 1, "page": 1, "pages": 1},
+			"matches": []map[string]interface{}{{
+				"type":     "message",
+				"channel":  map[string]interface{}{"id": "C123", "name": "general"},
+				"user":     "U1",
+				"username": "alice",
+				"text":     "hi",
+				"ts":       "1.0",
+			}},
+		},
+	}
+	c, server := newTestClient(func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode(response)
+	})
+	defer server.Close()
+	out := captureOutput(t, func() {
+		if err := runSearchAll("hi", &allOptions{count: 20, page: 1, sort: "score", sortDir: "desc"}, c); err != nil {
+			t.Fatalf("runSearchAll: %v", err)
+		}
+	})
+	if !strings.Contains(out, "Read: slck --as-user messages read <REF>") {
+		t.Errorf("footer should appear in messages section; got:\n%s", out)
+	}
+}

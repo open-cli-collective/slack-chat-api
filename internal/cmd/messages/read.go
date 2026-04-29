@@ -62,7 +62,7 @@ func runRead(input string, opts *readOptions, c *client.Client) error {
 	messages, err := c.GetThreadReplies(ref.ChannelID, ref.TS, opts.limit, "")
 	if err != nil {
 		if client.IsSlackError(err, "not_in_channel") {
-			return fmt.Errorf("%w\nHint: try `slck --as-user messages read %s` — search-derived refs typically require user-token access", err, ref)
+			return fmt.Errorf("%w; try `slck --as-user messages read %s` — search-derived refs typically require user-token access", err, ref)
 		}
 		return err
 	}
