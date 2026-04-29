@@ -943,3 +943,101 @@ func TestSearchMessages_WithSortOptions(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 }
+
+// TestRunSearchMessages_RefColumnAndFooter verifies the REF column uses
+// channel ID (not channel name) and that the footer hint is emitted when
+// matches are present.
+func TestRunSearchMessages_RefColumnAndFooter(t *testing.T) {
+	response := map[string]interface{}{
+		"ok": true,
+		"messages": map[string]interface{}{
+			"total":  1,
+			"paging": map[string]interface{}{"count": 20, "total": 1, "page": 1, "pages": 1},
+			"matches": []map[string]interface{}{{
+				"type":     "message",
+				"channel":  map[string]interface{}{"id": "C02DF3BEUGN", "name": "engineering"},
+				"user":     "U1",
+				"username": "alice",
+				"text":     "hello",
+				"ts":       "1777469221.721439",
+			}},
+		},
+	}
+	c, server := newTestClient(func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode(response)
+	})
+	defer server.Close()
+
+	out := captureOutput(t, func() {
+		if err := runSearchMessages("hello", &messagesOptions{count: 20, page: 1, sort: "score", sortDir: "desc"}, c); err != nil {
+			t.Fatalf("runSearchMessages: %v", err)
+		}
+	})
+
+	if !strings.Contains(out, "REF | CHANNEL | USER | WHEN | TEXT") {
+		t.Errorf("missing REF header line; got:\n%s", out)
+	}
+	if !strings.Contains(out, "C02DF3BEUGN/1777469221.721439 | engineering |") {
+		t.Errorf("REF should be channel-id/ts; got:\n%s", out)
+	}
+	if !strings.Contains(out, "Read: slck --as-user messages read <REF>") {
+		t.Errorf("missing footer hint; got:\n%s", out)
+	}
+}
+
+func TestRunSearchMessages_NoFooterWhenEmpty(t *testing.T) {
+	response := map[string]interface{}{
+		"ok": true,
+		"messages": map[string]interface{}{
+			"total":   0,
+			"paging":  map[string]interface{}{"count": 20, "total": 0, "page": 1, "pages": 0},
+			"matches": []map[string]interface{}{},
+		},
+	}
+	c, server := newTestClient(func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode(response)
+	})
+	defer server.Close()
+
+	out := captureOutput(t, func() {
+		if err := runSearchMessages("nope", &messagesOptions{count: 20, page: 1, sort: "score", sortDir: "desc"}, c); err != nil {
+			t.Fatalf("runSearchMessages: %v", err)
+		}
+	})
+
+	if strings.Contains(out, "Read: slck") {
+		t.Errorf("footer should not appear with no results; got:\n%s", out)
+	}
+}
+
+func TestRunSearchAll_FooterOnlyWithMessages(t *testing.T) {
+	// File-only result: footer hint must NOT appear.
+	response := map[string]interface{}{
+		"ok": true,
+		"files": map[string]interface{}{
+			"total":  1,
+			"paging": map[string]interface{}{"count": 20, "total": 1, "page": 1, "pages": 1},
+			"matches": []map[string]interface{}{{
+				"id":       "F1",
+				"name":     "report.pdf",
+				"title":    "report",
+				"filetype": "pdf",
+				"user":     "U1",
+				"created":  int64(1704067200),
+			}},
+		},
+	}
+	c, server := newTestClient(func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode(response)
+	})
+	defer server.Close()
+
+	out := captureOutput(t, func() {
+		if err := runSearchAll("query", &allOptions{count: 20, page: 1, sort: "score", sortDir: "desc"}, c); err != nil {
+			t.Fatalf("runSearchAll: %v", err)
+		}
+	})
+	if strings.Contains(out, "Read: slck") {
+		t.Errorf("footer should be suppressed for file-only results; got:\n%s", out)
+	}
+}

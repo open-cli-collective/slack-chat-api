@@ -109,6 +109,68 @@ func Table(headers []string, rows [][]string) {
 	}
 }
 
+// SearchTable writes pipe-delimited, unpadded rows for agent-friendly
+// search output: "h1 | h2 | h3" / "v1 | v2 | v3".
+//
+// Cell rules (callers pass raw strings only):
+//   - internal newlines and CRs are collapsed to single spaces
+//   - literal '|' is replaced with U+00A6 '¦' so a downstream parser can
+//     split on " | " deterministically
+//   - only the LAST column is truncated, rune-based, when lastColMaxRunes > 0;
+//     all other columns (REF, IDs, dates, names) render in full
+//
+// If a row's length doesn't match headers, missing cells are padded with ""
+// and extra cells are dropped — no panic.
+func SearchTable(headers []string, rows [][]string, lastColMaxRunes int) {
+	if len(headers) == 0 {
+		return
+	}
+
+	cleanHeaders := make([]string, len(headers))
+	for i, h := range headers {
+		cleanHeaders[i] = sanitizeSearchCell(h)
+	}
+	_, _ = fmt.Fprintln(Writer, strings.Join(cleanHeaders, " | "))
+
+	lastIdx := len(headers) - 1
+	for _, row := range rows {
+		cells := make([]string, len(headers))
+		for i := range headers {
+			var raw string
+			if i < len(row) {
+				raw = row[i]
+			}
+			c := sanitizeSearchCell(raw)
+			if i == lastIdx && lastColMaxRunes > 0 {
+				c = truncateRunes(c, lastColMaxRunes)
+			}
+			cells[i] = c
+		}
+		_, _ = fmt.Fprintln(Writer, strings.Join(cells, " | "))
+	}
+}
+
+func sanitizeSearchCell(s string) string {
+	s = strings.ReplaceAll(s, "\r", "")
+	s = strings.ReplaceAll(s, "\n", " ")
+	s = strings.ReplaceAll(s, "|", "¦")
+	return s
+}
+
+func truncateRunes(s string, max int) string {
+	if max <= 0 {
+		return s
+	}
+	runes := []rune(s)
+	if len(runes) <= max {
+		return s
+	}
+	if max <= 3 {
+		return string(runes[:max])
+	}
+	return string(runes[:max-3]) + "..."
+}
+
 // KeyValue prints a single key-value pair
 func KeyValue(key string, value interface{}) {
 	_, _ = fmt.Fprintf(Writer, "%-12s  %v\n", key+":", value)

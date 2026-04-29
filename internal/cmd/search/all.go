@@ -122,7 +122,7 @@ func runSearchAll(query string, opts *allOptions, c *client.Client) error {
 	if hasMessages {
 		output.Printf("=== Messages (%d total) ===\n\n", result.Messages.Total)
 
-		headers := []string{"CHANNEL", "USER", "TIMESTAMP", "TEXT"}
+		headers := []string{"REF", "CHANNEL", "USER", "WHEN", "TEXT"}
 		rows := make([][]string, 0, len(result.Messages.Matches))
 		for _, m := range result.Messages.Matches {
 			body := client.RenderMessage(client.MessageContent{
@@ -131,11 +131,11 @@ func runSearchAll(query string, opts *allOptions, c *client.Client) error {
 				Attachments: m.Attachments,
 				Files:       m.Files,
 			}, nil).Body
-			text := truncateText(body, 60)
-			ts := formatTimestamp(m.TS)
-			rows = append(rows, []string{m.Channel.Name, m.Username, ts, text})
+			when := formatTimestamp(m.TS)
+			ref := m.Channel.ID + "/" + m.TS
+			rows = append(rows, []string{ref, m.Channel.Name, m.Username, when, body})
 		}
-		output.Table(headers, rows)
+		output.SearchTable(headers, rows, 60)
 
 		paging := result.Messages.Paging
 		output.Printf("\nPage %d of %d (showing %d of %d messages)\n",
@@ -164,6 +164,10 @@ func runSearchAll(query string, opts *allOptions, c *client.Client) error {
 		paging := result.Files.Paging
 		output.Printf("\nPage %d of %d (showing %d of %d files)\n",
 			paging.Page, paging.Pages, len(result.Files.Matches), paging.Total)
+	}
+
+	if hasMessages {
+		output.Println("\nRead: slck --as-user messages read <REF>")
 	}
 
 	return nil

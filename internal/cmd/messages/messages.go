@@ -25,6 +25,7 @@ func NewCmd() *cobra.Command {
 	cmd.AddCommand(newDeleteCmd())
 	cmd.AddCommand(newHistoryCmd())
 	cmd.AddCommand(newThreadCmd())
+	cmd.AddCommand(newReadCmd())
 	cmd.AddCommand(newReactCmd())
 	cmd.AddCommand(newUnreactCmd())
 
