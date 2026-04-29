@@ -129,7 +129,13 @@ func runSearchMessages(query string, opts *messagesOptions, c *client.Client) er
 	headers := []string{"CHANNEL", "USER", "TIMESTAMP", "TEXT"}
 	rows := make([][]string, 0, len(result.Messages.Matches))
 	for _, m := range result.Messages.Matches {
-		text := truncateText(m.Text, 60)
+		body := client.RenderMessage(client.MessageContent{
+			Text:        m.Text,
+			Blocks:      m.Blocks,
+			Attachments: m.Attachments,
+			Files:       m.Files,
+		}, nil).Body
+		text := truncateText(body, 60)
 		ts := formatTimestamp(m.TS)
 		rows = append(rows, []string{m.Channel.Name, m.Username, ts, text})
 	}

@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/open-cli-collective/slack-chat-api/internal/client"
+	"github.com/open-cli-collective/slack-chat-api/internal/output"
 )
 
 // Helper to create a test client with a mock server
@@ -543,6 +545,100 @@ func TestTruncateText(t *testing.T) {
 				t.Errorf("truncateText() = %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+// captureOutput swaps output.Writer for a buffer and returns its contents.
+func captureOutput(t *testing.T, fn func()) string {
+	t.Helper()
+	var buf strings.Builder
+	orig := output.Writer
+	output.Writer = &buf
+	defer func() { output.Writer = orig }()
+	fn()
+	return buf.String()
+}
+
+// TestRunSearchMessages_RendersBlocksTextInTable is the regression test
+// for issue #143: a search match whose content lives in a section block
+// must appear in the rendered table column rather than showing empty.
+func TestRunSearchMessages_RendersBlocksTextInTable(t *testing.T) {
+	statusLine := "Served Rian in #general · 20.7s · claude-sonnet-4-6 · 2 in (73,746 cached) · 77 out · $0.07"
+	response := map[string]interface{}{
+		"ok": true,
+		"messages": map[string]interface{}{
+			"total":  1,
+			"paging": map[string]interface{}{"count": 20, "total": 1, "page": 1, "pages": 1},
+			"matches": []map[string]interface{}{{
+				"type":      "message",
+				"channel":   map[string]interface{}{"id": "C123", "name": "general"},
+				"user":      "U123",
+				"username":  "claude-bot",
+				"text":      "",
+				"ts":        "1704067200.000000",
+				"permalink": "https://slack.com/archives/C123/p1704067200000000",
+				"blocks": []map[string]interface{}{{
+					"type": "section",
+					"text": map[string]interface{}{"type": "mrkdwn", "text": statusLine},
+				}},
+			}},
+		},
+	}
+
+	c, server := newTestClient(func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode(response)
+	})
+	defer server.Close()
+
+	opts := &messagesOptions{count: 20, page: 1, sort: "score", sortDir: "desc"}
+	out := captureOutput(t, func() {
+		if err := runSearchMessages("claude-sonnet", opts, c); err != nil {
+			t.Fatalf("runSearchMessages: %v", err)
+		}
+	})
+	// Truncated to 60 chars in the table — assert the prefix is present.
+	if !strings.Contains(out, "Served Rian in #general") {
+		t.Errorf("expected section-block text in table output; got:\n%s", out)
+	}
+}
+
+// TestRunSearchAll_RendersBlocksTextInTable verifies the same shared
+// renderer is wired into search all (same call-site bug existed there).
+func TestRunSearchAll_RendersBlocksTextInTable(t *testing.T) {
+	response := map[string]interface{}{
+		"ok": true,
+		"messages": map[string]interface{}{
+			"total":  1,
+			"paging": map[string]interface{}{"count": 20, "total": 1, "page": 1, "pages": 1},
+			"matches": []map[string]interface{}{{
+				"type":      "message",
+				"channel":   map[string]interface{}{"id": "C1", "name": "general"},
+				"user":      "U1",
+				"username":  "alice",
+				"text":      "",
+				"ts":        "1704067200.000000",
+				"permalink": "https://slack.com/archives/C1/p1",
+				"blocks": []map[string]interface{}{{
+					"type": "section",
+					"text": map[string]interface{}{"type": "mrkdwn", "text": "block-only content"},
+				}},
+			}},
+		},
+	}
+
+	c, server := newTestClient(func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode(response)
+	})
+	defer server.Close()
+
+	opts := &allOptions{count: 20, page: 1, sort: "score", sortDir: "desc"}
+	out := captureOutput(t, func() {
+		if err := runSearchAll("query", opts, c); err != nil {
+			t.Fatalf("runSearchAll: %v", err)
+		}
+	})
+	if !strings.Contains(out, "block-only content") {
+		t.Errorf("expected section-block text in search-all output; got:\n%s", out)
 	}
 }
 

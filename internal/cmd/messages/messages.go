@@ -63,16 +63,19 @@ func truncate(s string, maxLen int) string {
 	return s[:maxLen-3] + "..."
 }
 
-// messageBody chooses the right source for a message's textual content.
-// When blocks render non-empty, returns the rendered body with
-// fromBlocks=true; otherwise returns the mention-resolved m.Text with
-// fromBlocks=false. Callers use fromBlocks to decide whether to preserve
-// newlines (thread detail view) or flatten them (text-only path).
-func messageBody(m client.Message, resolver *client.UserResolver) (body string, fromBlocks bool) {
-	if rendered := client.RenderBlocks(m.Blocks, resolver); rendered != "" {
-		return rendered, true
-	}
-	return resolver.ResolveMentions(m.Text), false
+// messageBody renders a message's readable surfaces (text, blocks,
+// attachments, files) into a single body string via the shared renderer.
+// preserveNewlines is true when the body came from a richer surface;
+// callers that flatten plain-text in compact views should leave such
+// content alone.
+func messageBody(m client.Message, resolver *client.UserResolver) (body string, preserveNewlines bool) {
+	rendered := client.RenderMessage(client.MessageContent{
+		Text:        m.Text,
+		Blocks:      m.Blocks,
+		Attachments: m.Attachments,
+		Files:       m.Files,
+	}, resolver)
+	return rendered.Body, rendered.PreserveNewlines
 }
 
 // indentContinuation replaces interior newlines with "\n\t" so that every

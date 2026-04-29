@@ -139,23 +139,176 @@ func (e RichTextElement) MarshalJSON() ([]byte, error) {
 
 // RenderBlocks walks top-level blocks and returns plain text suitable for
 // slck's text output. Returns "" if blocks is empty or no block yields
-// output — callers can use that signal to fall back to m.Text. Safe to
-// call with a nil resolver.
+// output. Handles rich_text along with the common Block Kit surface
+// types (section, header, context, actions, image, video). Safe to call
+// with a nil resolver.
 func RenderBlocks(blocks []Block, resolver *UserResolver) string {
 	if len(blocks) == 0 {
 		return ""
 	}
-	var out strings.Builder
+	var rendered []string
 	for _, b := range blocks {
-		if b.Type != "rich_text" {
-			// Non-rich_text blocks (section, image, context, etc.) are
-			// dropped so the caller falls back to m.Text, which Slack
-			// populates as a plain-text equivalent for these cases.
+		var piece string
+		switch b.Type {
+		case "rich_text":
+			piece = strings.TrimRight(renderRichText(b.Elements, resolver, 0), "\n")
+		case "section":
+			piece = renderSectionBlock(b.raw)
+		case "header":
+			piece = renderHeaderBlock(b.raw)
+		case "context":
+			piece = renderContextBlock(b.raw)
+		case "actions":
+			piece = renderActionsBlock(b.raw)
+		case "image":
+			piece = renderImageBlock(b.raw)
+		case "video":
+			piece = renderVideoBlock(b.raw)
+		default:
+			// divider and unknown types — drop.
+		}
+		if piece != "" {
+			rendered = append(rendered, piece)
+		}
+	}
+	return strings.Join(rendered, "\n")
+}
+
+// blockText is the shape of a {type, text, emoji?} text object embedded
+// in many block types (section.text, header.text, context.elements[], etc.).
+type blockText struct {
+	Type string `json:"type"`
+	Text string `json:"text"`
+}
+
+func renderSectionBlock(raw json.RawMessage) string {
+	var s struct {
+		Text   *blockText  `json:"text"`
+		Fields []blockText `json:"fields"`
+	}
+	if err := json.Unmarshal(raw, &s); err != nil {
+		return ""
+	}
+	var pieces []string
+	if s.Text != nil && strings.TrimSpace(s.Text.Text) != "" {
+		pieces = append(pieces, s.Text.Text)
+	}
+	if line := joinFieldTexts(s.Fields); line != "" {
+		pieces = append(pieces, line)
+	}
+	return strings.Join(pieces, "\n")
+}
+
+func joinFieldTexts(fields []blockText) string {
+	var parts []string
+	for _, f := range fields {
+		if t := strings.TrimSpace(f.Text); t != "" {
+			parts = append(parts, t)
+		}
+	}
+	return strings.Join(parts, " · ")
+}
+
+func renderHeaderBlock(raw json.RawMessage) string {
+	var s struct {
+		Text *blockText `json:"text"`
+	}
+	if err := json.Unmarshal(raw, &s); err != nil || s.Text == nil {
+		return ""
+	}
+	return strings.TrimSpace(s.Text.Text)
+}
+
+func renderContextBlock(raw json.RawMessage) string {
+	var s struct {
+		Elements []struct {
+			Type    string `json:"type"`
+			Text    string `json:"text"`
+			AltText string `json:"alt_text"`
+		} `json:"elements"`
+	}
+	if err := json.Unmarshal(raw, &s); err != nil {
+		return ""
+	}
+	var parts []string
+	for _, e := range s.Elements {
+		switch e.Type {
+		case "plain_text", "mrkdwn":
+			if t := strings.TrimSpace(e.Text); t != "" {
+				parts = append(parts, t)
+			}
+		case "image":
+			if alt := strings.TrimSpace(e.AltText); alt != "" {
+				parts = append(parts, alt)
+			}
+		}
+	}
+	return strings.Join(parts, " ")
+}
+
+func renderActionsBlock(raw json.RawMessage) string {
+	var s struct {
+		Elements []struct {
+			Type string     `json:"type"`
+			Text *blockText `json:"text"`
+		} `json:"elements"`
+	}
+	if err := json.Unmarshal(raw, &s); err != nil {
+		return ""
+	}
+	var parts []string
+	for _, e := range s.Elements {
+		if e.Text == nil {
 			continue
 		}
-		out.WriteString(renderRichText(b.Elements, resolver, 0))
+		if t := strings.TrimSpace(e.Text.Text); t != "" {
+			parts = append(parts, "["+t+"]")
+		}
 	}
-	return strings.TrimRight(out.String(), "\n")
+	return strings.Join(parts, " ")
+}
+
+func renderImageBlock(raw json.RawMessage) string {
+	var s struct {
+		AltText string     `json:"alt_text"`
+		Title   *blockText `json:"title"`
+	}
+	if err := json.Unmarshal(raw, &s); err != nil {
+		return ""
+	}
+	if alt := strings.TrimSpace(s.AltText); alt != "" {
+		return alt
+	}
+	if s.Title != nil {
+		return strings.TrimSpace(s.Title.Text)
+	}
+	return ""
+}
+
+func renderVideoBlock(raw json.RawMessage) string {
+	var s struct {
+		Title       *blockText `json:"title"`
+		Description *blockText `json:"description"`
+		AltText     string     `json:"alt_text"`
+	}
+	if err := json.Unmarshal(raw, &s); err != nil {
+		return ""
+	}
+	var pieces []string
+	if s.Title != nil {
+		if t := strings.TrimSpace(s.Title.Text); t != "" {
+			pieces = append(pieces, t)
+		}
+	}
+	if s.Description != nil {
+		if t := strings.TrimSpace(s.Description.Text); t != "" {
+			pieces = append(pieces, t)
+		}
+	}
+	if len(pieces) > 0 {
+		return strings.Join(pieces, "\n")
+	}
+	return strings.TrimSpace(s.AltText)
 }
 
 // renderRichText walks the sub-elements of a rich_text block.

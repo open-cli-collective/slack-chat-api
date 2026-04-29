@@ -232,15 +232,22 @@ type Reaction struct {
 
 // File represents a file attachment on a Slack message
 type File struct {
-	ID                 string `json:"id"`
-	Name               string `json:"name"`
-	Title              string `json:"title,omitempty"`
-	Mimetype           string `json:"mimetype,omitempty"`
-	Filetype           string `json:"filetype,omitempty"`
-	Size               int64  `json:"size,omitempty"`
-	URLPrivate         string `json:"url_private,omitempty"`
-	URLPrivateDownload string `json:"url_private_download,omitempty"`
-	Permalink          string `json:"permalink,omitempty"`
+	ID                 string       `json:"id"`
+	Name               string       `json:"name"`
+	Title              string       `json:"title,omitempty"`
+	Mimetype           string       `json:"mimetype,omitempty"`
+	Filetype           string       `json:"filetype,omitempty"`
+	Size               int64        `json:"size,omitempty"`
+	URLPrivate         string       `json:"url_private,omitempty"`
+	URLPrivateDownload string       `json:"url_private_download,omitempty"`
+	Permalink          string       `json:"permalink,omitempty"`
+	PlainText          string       `json:"plain_text,omitempty"`
+	InitialComment     *FileComment `json:"initial_comment,omitempty"`
+}
+
+// FileComment represents the comment posted alongside a shared file.
+type FileComment struct {
+	Comment string `json:"comment,omitempty"`
 }
 
 // Edited represents the edit metadata for an edited Slack message
@@ -251,16 +258,17 @@ type Edited struct {
 
 // Message represents a Slack message
 type Message struct {
-	Type       string     `json:"type"`
-	User       string     `json:"user"`
-	Text       string     `json:"text"`
-	TS         string     `json:"ts"`
-	ThreadTS   string     `json:"thread_ts,omitempty"`
-	ReplyCount int        `json:"reply_count,omitempty"`
-	Edited     *Edited    `json:"edited,omitempty"`
-	Reactions  []Reaction `json:"reactions,omitempty"`
-	Files      []File     `json:"files,omitempty"`
-	Blocks     []Block    `json:"blocks,omitempty"`
+	Type        string       `json:"type"`
+	User        string       `json:"user"`
+	Text        string       `json:"text"`
+	TS          string       `json:"ts"`
+	ThreadTS    string       `json:"thread_ts,omitempty"`
+	ReplyCount  int          `json:"reply_count,omitempty"`
+	Edited      *Edited      `json:"edited,omitempty"`
+	Reactions   []Reaction   `json:"reactions,omitempty"`
+	Files       []File       `json:"files,omitempty"`
+	Blocks      []Block      `json:"blocks,omitempty"`
+	Attachments []Attachment `json:"attachments,omitempty"`
 }
 
 // Team represents workspace info
@@ -277,11 +285,14 @@ type SearchMatch struct {
 		ID   string `json:"id"`
 		Name string `json:"name"`
 	} `json:"channel"`
-	User      string `json:"user"`
-	Username  string `json:"username"`
-	Text      string `json:"text"`
-	TS        string `json:"ts"`
-	Permalink string `json:"permalink"`
+	User        string       `json:"user"`
+	Username    string       `json:"username"`
+	Text        string       `json:"text"`
+	TS          string       `json:"ts"`
+	Permalink   string       `json:"permalink"`
+	Blocks      []Block      `json:"blocks,omitempty"`
+	Files       []File       `json:"files,omitempty"`
+	Attachments []Attachment `json:"attachments,omitempty"`
 }
 
 // FileMatch represents a file match from search

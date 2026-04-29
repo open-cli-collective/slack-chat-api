@@ -1913,7 +1913,10 @@ func TestRunThread_RendersRichTextBlocks(t *testing.T) {
 	assert.Contains(t, out, "Account Number Check Number")
 }
 
-func TestRunThread_BlocksOverrideNonEmptyText(t *testing.T) {
+func TestRunThread_TextDuplicatingBlocksIsDropped(t *testing.T) {
+	// When m.Text exactly matches the blocks rendering (Slack's plain-text
+	// fallback for Block Kit messages), the duplicate is suppressed —
+	// only the rendered blocks appear.
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/conversations.replies":
@@ -1923,7 +1926,7 @@ func TestRunThread_BlocksOverrideNonEmptyText(t *testing.T) {
 					{
 						"ts":   "1234567890.123456",
 						"user": "U001",
-						"text": "FALLBACK_TEXT_SENTINEL",
+						"text": "FROM_BLOCKS",
 						"blocks": []map[string]interface{}{
 							{
 								"type": "rich_text",
@@ -1953,7 +1956,8 @@ func TestRunThread_BlocksOverrideNonEmptyText(t *testing.T) {
 		require.NoError(t, runThread("C123", "1234567890.123456", opts, c))
 	})
 	assert.Contains(t, out, "FROM_BLOCKS")
-	assert.NotContains(t, out, "FALLBACK_TEXT_SENTINEL")
+	// Duplicate suppression: text shouldn't appear twice in the output.
+	assert.Equal(t, 1, strings.Count(out, "FROM_BLOCKS"))
 }
 
 func TestRunThread_FallsBackToTextWhenSubBlocksUnrenderable(t *testing.T) {
