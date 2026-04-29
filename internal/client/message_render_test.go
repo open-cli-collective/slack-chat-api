@@ -246,8 +246,8 @@ func TestRenderFilesText_LabelFallback(t *testing.T) {
 
 func TestAttachment_JSONRoundTripPreservesUnknownFields(t *testing.T) {
 	// Attachment with fields outside the typed struct (color, mrkdwn_in,
-	// callback_id) must round-trip byte-identically at those keys so
-	// --output json stays unchanged.
+	// callback_id) must round-trip losslessly so --output json preserves
+	// unknown fields the typed struct doesn't model.
 	original := `{"text":"hi","color":"#36a64f","mrkdwn_in":["text"],"callback_id":"cb_42"}`
 	var a Attachment
 	require.NoError(t, json.Unmarshal([]byte(original), &a))
