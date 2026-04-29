@@ -33,8 +33,8 @@ type RenderedMessage struct {
 
 // Attachment is the legacy pre-Block-Kit message attachment shape. Only
 // the readable fields are typed; the rest round-trips via raw bytes so
-// --output json stays byte-identical at unmodeled keys (color, mrkdwn_in,
-// callback_id, image_url, actions, ts, etc.).
+// --output json preserves unknown fields the typed struct doesn't model
+// (color, mrkdwn_in, callback_id, image_url, actions, ts, etc.).
 type Attachment struct {
 	Pretext    string            `json:"pretext,omitempty"`
 	Title      string            `json:"title,omitempty"`
