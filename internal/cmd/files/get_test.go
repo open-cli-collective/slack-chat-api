@@ -119,3 +119,27 @@ func TestRunGet_JSONOutputRaw(t *testing.T) {
 	assert.NotContains(t, parsed, "download")
 	assert.NotContains(t, parsed, "hint")
 }
+
+func TestRunGet_NegativeSizeRendersZero(t *testing.T) {
+	c, server := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"ok":   true,
+			"file": map[string]interface{}{"id": "F1", "name": "snippet", "size": -1},
+		})
+	})
+	defer server.Close()
+
+	out := captureOutput(t, func() { require.NoError(t, runGet("F1", c)) })
+	assert.Contains(t, out, "Size: 0 B\n")
+}
+
+func TestRunGet_APIErrorPropagates(t *testing.T) {
+	c, server := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"ok": false, "error": "file_not_found"})
+	})
+	defer server.Close()
+
+	err := runGet("F0ABC123", c)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "file_not_found")
+}
