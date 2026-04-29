@@ -2067,6 +2067,109 @@ func TestRunThread_FallsBackToTextWhenBlocksNil(t *testing.T) {
 	assert.Contains(t, out, "plain old text")
 }
 
+// TestRunHistory_AttachmentTextRendersInOutput exercises the
+// attachments path through the command layer — search/history/thread all
+// share the same RenderMessage call site.
+func TestRunHistory_AttachmentTextRendersInOutput(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/conversations.history":
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"ok": true,
+				"messages": []map[string]interface{}{{
+					"ts":   "1234567890.123456",
+					"user": "U001",
+					"text": "",
+					"attachments": []map[string]interface{}{{
+						"title": "Build #42",
+						"text":  "Failed in 12s",
+						"fields": []map[string]interface{}{
+							{"title": "Branch", "value": "main"},
+						},
+					}},
+				}},
+			})
+		case "/users.info":
+			mockUserInfoHandler(w, r)
+		}
+	}))
+	defer server.Close()
+
+	c := client.NewWithConfig(server.URL, "test-token", nil)
+	out := captureTextOutput(t, func() {
+		require.NoError(t, runHistory("C123", &historyOptions{limit: 20}, c))
+	})
+	// Attachment title + text both flow through (history truncates to 80
+	// and joins newlines into spaces, so we look for both substrings).
+	assert.Contains(t, out, "Build #42")
+}
+
+// TestRunThread_FileInitialCommentRendersInBody verifies file
+// initial_comment text reaches the body via RenderMessage. The legacy
+// "[file] X — slck files download Y" hint line is rendered separately
+// by renderFiles and is unaffected by this path.
+func TestRunThread_FileInitialCommentRendersInBody(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/conversations.replies":
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"ok": true,
+				"messages": []map[string]interface{}{{
+					"ts":   "1234567890.123456",
+					"user": "U001",
+					"text": "",
+					"files": []map[string]interface{}{{
+						"id":              "F1",
+						"name":            "report.pdf",
+						"initial_comment": map[string]interface{}{"comment": "see snippet"},
+					}},
+				}},
+			})
+		case "/users.info":
+			mockUserInfoHandler(w, r)
+		}
+	}))
+	defer server.Close()
+
+	c := client.NewWithConfig(server.URL, "test-token", nil)
+	out := captureTextOutput(t, func() {
+		require.NoError(t, runThread("C123", "1234567890.123456", &threadOptions{limit: 100}, c))
+	})
+	assert.Contains(t, out, "see snippet")
+}
+
+// TestRunThread_SectionBlockRendersInBody is the symmetric coverage for
+// thread (history is covered separately) — confirms section blocks
+// render through the thread command path.
+func TestRunThread_SectionBlockRendersInBody(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/conversations.replies":
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"ok": true,
+				"messages": []map[string]interface{}{{
+					"ts":   "1234567890.123456",
+					"user": "U001",
+					"text": "",
+					"blocks": []map[string]interface{}{{
+						"type": "section",
+						"text": map[string]interface{}{"type": "mrkdwn", "text": "section in thread"},
+					}},
+				}},
+			})
+		case "/users.info":
+			mockUserInfoHandler(w, r)
+		}
+	}))
+	defer server.Close()
+
+	c := client.NewWithConfig(server.URL, "test-token", nil)
+	out := captureTextOutput(t, func() {
+		require.NoError(t, runThread("C123", "1234567890.123456", &threadOptions{limit: 100}, c))
+	})
+	assert.Contains(t, out, "section in thread")
+}
+
 // TestRunHistory_SectionBlockRendersInTextColumn is the messages-side
 // regression for issue #143: a non-rich_text section block must surface
 // its text in the rendered output, not just in --output json.

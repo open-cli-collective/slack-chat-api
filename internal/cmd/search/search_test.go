@@ -642,6 +642,50 @@ func TestRunSearchAll_RendersBlocksTextInTable(t *testing.T) {
 	}
 }
 
+// TestRunSearchMessages_AttachmentAndFileFlow proves the command also
+// surfaces text from legacy attachments and file initial_comment through
+// the shared renderer — not just blocks.
+func TestRunSearchMessages_AttachmentAndFileFlow(t *testing.T) {
+	response := map[string]interface{}{
+		"ok": true,
+		"messages": map[string]interface{}{
+			"total":  1,
+			"paging": map[string]interface{}{"count": 20, "total": 1, "page": 1, "pages": 1},
+			"matches": []map[string]interface{}{{
+				"type":      "message",
+				"channel":   map[string]interface{}{"id": "C1", "name": "alerts"},
+				"user":      "U1",
+				"username":  "ci-bot",
+				"text":      "",
+				"ts":        "1704067200.000000",
+				"permalink": "https://slack.com/archives/C1/p1",
+				"attachments": []map[string]interface{}{{
+					"title": "Deploy v1.2.3",
+				}},
+				"files": []map[string]interface{}{{
+					"id":              "F1",
+					"name":            "log.txt",
+					"initial_comment": map[string]interface{}{"comment": "release notes attached"},
+				}},
+			}},
+		},
+	}
+	c, server := newTestClient(func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode(response)
+	})
+	defer server.Close()
+
+	out := captureOutput(t, func() {
+		if err := runSearchMessages("deploy", &messagesOptions{count: 20, page: 1, sort: "score", sortDir: "desc"}, c); err != nil {
+			t.Fatalf("runSearchMessages: %v", err)
+		}
+	})
+	// Truncation to 60 chars still leaves the leading attachment title visible.
+	if !strings.Contains(out, "Deploy v1.2.3") {
+		t.Errorf("expected attachment text in search output; got:\n%s", out)
+	}
+}
+
 func TestFormatTimestamp(t *testing.T) {
 	tests := []struct {
 		name  string

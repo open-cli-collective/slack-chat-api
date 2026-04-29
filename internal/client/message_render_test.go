@@ -259,6 +259,49 @@ func TestAttachment_JSONRoundTripPreservesUnknownFields(t *testing.T) {
 	assert.Contains(t, string(out), `"callback_id":"cb_42"`)
 }
 
+// fakeResolver is a non-*UserResolver implementation of MentionResolver
+// used to confirm the renderer's interface contract.
+type fakeResolver struct {
+	names map[string]string
+}
+
+func (f *fakeResolver) Resolve(userID string) string {
+	if name, ok := f.names[userID]; ok {
+		return name
+	}
+	return userID
+}
+
+func (f *fakeResolver) ResolveMentions(text string) string {
+	for id, name := range f.names {
+		text = strings.ReplaceAll(text, "<@"+id+">", "@"+name)
+	}
+	return text
+}
+
+// TestRenderMessage_NonUserResolverHonoredForPlainText confirms a
+// MentionResolver implementation that isn't *UserResolver still gets
+// invoked for plain-text surfaces (section/attachment/file). Rich-text
+// inline rendering is a known gap (deferred) — see the comment on
+// renderBlocksWithResolver.
+func TestRenderMessage_NonUserResolverHonoredForPlainText(t *testing.T) {
+	resolver := &fakeResolver{names: map[string]string{"U999": "alice"}}
+
+	blocks := mustBlocks(t, `[{
+		"type": "section",
+		"text": {"type": "mrkdwn", "text": "hi <@U999>"}
+	}]`)
+	got := RenderMessage(MessageContent{Blocks: blocks}, resolver)
+	assert.Equal(t, "hi @alice", got.Body)
+}
+
+func TestRenderMessage_NonUserResolverOnAttachmentText(t *testing.T) {
+	resolver := &fakeResolver{names: map[string]string{"U42": "bob"}}
+	atts := mustAttachments(t, `[{"text": "ping <@U42>"}]`)
+	got := RenderMessage(MessageContent{Attachments: atts}, resolver)
+	assert.Equal(t, "ping @bob", got.Body)
+}
+
 func TestNormalizeWhitespace(t *testing.T) {
 	assert.Equal(t, "a b c", normalizeWhitespace("  a   b\nc  "))
 	assert.Equal(t, "", normalizeWhitespace("   \t\n  "))
