@@ -2067,6 +2067,44 @@ func TestRunThread_FallsBackToTextWhenBlocksNil(t *testing.T) {
 	assert.Contains(t, out, "plain old text")
 }
 
+// TestRunHistory_SectionBlockRendersInTextColumn is the messages-side
+// regression for issue #143: a non-rich_text section block must surface
+// its text in the rendered output, not just in --output json.
+func TestRunHistory_SectionBlockRendersInTextColumn(t *testing.T) {
+	statusLine := "Served Rian in #general · claude-sonnet-4-6"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/conversations.history":
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"ok": true,
+				"messages": []map[string]interface{}{
+					{
+						"ts":   "1234567890.123456",
+						"user": "U001",
+						"text": "",
+						"blocks": []map[string]interface{}{
+							{
+								"type": "section",
+								"text": map[string]interface{}{"type": "mrkdwn", "text": statusLine},
+							},
+						},
+					},
+				},
+			})
+		case "/users.info":
+			mockUserInfoHandler(w, r)
+		}
+	}))
+	defer server.Close()
+
+	c := client.NewWithConfig(server.URL, "test-token", nil)
+	opts := &historyOptions{limit: 20}
+	out := captureTextOutput(t, func() {
+		require.NoError(t, runHistory("C123", opts, c))
+	})
+	assert.Contains(t, out, "Served Rian in #general")
+}
+
 func TestRunThread_MultilineBlocksIndentContinuationLines(t *testing.T) {
 	// A rich_text block with two sections renders as two lines; the
 	// second line must be indented with \t under the header.

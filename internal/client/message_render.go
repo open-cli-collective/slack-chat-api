@@ -82,13 +82,13 @@ func (a Attachment) MarshalJSON() ([]byte, error) {
 // content but Text isn't a duplicate of any individual rendered piece.
 func RenderMessage(c MessageContent, resolver MentionResolver) RenderedMessage {
 	pieces := make([]string, 0, 3)
-	if rendered := renderBlocksWithResolver(c.Blocks, resolver); rendered != "" {
+	if rendered := resolveMentions(renderBlocksWithResolver(c.Blocks, resolver), resolver); rendered != "" {
 		pieces = append(pieces, rendered)
 	}
-	if rendered := renderAttachments(c.Attachments, resolver); rendered != "" {
+	if rendered := resolveMentions(renderAttachments(c.Attachments, resolver), resolver); rendered != "" {
 		pieces = append(pieces, rendered)
 	}
-	if rendered := renderFilesText(c.Files); rendered != "" {
+	if rendered := resolveMentions(renderFilesText(c.Files), resolver); rendered != "" {
 		pieces = append(pieces, rendered)
 	}
 
@@ -133,6 +133,18 @@ func normalizeWhitespace(s string) string {
 	return strings.Join(strings.Fields(s), " ")
 }
 
+// resolveMentions runs s through the resolver's mention substitution if a
+// resolver is supplied. Rich-text user elements are resolved during their
+// own rendering, but plain-text section/attachment/file fields can still
+// carry raw `<@U…>` literals; this is the post-pass that catches them.
+// Safe with nil/empty.
+func resolveMentions(s string, resolver MentionResolver) string {
+	if s == "" || resolver == nil {
+		return s
+	}
+	return resolver.ResolveMentions(s)
+}
+
 // renderBlocksWithResolver bridges the MentionResolver interface to the
 // existing *UserResolver-typed RenderBlocks. nil resolver passes through.
 func renderBlocksWithResolver(blocks []Block, resolver MentionResolver) string {
@@ -161,15 +173,15 @@ func renderAttachments(atts []Attachment, resolver MentionResolver) string {
 
 func renderAttachment(a Attachment, resolver MentionResolver) string {
 	var pieces []string
-	addNonEmpty := func(s string) {
-		if s != "" {
-			pieces = append(pieces, s)
+	addTrimmed := func(s string) {
+		if t := strings.TrimSpace(s); t != "" {
+			pieces = append(pieces, t)
 		}
 	}
 
-	addNonEmpty(a.Pretext)
-	addNonEmpty(a.Title)
-	addNonEmpty(a.Text)
+	addTrimmed(a.Pretext)
+	addTrimmed(a.Title)
+	addTrimmed(a.Text)
 
 	if line := renderAttachmentFields(a.Fields); line != "" {
 		pieces = append(pieces, line)
@@ -179,7 +191,7 @@ func renderAttachment(a Attachment, resolver MentionResolver) string {
 		pieces = append(pieces, blocks)
 	}
 
-	addNonEmpty(a.Footer)
+	addTrimmed(a.Footer)
 
 	if len(pieces) == 0 {
 		// Fallback only when nothing else from the attachment rendered.
