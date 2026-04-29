@@ -31,24 +31,32 @@ jobs:
         run: |
           Invoke-WebRequest https://aka.ms/wingetcreate/latest -OutFile wingetcreate.exe
 
-      - name: Sync winget-pkgs fork
+      - name: Ensure winget-pkgs fork
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.WINGET_GITHUB_TOKEN }}
         run: |
           $owner = gh api user --jq .login
           $repo = "$owner/winget-pkgs"
-          $branch = gh api repos/microsoft/winget-pkgs --jq .default_branch
 
           gh api "repos/$repo" --silent 2>$null
           if ($LASTEXITCODE -ne 0) {
             Write-Host "Creating fork $repo"
             gh api -X POST repos/microsoft/winget-pkgs/forks -F default_branch_only=true --silent
 
+            $forkReady = $false
             for ($i = 0; $i -lt 12; $i++) {
               gh api "repos/$repo" --silent 2>$null
-              if ($LASTEXITCODE -eq 0) { break }
+              if ($LASTEXITCODE -eq 0) {
+                $forkReady = $true
+                break
+              }
               Start-Sleep -Seconds 5
+            }
+
+            if (-not $forkReady) {
+              Write-Error "Unable to access $repo after creating fork"
+              exit 1
             }
           } else {
             $parent = gh api "repos/$repo" --jq '.parent.full_name // ""'
@@ -58,13 +66,7 @@ jobs:
             }
           }
 
-          if ($LASTEXITCODE -ne 0) {
-            Write-Error "Unable to access $repo after creating fork"
-            exit 1
-          }
-
-          # The fork is only used as wingetcreate's submission workspace.
-          gh repo sync $repo --source microsoft/winget-pkgs --branch $branch --force
+          Write-Host "Using fork $repo"
 
       - name: Check if manifest exists in winget-pkgs
         id: check-manifest
@@ -77,7 +79,7 @@ jobs:
             Write-Host "Manifest exists - will use wingetcreate update"
             echo "exists=true" >> $env:GITHUB_OUTPUT
           } else {
-            Write-Host "Manifest does not exist - will use wingetcreate submit"
+            Write-Host "Manifest does not exist - will create a new manifest"
             echo "exists=false" >> $env:GITHUB_OUTPUT
           }
 
@@ -109,7 +111,7 @@ jobs:
           $arm64 = "https://github.com/open-cli-collective/slack-chat-api/releases/download/v${version}/slck_v${version}_windows_arm64.zip"
 
           Write-Host "Updating existing manifest to version $version"
-          ./wingetcreate.exe update OpenCLICollective.slack-chat-cli --version $version --urls $x64 $arm64 --submit
+          ./wingetcreate.exe update OpenCLICollective.slack-chat-cli --version $version --urls $x64 $arm64 --out .
 
       - name: Create manifest (new package)
         if: steps.check-manifest.outputs.exists == 'false'
@@ -118,7 +120,7 @@ jobs:
           WINGET_CREATE_GITHUB_TOKEN: ${{ secrets.WINGET_GITHUB_TOKEN }}
         run: |
           $version = "${{ inputs.version }}"
-          $manifestDir = "manifests"
+          $manifestDir = "manifests/o/OpenCLICollective/slack-chat-cli/$version"
           New-Item -ItemType Directory -Path $manifestDir -Force | Out-Null
 
           # Update version manifest
@@ -150,5 +152,54 @@ jobs:
           }
           Write-Host "Validation passed!"
 
-          Write-Host "`nSubmitting new package to Winget..."
-          ./wingetcreate.exe submit $manifestDir
+          Write-Host "`nManifests are ready for PR submission."
+
+      - name: Submit manifest PR
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.WINGET_GITHUB_TOKEN }}
+        run: |
+          $version = "${{ inputs.version }}"
+          $packageId = "OpenCLICollective.slack-chat-cli"
+          $manifestPath = "manifests/o/OpenCLICollective/slack-chat-cli/$version"
+
+          if (-not (Test-Path $manifestPath)) {
+            Write-Error "Expected manifest path not found: $manifestPath"
+            exit 1
+          }
+
+          $owner = gh api user --jq .login
+          $repo = "$owner/winget-pkgs"
+          $upstreamBranch = gh api repos/microsoft/winget-pkgs --jq .default_branch
+          $branch = "open-cli-collective-slack-chat-cli-$version-${{ github.run_id }}-${{ github.run_attempt }}"
+          $branch = $branch -replace '[^A-Za-z0-9._/-]', '-'
+
+          gh auth setup-git
+          gh repo clone $repo winget-pkgs-fork -- --filter=blob:none --depth=1
+
+          Set-Location winget-pkgs-fork
+          git checkout -b $branch
+
+          $destination = Join-Path (Get-Location) $manifestPath
+          New-Item -ItemType Directory -Path $destination -Force | Out-Null
+          Copy-Item -Path (Join-Path $env:GITHUB_WORKSPACE "$manifestPath/*") -Destination $destination -Recurse -Force
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add ($manifestPath -replace '\\', '/')
+
+          if (-not (git status --porcelain)) {
+            Write-Error "No manifest changes detected"
+            exit 1
+          }
+
+          git commit -m "$packageId version $version"
+          git push --force-with-lease origin $branch
+
+          Set-Location $env:GITHUB_WORKSPACE
+          gh pr create `
+            --repo microsoft/winget-pkgs `
+            --head "${owner}:$branch" `
+            --base $upstreamBranch `
+            --title "$packageId version $version" `
+            --body "Automated winget manifest update for $packageId version $version."
