@@ -130,7 +130,9 @@ func runSearchFiles(query string, opts *filesOptions, c *client.Client) error {
 	paging := result.Files.Paging
 	output.Printf("\nPage %d of %d (showing %d of %d results)\n",
 		paging.Page, paging.Pages, len(result.Files.Matches), paging.Total)
-	output.Println("Get: slck files get <REF>")
+	if len(rows) > 0 {
+		output.Println("Get: slck files get <REF>")
+	}
 
 	return nil
 }
