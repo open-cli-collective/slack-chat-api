@@ -153,19 +153,18 @@ func runSearchAll(query string, opts *allOptions, c *client.Client) error {
 	if hasFiles {
 		output.Printf("=== Files (%d total) ===\n\n", result.Files.Total)
 
-		headers := []string{"NAME", "TYPE", "USER", "CREATED", "TITLE"}
+		headers := []string{"REF", "TYPE", "USER", "CREATED", "NAME"}
 		rows := make([][]string, 0, len(result.Files.Matches))
 		for _, f := range result.Files.Matches {
-			name := truncateText(f.Name, 30)
-			title := truncateText(f.Title, 40)
 			created := formatUnixTimestamp(f.Created)
-			rows = append(rows, []string{name, f.Filetype, f.User, created, title})
+			rows = append(rows, []string{f.ID, f.Filetype, f.User, created, fileLabel(f.Name, f.Title)})
 		}
-		output.Table(headers, rows)
+		output.SearchTable(headers, rows, 60)
 
 		paging := result.Files.Paging
 		output.Printf("\nPage %d of %d (showing %d of %d files)\n",
 			paging.Page, paging.Pages, len(result.Files.Matches), paging.Total)
+		output.Println("Get: slck files get <REF>")
 	}
 
 	return nil

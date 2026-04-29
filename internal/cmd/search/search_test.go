@@ -1071,3 +1071,131 @@ func TestRunSearchAll_FooterShownWithMessages(t *testing.T) {
 		t.Errorf("footer should appear in messages section; got:\n%s", out)
 	}
 }
+
+func TestRunSearchFiles_RefColumnAndFooter(t *testing.T) {
+	response := map[string]interface{}{
+		"ok": true,
+		"files": map[string]interface{}{
+			"total":  1,
+			"paging": map[string]interface{}{"count": 20, "total": 1, "page": 1, "pages": 1},
+			"matches": []map[string]interface{}{{
+				"id":       "F0ABC123",
+				"name":     "report.pdf",
+				"title":    "Quarterly report",
+				"filetype": "pdf",
+				"user":     "U1",
+				"created":  int64(1704067200),
+			}},
+		},
+	}
+	c, server := newTestClient(func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode(response)
+	})
+	defer server.Close()
+
+	out := captureOutput(t, func() {
+		if err := runSearchFiles("report", &filesOptions{count: 20, page: 1, sort: "score", sortDir: "desc"}, c); err != nil {
+			t.Fatalf("runSearchFiles: %v", err)
+		}
+	})
+
+	if !strings.Contains(out, "REF | TYPE | USER | CREATED | NAME") {
+		t.Errorf("missing REF header line; got:\n%s", out)
+	}
+	if !strings.Contains(out, "F0ABC123 | pdf | U1 | ") {
+		t.Errorf("REF column not at start of row; got:\n%s", out)
+	}
+	if !strings.Contains(out, " | report.pdf · Quarterly report") {
+		t.Errorf("fileLabel not joined with separator; got:\n%s", out)
+	}
+	if !strings.Contains(out, "Get: slck files get <REF>") {
+		t.Errorf("missing footer hint; got:\n%s", out)
+	}
+}
+
+func TestRunSearchFiles_NoFooterWhenEmpty(t *testing.T) {
+	response := map[string]interface{}{
+		"ok": true,
+		"files": map[string]interface{}{
+			"total":   0,
+			"paging":  map[string]interface{}{"count": 20, "total": 0, "page": 1, "pages": 0},
+			"matches": []map[string]interface{}{},
+		},
+	}
+	c, server := newTestClient(func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode(response)
+	})
+	defer server.Close()
+
+	out := captureOutput(t, func() {
+		if err := runSearchFiles("nope", &filesOptions{count: 20, page: 1, sort: "score", sortDir: "desc"}, c); err != nil {
+			t.Fatalf("runSearchFiles: %v", err)
+		}
+	})
+	if strings.Contains(out, "Get: slck") {
+		t.Errorf("footer should not appear with no results; got:\n%s", out)
+	}
+}
+
+func TestRunSearchAll_BothFootersInTheirSections(t *testing.T) {
+	response := map[string]interface{}{
+		"ok": true,
+		"messages": map[string]interface{}{
+			"total":  1,
+			"paging": map[string]interface{}{"count": 20, "total": 1, "page": 1, "pages": 1},
+			"matches": []map[string]interface{}{{
+				"type": "message", "channel": map[string]interface{}{"id": "C1", "name": "g"},
+				"user": "U1", "username": "alice", "text": "hi", "ts": "1.0",
+			}},
+		},
+		"files": map[string]interface{}{
+			"total":  1,
+			"paging": map[string]interface{}{"count": 20, "total": 1, "page": 1, "pages": 1},
+			"matches": []map[string]interface{}{{
+				"id": "F1", "name": "x.pdf", "title": "X", "filetype": "pdf", "user": "U1", "created": int64(1704067200),
+			}},
+		},
+	}
+	c, server := newTestClient(func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode(response)
+	})
+	defer server.Close()
+
+	out := captureOutput(t, func() {
+		if err := runSearchAll("q", &allOptions{count: 20, page: 1, sort: "score", sortDir: "desc"}, c); err != nil {
+			t.Fatalf("runSearchAll: %v", err)
+		}
+	})
+	idxRead := strings.Index(out, "Read: slck --as-user messages read <REF>")
+	idxFiles := strings.Index(out, "=== Files")
+	idxGet := strings.Index(out, "Get: slck files get <REF>")
+	if idxRead < 0 || idxFiles < 0 || idxGet < 0 {
+		t.Fatalf("missing one of expected sections; got:\n%s", out)
+	}
+	// messages hint must appear before the files section header
+	if idxRead > idxFiles {
+		t.Errorf("messages hint should appear before files section; got:\n%s", out)
+	}
+	// files hint must appear after the files section header
+	if idxGet < idxFiles {
+		t.Errorf("files hint should appear after files section header; got:\n%s", out)
+	}
+}
+
+func TestFileLabel(t *testing.T) {
+	tests := []struct {
+		name, title, want string
+	}{
+		{"report.pdf", "Quarterly report", "report.pdf · Quarterly report"},
+		{"report.pdf", "report.pdf", "report.pdf"},
+		{"report.pdf", "", "report.pdf"},
+		{"", "Quarterly report", "Quarterly report"},
+		{"", "", ""},
+	}
+	for _, tt := range tests {
+		got := fileLabel(tt.name, tt.title)
+		if got != tt.want {
+			t.Errorf("fileLabel(%q, %q) = %q, want %q", tt.name, tt.title, got, tt.want)
+		}
+	}
+}

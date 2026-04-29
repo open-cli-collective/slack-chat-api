@@ -10,6 +10,7 @@ func NewCmd() *cobra.Command {
 	}
 
 	cmd.AddCommand(newDownloadCmd())
+	cmd.AddCommand(newGetCmd())
 
 	return cmd
 }
