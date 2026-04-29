@@ -68,11 +68,12 @@ func runThread(channel, threadTS string, opts *threadOptions, c *client.Client) 
 	resolver := client.NewUserResolver(c)
 	for _, m := range messages {
 		ts := formatTimestamp(m.TS)
-		body, fromBlocks := messageBody(m, resolver)
+		body, preserveNewlines := messageBody(m, resolver)
 		var text string
-		if fromBlocks {
-			// Preserve newlines from rendered blocks; indent continuation
-			// lines so multi-line content stays visually grouped.
+		if preserveNewlines {
+			// Body came from a richer surface (blocks/attachments/files);
+			// indent continuation lines so multi-line content stays
+			// visually grouped under the [ts] user: header.
 			text = indentContinuation(body)
 		} else {
 			// Plain-text fallback keeps existing single-line behavior.
