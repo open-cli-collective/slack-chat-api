@@ -6,7 +6,7 @@ Thank you for your interest in contributing to slack-chat-api!
 
 ### Prerequisites
 
-- Go 1.21 or later
+- Go 1.24 or later
 - Make
 - golangci-lint v2.0+ (for linting)
 
