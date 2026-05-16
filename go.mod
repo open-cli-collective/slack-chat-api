@@ -1,6 +1,6 @@
 module github.com/open-cli-collective/slack-chat-api
 
-go 1.24.0
+go 1.24
 
 require (
 	github.com/spf13/cobra v1.8.0
