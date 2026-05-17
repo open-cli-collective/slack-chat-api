@@ -24,6 +24,10 @@ func Setup(t *testing.T) string {
 	// Secret Service), with the passphrase supplied non-interactively.
 	t.Setenv("SLACK_CHAT_API_KEYRING_BACKEND", "file")
 	t.Setenv("SLACK_CHAT_API_KEYRING_PASSPHRASE", "test-passphrase")
+	// Neutralize the darwin legacy-Keychain `security` probe so the suite
+	// is hermetic. This is independent of the destination backend: the
+	// migration's discovery matrix (§2.4) otherwise always runs on macOS.
+	t.Setenv("SLCK_TEST_DISABLE_LEGACY_KEYCHAIN_SCAN", "1")
 	// Belt-and-suspenders: a prior test's recorded §1.8 block must never
 	// bleed into this one's JSON output.
 	output.ResetMigration()

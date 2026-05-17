@@ -188,7 +188,14 @@ func (o *initOptions) verify(token, label string) (*client.AuthTestResponse, err
 func (o *initOptions) resolveBot() (string, error) {
 	switch {
 	case o.botEnv != "":
-		return os.Getenv(o.botEnv), nil
+		// Explicit env ingress must fail closed: an unset/empty var is an
+		// error, not a silent "no bot token" that reports setup success
+		// while storing nothing.
+		v := os.Getenv(o.botEnv)
+		if v == "" {
+			return "", fmt.Errorf("--bot-token-from-env %s is empty or unset", o.botEnv)
+		}
+		return v, nil
 	case o.botStdin:
 		b, err := io.ReadAll(o.reader())
 		if err != nil {
@@ -202,7 +209,11 @@ func (o *initOptions) resolveBot() (string, error) {
 
 func (o *initOptions) resolveUser() (string, error) {
 	if o.userEnv != "" {
-		return os.Getenv(o.userEnv), nil
+		v := os.Getenv(o.userEnv)
+		if v == "" {
+			return "", fmt.Errorf("--user-token-from-env %s is empty or unset", o.userEnv)
+		}
+		return v, nil
 	}
 	if !o.interactive() {
 		return "", nil // non-interactive run only sets what was supplied

@@ -243,7 +243,7 @@ func TestMigrateEqualValueCleansUpSilently(t *testing.T) {
 func TestDiscoverFileBranch(t *testing.T) {
 	testutil.Setup(t)
 	writeLegacyFile(t, map[string]string{"api_token": botTok, "ignored_key": "x"})
-	got := discover("slack-chat-api", credstore.BackendFile)
+	got := discover("slack-chat-api")
 	var sawBot bool
 	for _, c := range got {
 		if c.newKey == KeyBotToken {

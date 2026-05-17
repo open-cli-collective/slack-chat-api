@@ -13,12 +13,15 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 
 	"github.com/open-cli-collective/cli-common/credstore"
 
+	"github.com/open-cli-collective/slack-chat-api/internal/cmd/channels"
 	cfgcmd "github.com/open-cli-collective/slack-chat-api/internal/cmd/config"
 	initcmd "github.com/open-cli-collective/slack-chat-api/internal/cmd/initcmd"
+	"github.com/open-cli-collective/slack-chat-api/internal/cmd/messages"
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/setcred"
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/whoami"
 	"github.com/open-cli-collective/slack-chat-api/internal/keychain"
@@ -27,6 +30,11 @@ import (
 )
 
 const secret = "xoxb-NOLEAK-canary-7f3a9c2e1d8b4a6f0011"
+
+// canaries: the full secret AND distinctive masked-prefix / suffix slices,
+// so a "first 8 + last 4" style display (§1.11 item 3 — masked prefixes are
+// still secret) is also caught, not just a verbatim dump.
+var canaries = []string{secret, secret[:16], secret[len(secret)-8:]}
 
 // captureAll redirects os.Stdout, os.Stderr and output.Writer, runs fn, and
 // returns everything written to any of them.
@@ -72,8 +80,8 @@ func seed(t *testing.T) {
 
 func assertNoLeak(t *testing.T, name, captured string) {
 	t.Helper()
-	if leak := credstore.NoLeakAssertion([]byte(captured), secret); leak != nil {
-		t.Fatalf("%s leaked the secret (%v).\n--- captured ---\n%s", name, leak, captured)
+	if leak := credstore.NoLeakAssertion([]byte(captured), canaries...); leak != nil {
+		t.Fatalf("%s leaked the secret/prefix (%v).\n--- captured ---\n%s", name, leak, captured)
 	}
 }
 
@@ -133,4 +141,37 @@ func TestNoLeak_Whoami(t *testing.T) {
 	// whoami will fail to reach Slack (hermetic env); we only care that no
 	// output channel echoes the seeded token.
 	assertNoLeak(t, "whoami", captureAll(t, "", func() { _ = c.Execute() }))
+}
+
+func TestNoLeak_ConfigTest(t *testing.T) {
+	testutil.Setup(t)
+	seed(t)
+	c := cfgcmd.NewCmd()
+	c.SetArgs([]string{"test"})
+	assertNoLeak(t, "config test", captureAll(t, "", func() { _ = c.Execute() }))
+}
+
+// Representative API command classes: with the canary token in the keyring
+// and no reachable Slack (hermetic), they take their error path. The token
+// travels only in the Authorization header — assert it never reaches any
+// output channel (incl. error/verbose output).
+func TestNoLeak_APICommandClasses(t *testing.T) {
+	cases := []struct {
+		name string
+		cmd  func() *cobra.Command
+		args []string
+	}{
+		{"channels list", channels.NewCmd, []string{"list"}},
+		{"channels list -o json", channels.NewCmd, []string{"list", "-o", "json"}},
+		{"messages history", messages.NewCmd, []string{"history", "C123"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			testutil.Setup(t)
+			seed(t)
+			c := tc.cmd()
+			c.SetArgs(tc.args)
+			assertNoLeak(t, tc.name, captureAll(t, "", func() { _ = c.Execute() }))
+		})
+	}
 }

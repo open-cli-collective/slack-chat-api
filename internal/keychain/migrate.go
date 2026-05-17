@@ -48,8 +48,7 @@ type candidate struct {
 // a legacy value over an existing keyring entry; it cannot resolve a
 // legacy-vs-legacy disagreement — the user must still pick.
 func migrateLegacyOverwrite(s *Store, cfg *config.Config, overwrite bool) error {
-	backend, _ := s.cs.Backend()
-	cands := discover(s.service, backend)
+	cands := discover(s.service)
 	if len(cands) == 0 {
 		return nil // nothing legacy on disk/keychain — the steady state
 	}
@@ -182,20 +181,24 @@ func conflict(s *Store, group []candidate, target string, hasTarget bool) error 
 	return credstore.MigrationConflictError("slck", group[0].legacyField, strings.Join(locs, ", "), s.ref)
 }
 
-// discover enumerates every legacy source that currently exists. macOS
-// keychain reads are migration-only and darwin-only (the sole sanctioned
-// `security` shell-out) — and only when the *selected* backend is the OS
-// Keychain. If the user forced the file/memory backend (config/env/Options),
-// they have opted out of the OS keychain entirely, so probing it for legacy
-// items would be wrong; this also keeps tests (which force the file backend
-// in a temp HOME) hermetic and free of `security` shell-outs. The plaintext
-// file path is the released layout — $XDG_CONFIG_HOME/slack-chat-api/
-// credentials else ~/.config/... — on Linux AND Windows alike (the legacy
-// code has no %APPDATA% branch).
-func discover(service string, backend credstore.Backend) []candidate {
+// legacyKeychainScanDisabledEnv is a test-only seam: when set, discover()
+// skips the darwin `security` shell-out so the test suite is hermetic and
+// never touches the real login Keychain. Production never sets it — legacy
+// Keychain discovery must run regardless of the destination backend
+// (§2.4: a macOS user who opts into keyring.backend:file must still have
+// old `slck`/`slack-chat-api` Keychain items migrated).
+const legacyKeychainScanDisabledEnv = "SLCK_TEST_DISABLE_LEGACY_KEYCHAIN_SCAN"
+
+// discover enumerates every legacy source that currently exists,
+// independent of the destination backend (§2.4). macOS Keychain reads are
+// migration-only and darwin-only (the sole sanctioned `security`
+// shell-out). The plaintext file path is the released layout —
+// $XDG_CONFIG_HOME/slack-chat-api/credentials else ~/.config/... — on Linux
+// AND Windows alike (the legacy code has no %APPDATA% branch).
+func discover(service string) []candidate {
 	var out []candidate
 
-	if runtime.GOOS == "darwin" && backend == credstore.BackendKeychain {
+	if runtime.GOOS == "darwin" && os.Getenv(legacyKeychainScanDisabledEnv) == "" {
 		for _, svc := range legacyKeychainServices {
 			for field, newKey := range legacyFields {
 				svc, field, newKey := svc, field, newKey
