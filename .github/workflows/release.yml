@@ -124,10 +124,11 @@ jobs:
 
             caveats <<~EOS
               To configure slck, run:
-                slck config set-token
+                slck init
 
-              On macOS, your token is stored securely in the system Keychain.
-              On Linux, your token is stored in ~/.config/slack-chat-api/credentials.
+              Tokens are stored in the OS keyring (Keychain on macOS,
+              Credential Manager on Windows, Secret Service on Linux).
+              They are never written to a plaintext file.
             EOS
           end
           CASKEOF

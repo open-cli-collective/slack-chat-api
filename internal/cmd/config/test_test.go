@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/open-cli-collective/slack-chat-api/internal/client"
-	"github.com/open-cli-collective/slack-chat-api/internal/keychain"
+	"github.com/open-cli-collective/slack-chat-api/internal/testutil"
 )
 
 func TestRunTest_Success(t *testing.T) {
@@ -174,15 +174,8 @@ func TestRunTest_NetworkErrors(t *testing.T) {
 }
 
 func TestRunTest_NoTokenConfigured(t *testing.T) {
-	if keychain.IsSecureStorage() {
-		t.Skip("Skipping on macOS - keychain may have stored token")
-	}
-
-	// Use temp dir with no token set
-	tempDir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", tempDir)
-	t.Setenv("SLACK_API_TOKEN", "")  // Ensure bot env var is empty
-	t.Setenv("SLACK_USER_TOKEN", "") // Ensure user env var is empty
+	// Hermetic empty keyring (file backend, temp HOME) — no real keychain.
+	testutil.Setup(t)
 
 	opts := &testOptions{}
 

@@ -1,273 +1,228 @@
+// Package keychain is slck's credential adapter. Despite the historical
+// package name, it no longer shells out to macOS `security` or writes a
+// plaintext file: it is a thin wrapper over cli-common's credstore, which
+// owns OS-keyring storage, §1.4 backend selection (incl. Linux fail-closed
+// and the encrypted-file fallback), and the §1.5.2 allowed-key allowlist.
+// The name is retained only to avoid churning every importer during the
+// Phase B pilot (Open CLI Collective Secret-Handling Standard §2.4).
+//
+// All runtime credential resolution goes through here and reads the OS
+// keyring only — never an environment variable, never a config field
+// (§1.11 acceptance item 2). Environment variables carry secret material
+// into slck solely as *ingress* during `init` / `set-credential`.
 package keychain
 
 import (
+	"errors"
 	"fmt"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"runtime"
 	"strings"
+
+	"github.com/open-cli-collective/cli-common/credstore"
+
+	"github.com/open-cli-collective/slack-chat-api/internal/config"
 )
 
+// Bundle key names (§2.4). Note bot_token, not the legacy api_token — the
+// rename is performed by the one-time migration (migrate.go).
 const (
-	serviceName  = "slack-chat-api"
-	apiTokenKey  = "api_token"
-	userTokenKey = "user_token"
+	KeyBotToken  = "bot_token"
+	KeyUserToken = "user_token"
 )
 
-// GetAPIToken retrieves the Slack API token from environment or keychain/config
-func GetAPIToken() (string, error) {
-	// Check environment variable first (allows override for automation)
-	if token := os.Getenv("SLACK_API_TOKEN"); token != "" {
-		return token, nil
+// allowedKeys is slck's §1.5.2 allowlist: exactly the two bundle keys.
+var allowedKeys = []string{KeyBotToken, KeyUserToken}
+
+// Store is an open handle to slck's credential bundle. Construct with Open,
+// always Close. It carries the resolved ref so callers can report it in
+// `config show` / errors without re-deriving it (§1.12: ref is not secret).
+type Store struct {
+	cs      *credstore.Store
+	service string
+	profile string
+	ref     string
+}
+
+// Open resolves the authoritative credential_ref from config.yml (§1.3 —
+// the service/profile are parsed, never assumed), opens the backing
+// credstore, and runs the one-time legacy migration (§1.8) before returning.
+// The returned Store reads/writes the OS keyring only. A legacy-vs-keyring
+// conflict surfaces here as a §1.8 error; `slck init --overwrite` calls
+// OpenForMigrationOverwrite to force the legacy value instead.
+func Open() (*Store, error) { return open(false, true) }
+
+// OpenForMigrationOverwrite is Open with the §1.8 `--overwrite` resolution:
+// a legacy value is forced over an existing keyring entry. It still cannot
+// resolve a legacy-vs-legacy disagreement (the user must pick).
+func OpenForMigrationOverwrite() (*Store, error) { return open(true, true) }
+
+// OpenNoMigrate opens the store WITHOUT running the one-time migration. It
+// exists so `config clear` can perform the §1.8 conflict remediation it
+// advertises ("run config clear then re-run"): if migration ran first it
+// would return ErrMigrationConflict before clear could delete the keyring
+// entry, leaving the user with no way out.
+func OpenNoMigrate() (*Store, error) { return open(false, false) }
+
+func open(overwrite, runMigration bool) (*Store, error) {
+	cfg, err := config.Load()
+	if err != nil {
+		return nil, err
+	}
+	return openWith(cfg, overwrite, runMigration)
+}
+
+// OpenRef opens a store against an explicit ref instead of config.yml's
+// credential_ref — used by `slck set-credential --ref` (§1.5.2 ingress).
+// An empty ref falls back to the configured/default ref. Migration does NOT
+// run here: the one-time §1.8 migration only ever targets the canonical
+// configured ref (running it against an arbitrary --ref would discover the
+// default ref's legacy data and could write it under the wrong
+// service/profile). set-credential is pure ingress; migration still runs on
+// the next init / first API call via the default Open path.
+func OpenRef(ref string) (*Store, error) {
+	cfg, err := config.Load()
+	if err != nil {
+		return nil, err
+	}
+	if ref != "" {
+		cfg.CredentialRef = ref
+	}
+	return openWith(cfg, false, false)
+}
+
+// openWith is the seam unit tests drive with an injected config (e.g. a
+// file-backend opt-in via Keyring.Backend) so they never touch a real
+// keyring (§1.12 test obligation, and hermeticity).
+func openWith(cfg *config.Config, overwrite, runMigration bool) (*Store, error) {
+	service, profile, err := credstore.ParseRef(cfg.CredentialRef)
+	if err != nil {
+		return nil, fmt.Errorf("invalid credential_ref %q: %w", cfg.CredentialRef, err)
 	}
 
-	// Fallback to secure storage (keychain on macOS, config file on Linux)
-	token, err := getCredential(apiTokenKey)
-	if err == nil && token != "" {
-		return token, nil
+	opts := &credstore.Options{AllowedKeys: allowedKeys}
+	switch b := strings.TrimSpace(cfg.Keyring.Backend); b {
+	case "":
+		// Auto-select per §1.4 (credstore decides; fail-closed on Linux).
+	case "file":
+		opts.ConfigBackend = credstore.BackendFile
+	default:
+		// Fail closed: an unrecognized backend must not silently degrade
+		// to auto-selection and store credentials somewhere unintended.
+		return nil, fmt.Errorf("invalid keyring.backend %q in config (only \"file\" is supported)", b)
+	}
+	opts.FilePassphrase = passphraseFunc(service)
+
+	cs, err := credstore.Open(service, opts)
+	if err != nil {
+		return nil, err
 	}
 
-	return "", fmt.Errorf("no API token found - run 'slck config set-token' or set SLACK_API_TOKEN")
-}
+	s := &Store{cs: cs, service: service, profile: profile, ref: cfg.CredentialRef}
 
-// SetAPIToken stores the Slack API token
-func SetAPIToken(token string) error {
-	return setCredential(apiTokenKey, token)
-}
-
-// DeleteAPIToken removes the Slack API token
-func DeleteAPIToken() error {
-	return deleteCredential(apiTokenKey)
-}
-
-// IsSecureStorage returns true if using secure storage (macOS Keychain)
-func IsSecureStorage() bool {
-	return runtime.GOOS == "darwin"
-}
-
-// HasStoredToken returns true if a token is stored in keychain/config (not env var)
-func HasStoredToken() bool {
-	token, err := getCredential(apiTokenKey)
-	return err == nil && token != ""
-}
-
-// GetTokenSource returns where the current token is stored
-func GetTokenSource() string {
-	if os.Getenv("SLACK_API_TOKEN") != "" {
-		return "environment variable"
-	}
-	if token, err := getCredential(apiTokenKey); err == nil && token != "" {
-		if runtime.GOOS == "darwin" {
-			return "Keychain"
+	if runMigration {
+		if err := migrateLegacyOverwrite(s, cfg, overwrite); err != nil {
+			_ = cs.Close()
+			return nil, err
 		}
-		return "config file"
 	}
-	return ""
+	return s, nil
 }
 
-// --- User Token (for search) ---
-
-// GetUserToken retrieves the user token from keychain/config or environment
-func GetUserToken() (string, error) {
-	// Check environment variable first
-	if token := os.Getenv("SLACK_USER_TOKEN"); token != "" {
-		return token, nil
+// Close releases the backing store. Safe on a nil receiver.
+func (s *Store) Close() error {
+	if s == nil || s.cs == nil {
+		return nil
 	}
+	return s.cs.Close()
+}
 
-	// Try secure storage (keychain on macOS, config file on Linux)
-	token, err := getCredential(userTokenKey)
-	if err == nil && token != "" {
-		return token, nil
+// Ref returns the resolved credential ref (non-secret; safe to display).
+func (s *Store) Ref() string { return s.ref }
+
+// Backend reports the credstore backend and how it was selected, for
+// `config show` (§1.11 item 7). Neither value is secret.
+func (s *Store) Backend() (credstore.Backend, credstore.Source) { return s.cs.Backend() }
+
+// BotToken returns the bot token from the keyring. ErrMissingBotToken (an
+// errors.Is-matchable wrapper of credstore.ErrNotFound) when unset.
+func (s *Store) BotToken() (string, error) { return s.get(KeyBotToken, ErrMissingBotToken) }
+
+// UserToken returns the user token from the keyring.
+func (s *Store) UserToken() (string, error) { return s.get(KeyUserToken, ErrMissingUserToken) }
+
+func (s *Store) get(key string, missing error) (string, error) {
+	v, err := s.cs.Get(s.profile, key)
+	if errors.Is(err, credstore.ErrNotFound) || (err == nil && v == "") {
+		return "", missing
 	}
-
-	return "", fmt.Errorf("no user token found - run 'slck config set-token <xoxp-token>' or set SLACK_USER_TOKEN")
-}
-
-// SetUserToken stores a user token
-func SetUserToken(token string) error {
-	return setCredential(userTokenKey, token)
-}
-
-// DeleteUserToken removes the stored user token
-func DeleteUserToken() error {
-	return deleteCredential(userTokenKey)
-}
-
-// HasStoredUserToken returns true if a user token is stored in keychain/config (not env var)
-func HasStoredUserToken() bool {
-	token, err := getCredential(userTokenKey)
-	return err == nil && token != ""
-}
-
-// GetUserTokenSource returns where the user token comes from
-func GetUserTokenSource() string {
-	if token, err := getCredential(userTokenKey); err == nil && token != "" {
-		if runtime.GOOS == "darwin" {
-			return "Keychain"
-		}
-		return "config file"
+	if err != nil {
+		// Never embed the value; naming ref/key/op is allowed (§1.12).
+		return "", fmt.Errorf("read %s from %s: %w", key, s.ref, err)
 	}
-	if os.Getenv("SLACK_USER_TOKEN") != "" {
-		return "environment variable"
-	}
-	return ""
+	return v, nil
 }
 
-// DetectTokenType returns "bot" for xoxb-*, "user" for xoxp-*, or "unknown"
+// SetBotToken / SetUserToken are ingress-only writes (called from init /
+// set-credential after the value arrived via stdin/env per §1.5).
+func (s *Store) SetBotToken(v string) error  { return s.set(KeyBotToken, v) }
+func (s *Store) SetUserToken(v string) error { return s.set(KeyUserToken, v) }
+
+func (s *Store) set(key, v string) error {
+	if err := s.cs.Set(s.profile, key, v, credstore.WithOverwrite()); err != nil {
+		return fmt.Errorf("store %s at %s: %w", key, s.ref, err)
+	}
+	return nil
+}
+
+// DeleteBotToken / DeleteUserToken remove a single key (idempotent: a
+// missing key is not an error — §1.7).
+func (s *Store) DeleteBotToken() error  { return s.del(KeyBotToken) }
+func (s *Store) DeleteUserToken() error { return s.del(KeyUserToken) }
+
+func (s *Store) del(key string) error {
+	// Idempotent by construction (§1.7): an absent key is success. The
+	// Exists pre-check is backend-agnostic — credstore's file backend
+	// surfaces a raw os "not found" rather than ErrNotFound on Delete.
+	if ok, _ := s.cs.Exists(s.profile, key); !ok {
+		return nil
+	}
+	if err := s.cs.Delete(s.profile, key); err != nil && !errors.Is(err, credstore.ErrNotFound) {
+		return fmt.Errorf("delete %s at %s: %w", key, s.ref, err)
+	}
+	return nil
+}
+
+// HasBotToken / HasUserToken report presence without returning the value
+// (used by `config show` / `init` overwrite prompts — §1.11 item 3).
+func (s *Store) HasBotToken() bool  { return s.has(KeyBotToken) }
+func (s *Store) HasUserToken() bool { return s.has(KeyUserToken) }
+
+func (s *Store) has(key string) bool {
+	ok, err := s.cs.Exists(s.profile, key)
+	return err == nil && ok
+}
+
+// Clear removes the whole bundle under the active profile (config clear,
+// §1.7). Idempotent; scope is the active profile only.
+func (s *Store) Clear() ([]string, error) {
+	return s.cs.DeleteBundle(s.profile)
+}
+
+// Sentinel "missing" errors. errors.Is(err, ErrMissingBotToken) lets the
+// CLI print an actionable setup hint without leaking anything.
+var (
+	ErrMissingBotToken  = errors.New("slck: no bot token in keyring — run `slck init` or `slck set-credential --key bot_token --stdin`")
+	ErrMissingUserToken = errors.New("slck: no user token in keyring — run `slck init` or `slck set-credential --key user_token --stdin`")
+)
+
+// DetectTokenType returns "bot" for xoxb-*, "user" for xoxp-*, else
+// "unknown". Pure; used by init to validate the slot a token was given to.
 func DetectTokenType(token string) string {
-	if strings.HasPrefix(token, "xoxb-") {
+	switch {
+	case strings.HasPrefix(token, "xoxb-"):
 		return "bot"
-	}
-	if strings.HasPrefix(token, "xoxp-") {
+	case strings.HasPrefix(token, "xoxp-"):
 		return "user"
+	default:
+		return "unknown"
 	}
-	return "unknown"
-}
-
-// --- Platform-specific implementations ---
-
-func getCredential(key string) (string, error) {
-	if runtime.GOOS == "darwin" {
-		return getFromKeychain(key)
-	}
-	return getFromConfigFile(key)
-}
-
-func setCredential(key, value string) error {
-	if runtime.GOOS == "darwin" {
-		return setInKeychain(key, value)
-	}
-	return setInConfigFile(key, value)
-}
-
-func deleteCredential(key string) error {
-	if runtime.GOOS == "darwin" {
-		return deleteFromKeychain(key)
-	}
-	return deleteFromConfigFile(key)
-}
-
-// --- macOS Keychain ---
-
-func getFromKeychain(account string) (string, error) {
-	cmd := exec.Command("security", "find-generic-password",
-		"-s", serviceName,
-		"-a", account,
-		"-w")
-
-	output, err := cmd.Output()
-	if err != nil {
-		return "", err
-	}
-
-	return strings.TrimSpace(string(output)), nil
-}
-
-func setInKeychain(account, value string) error {
-	// First try to delete any existing item (ignore errors)
-	_ = deleteFromKeychain(account)
-
-	cmd := exec.Command("security", "add-generic-password",
-		"-s", serviceName,
-		"-a", account,
-		"-w", value,
-		"-U") // Update if exists
-
-	return cmd.Run()
-}
-
-func deleteFromKeychain(account string) error {
-	cmd := exec.Command("security", "delete-generic-password",
-		"-s", serviceName,
-		"-a", account)
-
-	return cmd.Run()
-}
-
-// --- Config File (Linux fallback) ---
-
-func getConfigDir() string {
-	if xdgConfig := os.Getenv("XDG_CONFIG_HOME"); xdgConfig != "" {
-		return filepath.Join(xdgConfig, "slack-chat-api")
-	}
-	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".config", "slack-chat-api")
-}
-
-func getConfigFilePath() string {
-	return filepath.Join(getConfigDir(), "credentials")
-}
-
-func getFromConfigFile(key string) (string, error) {
-	data, err := os.ReadFile(getConfigFilePath())
-	if err != nil {
-		return "", err
-	}
-
-	lines := strings.Split(string(data), "\n")
-	for _, line := range lines {
-		parts := strings.SplitN(line, "=", 2)
-		if len(parts) == 2 && parts[0] == key {
-			return parts[1], nil
-		}
-	}
-
-	return "", fmt.Errorf("key not found")
-}
-
-func setInConfigFile(key, value string) error {
-	configDir := getConfigDir()
-	if err := os.MkdirAll(configDir, 0700); err != nil {
-		return err
-	}
-
-	configPath := getConfigFilePath()
-
-	// Read existing config
-	existing := make(map[string]string)
-	if data, err := os.ReadFile(configPath); err == nil {
-		lines := strings.Split(string(data), "\n")
-		for _, line := range lines {
-			parts := strings.SplitN(line, "=", 2)
-			if len(parts) == 2 {
-				existing[parts[0]] = parts[1]
-			}
-		}
-	}
-
-	// Update value
-	existing[key] = value
-
-	// Write back
-	var lines []string
-	for k, v := range existing {
-		lines = append(lines, fmt.Sprintf("%s=%s", k, v))
-	}
-
-	return os.WriteFile(configPath, []byte(strings.Join(lines, "\n")+"\n"), 0600)
-}
-
-func deleteFromConfigFile(key string) error {
-	configPath := getConfigFilePath()
-
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		return err
-	}
-
-	var newLines []string
-	lines := strings.Split(string(data), "\n")
-	for _, line := range lines {
-		parts := strings.SplitN(line, "=", 2)
-		if len(parts) == 2 && parts[0] != key {
-			newLines = append(newLines, line)
-		}
-	}
-
-	if len(newLines) == 0 {
-		return os.Remove(configPath)
-	}
-
-	return os.WriteFile(configPath, []byte(strings.Join(newLines, "\n")+"\n"), 0600)
 }

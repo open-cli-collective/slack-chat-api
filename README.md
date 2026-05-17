@@ -129,22 +129,31 @@ make build
 
 ## Platform Support
 
+Credentials are stored in the OS keyring via the shared `cli-common/credstore`
+library:
+
 | Platform | Credential Storage |
 |----------|-------------------|
-| macOS | Secure (Keychain) |
-| Linux | Config file (`~/.config/slack-chat-api/credentials`) |
-| Windows | Config file (`%USERPROFILE%\.config\slack-chat-api\credentials`) |
+| macOS | Keychain |
+| Windows | Credential Manager |
+| Linux | Secret Service (D-Bus); fails closed if a working keyring is locked. Encrypted-file backend only when there is no keyring at all, or by explicit opt-in (`keyring.backend: file` in `config.yml`). |
 
-**Note:** On Linux and Windows, credentials are stored in a file with restricted permissions (0600). While not as secure as macOS Keychain, this is standard practice for CLI tools.
+Tokens are **never** written to a plaintext file. Non-secret config
+(`credential_ref`, `workspace`) lives in `~/.config/slack-chat-api/config.yml`.
 
 ### Credential Resolution
 
-Credentials are resolved in this order (first match wins):
+At runtime the **only** source of a token is the OS keyring. Environment
+variables are **not** read as credentials at runtime (per the Open CLI
+Collective Secret-Handling Standard §1.11) — they are accepted only as
+*ingress* during setup, e.g. `slck init --bot-token-from-env SLACK_BOT_TOKEN`
+or `op read ... | slck set-credential --key bot_token --stdin`.
 
-1. **Environment variables** (highest priority) — `SLACK_API_TOKEN`, `SLACK_USER_TOKEN`
-2. **Stored credentials** — Keychain (macOS) or config file (Linux/Windows)
-
-This means environment variables always override stored credentials, allowing automation tools to inject their own tokens without conflicting with locally stored ones.
+> **Migrating from an older slck?** On first run, any tokens from a previous
+> version (old macOS Keychain items under service `slck`/`slack-chat-api`, or
+> the legacy `~/.config/slack-chat-api/credentials` file) are moved into the
+> keyring automatically, once, then the originals are removed. A one-line
+> notice is printed to stderr (and a `_migration` block to JSON output).
 
 ## Authentication
 
@@ -303,47 +312,47 @@ This means environment variables always override stored credentials, allowing au
    }
    ```
 
-   **Upgrading an existing install?** Paste the full manifest above into your app's **Features → App Manifest** tab (replacing the previous manifest), click **Save Changes**, then click **Install App → Reinstall to Workspace** to grant the new scopes. Copy the fresh `xoxb-…` token and run `slck config set-token`.
+   **Upgrading an existing install?** Paste the full manifest above into your app's **Features → App Manifest** tab (replacing the previous manifest), click **Save Changes**, then click **Install App → Reinstall to Workspace** to grant the new scopes. Copy the fresh `xoxb-…` token and run `slck init` (or `slck set-credential`).
    </details>
 4. Click **Create** → **Install to Workspace** → **Allow**
 5. Copy the **Bot User OAuth Token** (starts with `xoxb-`)
-6. Run:
+6. Run the interactive setup:
    ```bash
-   slck config set-token
-   # Paste your token when prompted
+   slck init
+   # Paste your token when prompted (input is not echoed back)
    ```
 
-Your token is stored securely in macOS Keychain, or in a config file on Linux and Windows.
+Your token is stored in the OS keyring (Keychain / Credential Manager /
+Secret Service). It is never written to a plaintext file.
 
 **NOTE:** If you plan on sending messages or taking actions using your user token _(See: Choosing Between Bot and User Tokens)_, you'll need to adjust the manifest above to have all the same scopes configured for your user as your bot (with the exception of the `"channels:manage"` scope, which only applies to bots).
 
-### Alternative: Environment Variable
+### Scripted / non-interactive setup
+
+The token is read only from stdin or a named env var — never a flag or
+positional value (so it can't leak via shell history or `ps`):
 
 ```bash
-export SLACK_API_TOKEN=xoxb-your-token-here
+# From a pipe (preferred for automation):
+op read 'op://Personal/slck/bot_token' | slck set-credential --key bot_token --stdin
+
+# Or, during full init, from a named env var (the env var is consumed at
+# setup time only; it is NOT read on subsequent runs):
+slck init --bot-token-from-env SLACK_BOT_TOKEN --user-token-from-env SLACK_USER_TOKEN
 ```
 
-### Alternative: 1Password Integration
+### 1Password integration
 
-Use a shell function to lazy-load your token from 1Password on first use:
+Because the token lives in the keyring after setup, you do **not** wrap every
+invocation in `op`. Stage it once:
 
 ```bash
-# Add to ~/.zshrc or ~/.bashrc
-slack-chat() {
-  if [[ -z "$SLACK_API_TOKEN" ]]; then
-    export SLACK_API_TOKEN="$(op read 'op://Personal/slck/api_token')"
-  fi
-  command slck "$@"
-}
+op read 'op://Personal/slck/bot_token'  | slck set-credential --key bot_token  --stdin
+op read 'op://Personal/slck/user_token' | slck set-credential --key user_token --stdin
 ```
 
-Or create an alias that always fetches fresh:
-
-```bash
-alias slack-chat='SLACK_API_TOKEN="$(op read '\''op://Personal/slck/api_token'\'')" slck'
-```
-
-Replace `op://Personal/slck/api_token` with your 1Password secret reference.
+Replace the `op://…` references with your own 1Password secret references.
+Re-run only when the token rotates.
 
 ### Required Scopes
 
@@ -394,14 +403,14 @@ Most commands use the **bot token**. Search commands require a **user token**.
 **Setting up both tokens:**
 
 ```bash
-# Set bot token (for channels, users, messages, workspace)
-slck config set-token xoxb-your-bot-token
+# Bot token (for channels, users, messages, workspace)
+op read 'op://Personal/slck/bot_token'  | slck set-credential --key bot_token  --stdin
 
-# Set user token (for search)
-slck config set-token xoxp-your-user-token
+# User token (for search)
+op read 'op://Personal/slck/user_token' | slck set-credential --key user_token --stdin
 ```
 
-The `set-token` command automatically detects the token type and stores it appropriately.
+Or run `slck init` for a guided, interactive setup of both.
 
 **Getting a user token:**
 
@@ -410,12 +419,12 @@ The `set-token` command automatically detects the token type and stores it appro
 3. Reinstall app to workspace (if already installed)
 4. Copy the **User OAuth Token** (starts with `xoxp-`)
 
-**Environment variables:**
+**Setup-time env-var ingress** (read once during `slck init`, never at runtime):
 
-| Variable | Token Type | Description |
-|----------|------------|-------------|
-| `SLACK_API_TOKEN` | Bot | Bot token for most commands |
-| `SLACK_USER_TOKEN` | User | User token for search commands |
+| Flag | Description |
+|------|-------------|
+| `slck init --bot-token-from-env NAME` | Read the bot token from env var `NAME` at setup |
+| `slck init --user-token-from-env NAME` | Read the user token from env var `NAME` at setup |
 
 ## Global Flags
 
@@ -743,25 +752,34 @@ slck whoami
 ### Config
 
 ```bash
-# Set API token (interactive prompt)
-slck config set-token
+# Guided interactive setup (bot + optional user token)
+slck init
 
-# Set API token directly
-slck config set-token xoxb-your-token-here
+# Set one credential from stdin (scriptable; no value on the command line)
+op read 'op://Personal/slck/bot_token' | slck set-credential --key bot_token --stdin
 
-# Show current config status
+# Show current config status (backend, ref, which keys present — never values)
 slck config show
 
-# Delete stored token
+# Delete stored token(s)
 slck config delete-token
 ```
 
 #### Config Command Reference
 
+Ingress is at the top level, not under `config`:
+
 | Command | Flags | Description |
 |---------|-------|-------------|
-| `set-token [token]` | | Set API token (auto-detects bot/user type) |
-| `show` | | Show current configuration status |
+| `slck init` | `--bot-token-from-env`, `--user-token-from-env`, `--bot-token-stdin`, `--overwrite`, `--no-verify` | Guided setup; stores into the keyring |
+| `slck set-credential` | `--key`, `--stdin`, `--from-env`, `--ref` | Set one credential (stdin/env only) |
+
+`config` subcommands (none accept a secret value):
+
+| Command | Flags | Description |
+|---------|-------|-------------|
+| `set-token` | | Removed — errors out, points to `set-credential` |
+| `show` | | Show backend, ref, which keys are present (never values) |
 | `delete-token` | `--force`, `--type` | Delete stored token(s) |
 | `test` | | Test authentication for configured tokens |
 
@@ -820,11 +838,15 @@ Commands have convenient aliases:
 
 | Variable | Description |
 |----------|-------------|
-| `SLACK_API_TOKEN` | Bot token (overrides stored bot token) |
-| `SLACK_USER_TOKEN` | User token for search (overrides stored user token) |
 | `SLCK_AS_USER` | Set to `true` or `1` to default to user token instead of bot token |
+| `SLACK_CHAT_API_KEYRING_BACKEND` | Force the keyring backend (e.g. `file`) — non-secret selector (§1.4) |
+| `SLACK_CHAT_API_KEYRING_PASSPHRASE` | Passphrase for the encrypted-file backend (the one runtime secret-env exception, §1.4) |
 | `NO_COLOR` | Disable colored output when set |
 | `XDG_CONFIG_HOME` | Custom config directory (default: `~/.config`) |
+
+> `SLACK_API_TOKEN` / `SLACK_USER_TOKEN` are **no longer read at runtime**
+> (§1.11). Use `slck init --bot-token-from-env` / `slck set-credential` to
+> stage a token into the keyring instead.
 
 ## Known Limitations
 

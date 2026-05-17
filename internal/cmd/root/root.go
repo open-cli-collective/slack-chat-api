@@ -15,6 +15,7 @@ import (
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/initcmd"
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/messages"
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/search"
+	"github.com/open-cli-collective/slack-chat-api/internal/cmd/setcred"
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/users"
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/whoami"
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/workspace"
@@ -34,10 +35,12 @@ var rootCmd = &cobra.Command{
 It provides commands for managing channels, users, messages,
 and other Slack workspace operations.
 
-Configure your API token with:
-  slck config set-token <your-token>
+Configure credentials with:
+  slck init
+  slck set-credential --key bot_token --stdin   (e.g. via 'op read | ...')
 
-Or set the SLACK_API_TOKEN environment variable.`,
+Credentials are stored in the OS keyring; environment variables are not
+read at runtime (they are accepted only as ingress during setup).`,
 	Version: version.Version,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		// Parse and validate output format
@@ -61,6 +64,13 @@ Or set the SLACK_API_TOKEN environment variable.`,
 		return nil
 	},
 }
+
+// Command returns the fully-configured root command (persistent --output
+// flag, PersistentPreRunE, all subcommands). Exposed so tests — notably the
+// §1.12 no-leak suite — can drive the real top-level command exactly as a
+// user would, instead of constructing a subcommand without root's
+// persistent flags (which would error out before the command ever runs).
+func Command() *cobra.Command { return rootCmd }
 
 // Execute runs the root command
 func Execute() {
@@ -91,4 +101,5 @@ func init() {
 	rootCmd.AddCommand(emoji.NewCmd())
 	rootCmd.AddCommand(files.NewCmd())
 	rootCmd.AddCommand(initcmd.NewCmd())
+	rootCmd.AddCommand(setcred.NewCmd())
 }

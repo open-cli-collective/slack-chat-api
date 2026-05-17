@@ -2,6 +2,13 @@
 
 Manual integration tests for verifying slck against a live Slack workspace. Tests are organized from safe (read-only) to destructive, so you can stop at any section.
 
+> **Credential model (§1.11/§1.12):** slck stores credentials in the OS
+> keyring only. Ingress is `slck init` or `slck set-credential` (stdin /
+> `--from-env`) — never a positional/flag value. `slck config set-token` is
+> removed. `SLACK_API_TOKEN` / `SLACK_USER_TOKEN` are **not** read at
+> runtime (only as `init --bot-token-from-env` setup ingress). Scenarios
+> below use the new commands.
+
 ---
 
 ## Part 1: Setup
@@ -48,17 +55,15 @@ Also add this **User Token Scope** (for Part 3B: Search Tests):
 # Build the CLI
 make build
 
-# Set up Bot Token (required for most commands)
-# Copy the "Bot User OAuth Token" (starts with xoxb-)
-./bin/slck config set-token
-# Paste your xoxb-... token when prompted
+# Set up Bot + User tokens (guided; input is not echoed)
+# Copy the "Bot User OAuth Token" (xoxb-) and "User OAuth Token" (xoxp-)
+./bin/slck init
+# Or non-interactively, per secret, from a pipe:
+#   printf '%s' "$XOXB" | ./bin/slck set-credential --key bot_token  --stdin
+#   printf '%s' "$XOXP" | ./bin/slck set-credential --key user_token --stdin
 
 # Verify bot token works
 ./bin/slck workspace info
-
-# Set up User Token (required for search tests in Part 3B)
-# Copy the "User OAuth Token" (starts with xoxp-)
-./bin/slck config set-token xoxp-your-user-token
 
 # Verify both tokens are configured
 ./bin/slck config show
@@ -234,10 +239,8 @@ Search requires a **user token** (`xoxp-*`), not a bot token. These tests verify
    ```bash
    # Get your user token from Slack app settings:
    # OAuth & Permissions → User OAuth Token (starts with xoxp-)
-   slck config set-token xoxp-your-user-token
-
-   # Or use environment variable:
-   export SLACK_USER_TOKEN=xoxp-your-user-token
+   printf '%s' "$XOXP" | slck set-credential --key user_token --stdin
+   # (or run `slck init` for the guided flow)
    ```
 
 2. Verify both tokens are configured:
@@ -312,10 +315,9 @@ First, create a message with a unique identifier that we can search for:
 
 | Step | Command | Expected |
 |------|---------|----------|
-| 1 | `unset SLACK_USER_TOKEN` | Clear env var |
-| 2 | `slck config delete-token --type user --force` | Delete stored user token |
-| 3 | `slck search messages "test"` | Error mentioning user token requirement |
-| 4 | `slck config set-token xoxp-your-user-token` | Re-configure user token |
+| 1 | `slck config delete-token --type user --force` | Delete stored user token |
+| 2 | `slck search messages "test"` | Error mentioning user token requirement |
+| 3 | `printf '%s' "$XOXP" \| slck set-credential --key user_token --stdin` | Re-configure user token |
 
 ### 3B.9 User Search Tests
 
@@ -465,7 +467,7 @@ Using **NEW_CHANNEL_ID** from step 5.1:
 
 | Step | Command | Expected |
 |------|---------|----------|
-| 1 | `slck config show` | Shows both Bot Token and User Token (masked) with storage location |
+| 1 | `slck config show` | `bot_token: present`, `user_token: present`, plus backend + ref (NO token characters, not even masked) |
 
 ### 6.2 Config Test (Dual Token)
 
@@ -477,16 +479,16 @@ Using **NEW_CHANNEL_ID** from step 5.1:
 
 | Step | Command | Expected |
 |------|---------|----------|
-| 1 | `slck config set-token xoxb-test-fake-token` | "Bot token stored" |
-| 2 | `slck config set-token xoxp-test-fake-token` | "User token stored" |
-| 3 | `slck config set-token invalid-token` | Error: unrecognized token format |
+| 1 | `printf '%s' xoxb-test-fake-token \| slck set-credential --key bot_token --stdin` | "Stored bot_token" |
+| 2 | `printf '%s' xoxp-test-fake-token \| slck set-credential --key user_token --stdin` | "Stored user_token" |
+| 3 | `slck config set-token xoxb-x` | Error: removed; points to `slck set-credential` (nonzero exit) |
 
 ### 6.4 Selective Token Deletion
 
 | Step | Command | Expected |
 |------|---------|----------|
 | 1 | `slck config delete-token --type bot --force` | "Bot token deleted" |
-| 2 | `slck config show` | Bot Token: Not configured, User Token: still present |
+| 2 | `slck config show` | `bot_token: not configured`, `user_token: present` |
 | 3 | `slck workspace info` | Error: no bot token configured |
 | 4 | `slck search messages "test"` | Still works (uses user token) |
 | 5 | `slck config delete-token --type user --force` | "User token deleted" |
@@ -496,9 +498,9 @@ Using **NEW_CHANNEL_ID** from step 5.1:
 
 | Step | Command | Expected |
 |------|---------|----------|
-| 1 | `slck config set-token` | Prompts for token, stores it (bot) |
-| 2 | `slck config set-token xoxp-your-user-token` | Stores user token |
-| 3 | `slck config show` | Both tokens configured |
+| 1 | `slck init` | Prompts for bot (and optional user) token, stores them |
+| 2 | `printf '%s' "$XOXP" \| slck set-credential --key user_token --stdin` | Stores user token |
+| 3 | `slck config show` | Both tokens present (values never shown) |
 | 4 | `slck config test` | Both tokens valid |
 
 ### 6.6 Delete All Tokens
@@ -528,7 +530,7 @@ These can be run at any time to verify error handling.
 
 | Step | Command | Expected |
 |------|---------|----------|
-| 1 | `SLACK_API_TOKEN=invalid slck workspace info` | Error: `invalid_auth` |
+| 1 | `printf '%s' invalid \| slck set-credential --key bot_token --stdin` then `slck workspace info` | Error: `invalid_auth` (env vars are not read at runtime) |
 | 2 | (Use token without `channels:manage`) `slck channels create test` | Error describing missing scope |
 
 ### 7.3 Edge Cases
@@ -637,7 +639,7 @@ Using **CANVAS_ID₁** from step 10.1:
 
 | Error | Cause | Solution |
 |-------|-------|----------|
-| `invalid_auth` | Token invalid or expired | Regenerate token, run `config set-token` |
+| `invalid_auth` | Token invalid or expired | Regenerate token, run `slck init` (or `slck set-credential`) |
 | `not_in_channel` | Bot not in channel | `/invite @botname` in Slack |
 | `channel_not_found` | Wrong ID or no access | Verify ID, check bot permissions |
 | `missing_scope` | Token lacks required scope | Add scope in Slack app settings, reinstall |

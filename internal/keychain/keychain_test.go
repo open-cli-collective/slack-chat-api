@@ -1,667 +1,354 @@
 package keychain
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
-	"runtime"
+	"strings"
 	"testing"
+
+	"github.com/open-cli-collective/cli-common/credstore"
+
+	appconfig "github.com/open-cli-collective/slack-chat-api/internal/config"
+	"github.com/open-cli-collective/slack-chat-api/internal/output"
+	"github.com/open-cli-collective/slack-chat-api/internal/testutil"
 )
 
-func TestGetAPIToken_FromEnvVar(t *testing.T) {
-	// Clear any existing env var first
-	originalValue := os.Getenv("SLACK_API_TOKEN")
-	defer func() {
-		if originalValue != "" {
-			_ = os.Setenv("SLACK_API_TOKEN", originalValue)
-		} else {
-			_ = os.Unsetenv("SLACK_API_TOKEN")
+const (
+	botTok  = "xoxb-1111-distinctive-bot-secret"
+	userTok = "xoxp-2222-distinctive-user-secret"
+)
+
+// TestPlanMigration exercises the pure §1.8 resolver directly — including
+// the legacy-vs-legacy disagreement branch, which the file/keychain
+// plumbing can't reach (a key=value file yields one value per key and the
+// darwin Keychain scan is disabled in tests).
+func TestPlanMigration(t *testing.T) {
+	cand := func(val, loc string) candidate {
+		return candidate{newKey: KeyBotToken, legacyField: "api_token", value: val,
+			location: loc, deleter: func() error { return nil }}
+	}
+	none := func(string) (string, bool) { return "", false }
+	has := func(v string) func(string) (string, bool) {
+		return func(string) (string, bool) { return v, true }
+	}
+
+	t.Run("legacy-vs-legacy disagreement is always a conflict", func(t *testing.T) {
+		for _, ow := range []bool{false, true} { // overwrite cannot resolve it
+			_, err := planMigration("slack-chat-api", "default", "slack-chat-api/default",
+				[]candidate{cand("xoxb-AAA", "keychain:slck/api_token"),
+					cand("xoxb-BBB", "file:/p/credentials#api_token")}, none, ow)
+			if !errors.Is(err, credstore.ErrMigrationConflict) {
+				t.Fatalf("overwrite=%v: want ErrMigrationConflict, got %v", ow, err)
+			}
+			if leak := credstore.NoLeakAssertion([]byte(err.Error()),
+				"xoxb-AAA", "xoxb-BBB"); leak != nil {
+				t.Fatalf("conflict leaked a value: %v", leak)
+			}
+			if !strings.Contains(err.Error(), "keychain:slck/api_token") ||
+				!strings.Contains(err.Error(), "file:/p/credentials#api_token") {
+				t.Fatalf("conflict must name all sources: %q", err.Error())
+			}
 		}
-	}()
+	})
 
-	t.Setenv("SLACK_API_TOKEN", "xoxb-test-token-from-env")
-
-	token, err := GetAPIToken()
-	if err != nil {
-		// On macOS, keychain might have a token which takes precedence
-		// So we only check the env var path on non-darwin or when keychain fails
-		if runtime.GOOS != "darwin" {
-			t.Fatalf("unexpected error: %v", err)
+	t.Run("legacy-vs-target differs, no overwrite -> conflict", func(t *testing.T) {
+		_, err := planMigration("svc", "default", "svc/default",
+			[]candidate{cand("xoxb-LEGACY", "file:x#api_token")}, has("xoxb-TARGET"), false)
+		if !errors.Is(err, credstore.ErrMigrationConflict) {
+			t.Fatalf("want conflict, got %v", err)
 		}
-	}
+	})
 
-	// If we got a token and we're not on darwin (where keychain takes precedence)
-	if runtime.GOOS != "darwin" && token != "xoxb-test-token-from-env" {
-		t.Errorf("expected token from env, got %s", token)
-	}
-}
-
-func TestGetAPIToken_NoToken(t *testing.T) {
-	if runtime.GOOS == "darwin" {
-		t.Skip("Skipping on macOS - keychain may have stored token")
-	}
-
-	// Clear env var
-	originalValue := os.Getenv("SLACK_API_TOKEN")
-	defer func() {
-		if originalValue != "" {
-			_ = os.Setenv("SLACK_API_TOKEN", originalValue)
-		} else {
-			_ = os.Unsetenv("SLACK_API_TOKEN")
+	t.Run("legacy-vs-target differs, overwrite -> write", func(t *testing.T) {
+		p, err := planMigration("svc", "default", "svc/default",
+			[]candidate{cand("xoxb-LEGACY", "file:x#api_token")}, has("xoxb-TARGET"), true)
+		if err != nil || p.writes[KeyBotToken] != "xoxb-LEGACY" || len(p.changes) != 1 {
+			t.Fatalf("overwrite should force legacy: plan=%+v err=%v", p, err)
 		}
-	}()
-	_ = os.Unsetenv("SLACK_API_TOKEN")
+	})
 
-	// Use a temp dir that doesn't have any config
-	tmpDir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", tmpDir)
-
-	_, err := GetAPIToken()
-	if err == nil {
-		t.Error("expected error when no token is configured")
-	}
-}
-
-func TestIsSecureStorage(t *testing.T) {
-	expected := runtime.GOOS == "darwin"
-	actual := IsSecureStorage()
-
-	if actual != expected {
-		t.Errorf("IsSecureStorage() = %v, expected %v", actual, expected)
-	}
-}
-
-func TestGetConfigDir_Default(t *testing.T) {
-	// Clear XDG_CONFIG_HOME to test default
-	originalValue := os.Getenv("XDG_CONFIG_HOME")
-	defer func() {
-		if originalValue != "" {
-			_ = os.Setenv("XDG_CONFIG_HOME", originalValue)
-		} else {
-			_ = os.Unsetenv("XDG_CONFIG_HOME")
+	t.Run("equal target -> cleanup only, no write/signal", func(t *testing.T) {
+		p, err := planMigration("svc", "default", "svc/default",
+			[]candidate{cand("xoxb-SAME", "file:x#api_token")}, has("xoxb-SAME"), false)
+		if err != nil || len(p.writes) != 0 || len(p.changes) != 0 || len(p.cleanups) != 1 {
+			t.Fatalf("equal value should clean up silently: plan=%+v err=%v", p, err)
 		}
-	}()
-	_ = os.Unsetenv("XDG_CONFIG_HOME")
+	})
 
-	home, _ := os.UserHomeDir()
-	expected := filepath.Join(home, ".config", "slack-chat-api")
-	actual := getConfigDir()
-
-	if actual != expected {
-		t.Errorf("getConfigDir() = %s, expected %s", actual, expected)
-	}
-}
-
-func TestGetConfigDir_XDGConfigHome(t *testing.T) {
-	tmpDir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", tmpDir)
-
-	expected := filepath.Join(tmpDir, "slack-chat-api")
-	actual := getConfigDir()
-
-	if actual != expected {
-		t.Errorf("getConfigDir() = %s, expected %s", actual, expected)
-	}
-}
-
-func TestConfigFile_SetAndGet(t *testing.T) {
-	// This tests the config file functions directly
-	// which work on all platforms (used as fallback on macOS)
-
-	tmpDir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", tmpDir)
-
-	// Test set
-	err := setInConfigFile("test_key", "test_value")
-	if err != nil {
-		t.Fatalf("setInConfigFile failed: %v", err)
-	}
-
-	// Verify config directory was created
-	configDir := filepath.Join(tmpDir, "slack-chat-api")
-	info, err := os.Stat(configDir)
-	if err != nil {
-		t.Fatalf("config directory not created: %v", err)
-	}
-	if !info.IsDir() {
-		t.Error("expected config path to be a directory")
-	}
-
-	// Test get
-	value, err := getFromConfigFile("test_key")
-	if err != nil {
-		t.Fatalf("getFromConfigFile failed: %v", err)
-	}
-	if value != "test_value" {
-		t.Errorf("expected test_value, got %s", value)
-	}
-}
-
-func TestConfigFile_GetNonExistent(t *testing.T) {
-	tmpDir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", tmpDir)
-
-	_, err := getFromConfigFile("nonexistent_key")
-	if err == nil {
-		t.Error("expected error for nonexistent key")
-	}
-}
-
-func TestConfigFile_Delete(t *testing.T) {
-	tmpDir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", tmpDir)
-
-	// Set a value first
-	err := setInConfigFile("delete_test", "value")
-	if err != nil {
-		t.Fatalf("setInConfigFile failed: %v", err)
-	}
-
-	// Verify it exists
-	_, err = getFromConfigFile("delete_test")
-	if err != nil {
-		t.Fatalf("key not found after set: %v", err)
-	}
-
-	// Delete it
-	err = deleteFromConfigFile("delete_test")
-	if err != nil {
-		t.Fatalf("deleteFromConfigFile failed: %v", err)
-	}
-
-	// Verify it's gone
-	_, err = getFromConfigFile("delete_test")
-	if err == nil {
-		t.Error("expected error after delete")
-	}
-}
-
-func TestConfigFile_MultipleKeys(t *testing.T) {
-	tmpDir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", tmpDir)
-
-	// Set multiple keys
-	err := setInConfigFile("key1", "value1")
-	if err != nil {
-		t.Fatalf("setInConfigFile key1 failed: %v", err)
-	}
-	err = setInConfigFile("key2", "value2")
-	if err != nil {
-		t.Fatalf("setInConfigFile key2 failed: %v", err)
-	}
-	err = setInConfigFile("key3", "value3")
-	if err != nil {
-		t.Fatalf("setInConfigFile key3 failed: %v", err)
-	}
-
-	// Verify all exist
-	v1, _ := getFromConfigFile("key1")
-	v2, _ := getFromConfigFile("key2")
-	v3, _ := getFromConfigFile("key3")
-
-	if v1 != "value1" || v2 != "value2" || v3 != "value3" {
-		t.Errorf("multiple keys not stored correctly: %s, %s, %s", v1, v2, v3)
-	}
-
-	// Delete middle key
-	err = deleteFromConfigFile("key2")
-	if err != nil {
-		t.Fatalf("deleteFromConfigFile failed: %v", err)
-	}
-
-	// Verify key1 and key3 still exist
-	v1, err = getFromConfigFile("key1")
-	if err != nil || v1 != "value1" {
-		t.Errorf("key1 not preserved after deleting key2")
-	}
-	v3, err = getFromConfigFile("key3")
-	if err != nil || v3 != "value3" {
-		t.Errorf("key3 not preserved after deleting key2")
-	}
-
-	// Verify key2 is gone
-	_, err = getFromConfigFile("key2")
-	if err == nil {
-		t.Error("key2 should be deleted")
-	}
-}
-
-func TestConfigFile_UpdateExistingKey(t *testing.T) {
-	tmpDir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", tmpDir)
-
-	// Set initial value
-	err := setInConfigFile("update_test", "original")
-	if err != nil {
-		t.Fatalf("setInConfigFile failed: %v", err)
-	}
-
-	// Update value
-	err = setInConfigFile("update_test", "updated")
-	if err != nil {
-		t.Fatalf("setInConfigFile update failed: %v", err)
-	}
-
-	// Verify updated value
-	value, err := getFromConfigFile("update_test")
-	if err != nil {
-		t.Fatalf("getFromConfigFile failed: %v", err)
-	}
-	if value != "updated" {
-		t.Errorf("expected updated, got %s", value)
-	}
-}
-
-func TestConfigFile_Permissions(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("File permissions test not applicable on Windows")
-	}
-
-	tmpDir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", tmpDir)
-
-	// Set a value to create the file
-	err := setInConfigFile("perm_test", "value")
-	if err != nil {
-		t.Fatalf("setInConfigFile failed: %v", err)
-	}
-
-	// Check file permissions (should be 0600)
-	configPath := filepath.Join(tmpDir, "slack-chat-api", "credentials")
-	info, err := os.Stat(configPath)
-	if err != nil {
-		t.Fatalf("stat failed: %v", err)
-	}
-
-	mode := info.Mode().Perm()
-	if mode != 0600 {
-		t.Errorf("expected file permissions 0600, got %o", mode)
-	}
-
-	// Check directory permissions (should be 0700)
-	dirInfo, err := os.Stat(filepath.Join(tmpDir, "slack-chat-api"))
-	if err != nil {
-		t.Fatalf("stat dir failed: %v", err)
-	}
-
-	dirMode := dirInfo.Mode().Perm()
-	if dirMode != 0700 {
-		t.Errorf("expected directory permissions 0700, got %o", dirMode)
-	}
-}
-
-func TestConfigFile_ValueWithEquals(t *testing.T) {
-	tmpDir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", tmpDir)
-
-	// Test value containing equals sign
-	valueWithEquals := "token=part=with=equals"
-	err := setInConfigFile("equals_test", valueWithEquals)
-	if err != nil {
-		t.Fatalf("setInConfigFile failed: %v", err)
-	}
-
-	value, err := getFromConfigFile("equals_test")
-	if err != nil {
-		t.Fatalf("getFromConfigFile failed: %v", err)
-	}
-	if value != valueWithEquals {
-		t.Errorf("expected %s, got %s", valueWithEquals, value)
-	}
-}
-
-func TestHasStoredToken_WithToken(t *testing.T) {
-	if runtime.GOOS == "darwin" {
-		t.Skip("Skipping on macOS - keychain tests require manual setup")
-	}
-
-	tmpDir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", tmpDir)
-
-	// Initially no token
-	if HasStoredToken() {
-		t.Error("expected no stored token initially")
-	}
-
-	// Set a token
-	err := setInConfigFile(apiTokenKey, "xoxb-test-token")
-	if err != nil {
-		t.Fatalf("setInConfigFile failed: %v", err)
-	}
-
-	// Now should have a token
-	if !HasStoredToken() {
-		t.Error("expected stored token after set")
-	}
-}
-
-func TestHasStoredToken_EnvVarOnly(t *testing.T) {
-	if runtime.GOOS == "darwin" {
-		t.Skip("Skipping on macOS - keychain tests require manual setup")
-	}
-
-	tmpDir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", tmpDir)
-	t.Setenv("SLACK_API_TOKEN", "xoxb-env-token")
-
-	// HasStoredToken should return false when only env var is set
-	if HasStoredToken() {
-		t.Error("expected false when only env var is set")
-	}
-}
-
-func TestGetTokenSource_ConfigFile(t *testing.T) {
-	if runtime.GOOS == "darwin" {
-		t.Skip("Skipping on macOS - keychain tests require manual setup")
-	}
-
-	tmpDir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", tmpDir)
-
-	// Clear env var
-	originalValue := os.Getenv("SLACK_API_TOKEN")
-	defer func() {
-		if originalValue != "" {
-			_ = os.Setenv("SLACK_API_TOKEN", originalValue)
-		} else {
-			_ = os.Unsetenv("SLACK_API_TOKEN")
+	t.Run("identical duplicate legacy values -> single write", func(t *testing.T) {
+		p, err := planMigration("svc", "default", "svc/default",
+			[]candidate{cand("xoxb-DUP", "keychain:slck/api_token"),
+				cand("xoxb-DUP", "file:x#api_token")}, none, false)
+		if err != nil || p.writes[KeyBotToken] != "xoxb-DUP" || len(p.cleanups) != 2 {
+			t.Fatalf("byte-identical dup should migrate once: plan=%+v err=%v", p, err)
 		}
-	}()
-	_ = os.Unsetenv("SLACK_API_TOKEN")
-
-	// No token - should return empty string
-	source := GetTokenSource()
-	if source != "" {
-		t.Errorf("expected empty string for no token, got %s", source)
-	}
-
-	// Set a token in config file
-	err := setInConfigFile(apiTokenKey, "xoxb-test-token")
-	if err != nil {
-		t.Fatalf("setInConfigFile failed: %v", err)
-	}
-
-	// Should return "config file" on non-darwin
-	source = GetTokenSource()
-	if source != "config file" {
-		t.Errorf("expected 'config file', got %s", source)
-	}
-}
-
-func TestGetTokenSource_EnvVar(t *testing.T) {
-	if runtime.GOOS == "darwin" {
-		t.Skip("Skipping on macOS - keychain tests require manual setup")
-	}
-
-	tmpDir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", tmpDir)
-	t.Setenv("SLACK_API_TOKEN", "xoxb-env-token")
-
-	// When only env var is set (no config file)
-	source := GetTokenSource()
-	if source != "environment variable" {
-		t.Errorf("expected 'environment variable', got %s", source)
-	}
-}
-
-// --- User Token Tests ---
-
-func TestUserToken_SetAndGet(t *testing.T) {
-	if runtime.GOOS == "darwin" {
-		t.Skip("Skipping on macOS - keychain tests require manual setup")
-	}
-
-	tmpDir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", tmpDir)
-
-	// Clear env var
-	_ = os.Unsetenv("SLACK_USER_TOKEN")
-
-	// Set user token
-	err := SetUserToken("xoxp-test-user-token")
-	if err != nil {
-		t.Fatalf("SetUserToken failed: %v", err)
-	}
-
-	// Get user token
-	token, err := GetUserToken()
-	if err != nil {
-		t.Fatalf("GetUserToken failed: %v", err)
-	}
-	if token != "xoxp-test-user-token" {
-		t.Errorf("expected xoxp-test-user-token, got %s", token)
-	}
-}
-
-func TestUserToken_Delete(t *testing.T) {
-	if runtime.GOOS == "darwin" {
-		t.Skip("Skipping on macOS - keychain tests require manual setup")
-	}
-
-	tmpDir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", tmpDir)
-	_ = os.Unsetenv("SLACK_USER_TOKEN")
-
-	// Set a token first
-	err := SetUserToken("xoxp-delete-test")
-	if err != nil {
-		t.Fatalf("SetUserToken failed: %v", err)
-	}
-
-	// Verify it exists
-	if !HasStoredUserToken() {
-		t.Error("expected stored user token after set")
-	}
-
-	// Delete it
-	err = DeleteUserToken()
-	if err != nil {
-		t.Fatalf("DeleteUserToken failed: %v", err)
-	}
-
-	// Verify it's gone
-	if HasStoredUserToken() {
-		t.Error("expected no stored user token after delete")
-	}
-}
-
-func TestUserToken_EnvVar(t *testing.T) {
-	if runtime.GOOS == "darwin" {
-		t.Skip("Skipping on macOS - keychain tests require manual setup")
-	}
-
-	tmpDir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", tmpDir)
-	t.Setenv("SLACK_USER_TOKEN", "xoxp-env-user-token")
-
-	// Should get token from env var
-	token, err := GetUserToken()
-	if err != nil {
-		t.Fatalf("GetUserToken failed: %v", err)
-	}
-	if token != "xoxp-env-user-token" {
-		t.Errorf("expected xoxp-env-user-token, got %s", token)
-	}
-}
-
-func TestUserToken_NoToken(t *testing.T) {
-	if runtime.GOOS == "darwin" {
-		t.Skip("Skipping on macOS - keychain tests require manual setup")
-	}
-
-	tmpDir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", tmpDir)
-	_ = os.Unsetenv("SLACK_USER_TOKEN")
-
-	_, err := GetUserToken()
-	if err == nil {
-		t.Error("expected error when no user token is configured")
-	}
-}
-
-func TestHasStoredUserToken(t *testing.T) {
-	if runtime.GOOS == "darwin" {
-		t.Skip("Skipping on macOS - keychain tests require manual setup")
-	}
-
-	tmpDir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", tmpDir)
-	_ = os.Unsetenv("SLACK_USER_TOKEN")
-
-	// Initially no token
-	if HasStoredUserToken() {
-		t.Error("expected no stored user token initially")
-	}
-
-	// Set a token
-	err := SetUserToken("xoxp-test-token")
-	if err != nil {
-		t.Fatalf("SetUserToken failed: %v", err)
-	}
-
-	// Now should have a token
-	if !HasStoredUserToken() {
-		t.Error("expected stored user token after set")
-	}
-}
-
-func TestHasStoredUserToken_EnvVarOnly(t *testing.T) {
-	if runtime.GOOS == "darwin" {
-		t.Skip("Skipping on macOS - keychain tests require manual setup")
-	}
-
-	tmpDir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", tmpDir)
-	t.Setenv("SLACK_USER_TOKEN", "xoxp-env-token")
-
-	// HasStoredUserToken should return false when only env var is set
-	if HasStoredUserToken() {
-		t.Error("expected false when only env var is set")
-	}
-}
-
-func TestGetUserTokenSource_ConfigFile(t *testing.T) {
-	if runtime.GOOS == "darwin" {
-		t.Skip("Skipping on macOS - keychain tests require manual setup")
-	}
-
-	tmpDir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", tmpDir)
-	_ = os.Unsetenv("SLACK_USER_TOKEN")
-
-	// No token - should return empty string
-	source := GetUserTokenSource()
-	if source != "" {
-		t.Errorf("expected empty string for no token, got %s", source)
-	}
-
-	// Set a token in config file
-	err := SetUserToken("xoxp-test-token")
-	if err != nil {
-		t.Fatalf("SetUserToken failed: %v", err)
-	}
-
-	// Should return "config file" on non-darwin
-	source = GetUserTokenSource()
-	if source != "config file" {
-		t.Errorf("expected 'config file', got %s", source)
-	}
-}
-
-func TestGetUserTokenSource_EnvVar(t *testing.T) {
-	if runtime.GOOS == "darwin" {
-		t.Skip("Skipping on macOS - keychain tests require manual setup")
-	}
-
-	tmpDir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", tmpDir)
-	t.Setenv("SLACK_USER_TOKEN", "xoxp-env-token")
-
-	// When only env var is set (no config file)
-	source := GetUserTokenSource()
-	if source != "environment variable" {
-		t.Errorf("expected 'environment variable', got %s", source)
-	}
+	})
 }
 
 func TestDetectTokenType(t *testing.T) {
-	tests := []struct {
-		token    string
-		expected string
-	}{
-		{"xoxb-123-456-789", "bot"},
-		{"xoxp-123-456-789", "user"},
-		{"invalid-token", "unknown"},
-		{"", "unknown"},
-		{"xoxb", "unknown"},
-		{"xoxp", "unknown"},
-		{"xoxb-", "bot"},
-		{"xoxp-", "user"},
+	cases := map[string]string{
+		"xoxb-abc": "bot", "xoxp-abc": "user", "xoxc-abc": "unknown", "": "unknown",
 	}
-
-	for _, tt := range tests {
-		t.Run(tt.token, func(t *testing.T) {
-			result := DetectTokenType(tt.token)
-			if result != tt.expected {
-				t.Errorf("DetectTokenType(%q) = %q, expected %q", tt.token, result, tt.expected)
-			}
-		})
+	for in, want := range cases {
+		if got := DetectTokenType(in); got != want {
+			t.Fatalf("DetectTokenType(%q)=%q want %q", in, got, want)
+		}
 	}
 }
 
-func TestBothTokenTypes_Coexist(t *testing.T) {
-	if runtime.GOOS == "darwin" {
-		t.Skip("Skipping on macOS - keychain tests require manual setup")
-	}
+// TestRuntimeEnvNotReadAsCredential locks the headline §1.11 invariant:
+// SLACK_API_TOKEN / SLACK_USER_TOKEN must NOT be consulted at runtime, even
+// when set. With an empty keyring, reads must still fail-missing.
+func TestRuntimeEnvNotReadAsCredential(t *testing.T) {
+	testutil.Setup(t)
+	t.Setenv("SLACK_API_TOKEN", "xoxb-env-must-be-ignored")
+	t.Setenv("SLACK_USER_TOKEN", "xoxp-env-must-be-ignored")
 
-	tmpDir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", tmpDir)
-	_ = os.Unsetenv("SLACK_API_TOKEN")
-	_ = os.Unsetenv("SLACK_USER_TOKEN")
-
-	// Set both tokens
-	err := SetAPIToken("xoxb-bot-token")
+	st, err := Open()
 	if err != nil {
-		t.Fatalf("SetAPIToken failed: %v", err)
+		t.Fatalf("Open: %v", err)
 	}
-	err = SetUserToken("xoxp-user-token")
-	if err != nil {
-		t.Fatalf("SetUserToken failed: %v", err)
-	}
+	defer func() { _ = st.Close() }()
 
-	// Verify both exist independently
-	botToken, err := GetAPIToken()
-	if err != nil {
-		t.Fatalf("GetAPIToken failed: %v", err)
+	if _, err := st.BotToken(); !errors.Is(err, ErrMissingBotToken) {
+		t.Fatalf("SLACK_API_TOKEN was consulted at runtime (err=%v)", err)
 	}
-	if botToken != "xoxb-bot-token" {
-		t.Errorf("expected xoxb-bot-token, got %s", botToken)
+	if _, err := st.UserToken(); !errors.Is(err, ErrMissingUserToken) {
+		t.Fatalf("SLACK_USER_TOKEN was consulted at runtime (err=%v)", err)
 	}
+	if st.HasBotToken() || st.HasUserToken() {
+		t.Fatal("Has*Token true purely from env — §1.11 violation")
+	}
+}
 
-	userToken, err := GetUserToken()
+func TestStoreRoundTripAndClear(t *testing.T) {
+	testutil.Setup(t)
+	st, err := Open()
 	if err != nil {
-		t.Fatalf("GetUserToken failed: %v", err)
+		t.Fatalf("Open: %v", err)
 	}
-	if userToken != "xoxp-user-token" {
-		t.Errorf("expected xoxp-user-token, got %s", userToken)
-	}
+	defer func() { _ = st.Close() }()
 
-	// Delete bot token, user token should remain
-	err = DeleteAPIToken()
+	if _, err := st.BotToken(); !errors.Is(err, ErrMissingBotToken) {
+		t.Fatalf("missing bot token err=%v want ErrMissingBotToken", err)
+	}
+	if err := st.SetBotToken(botTok); err != nil {
+		t.Fatalf("SetBotToken: %v", err)
+	}
+	if err := st.SetUserToken(userTok); err != nil {
+		t.Fatalf("SetUserToken: %v", err)
+	}
+	if v, err := st.BotToken(); err != nil || v != botTok {
+		t.Fatalf("BotToken=%q,%v", v, err)
+	}
+	if !st.HasBotToken() || !st.HasUserToken() {
+		t.Fatalf("Has*Token false after set")
+	}
+	if err := st.DeleteUserToken(); err != nil {
+		t.Fatalf("DeleteUserToken: %v", err)
+	}
+	if st.HasUserToken() {
+		t.Fatalf("user token still present after delete")
+	}
+	if err := st.DeleteUserToken(); err != nil {
+		t.Fatalf("idempotent delete: %v", err)
+	}
+	removed, err := st.Clear()
 	if err != nil {
-		t.Fatalf("DeleteAPIToken failed: %v", err)
+		t.Fatalf("Clear: %v", err)
 	}
+	if len(removed) == 0 || st.HasBotToken() {
+		t.Fatalf("Clear left state: removed=%v", removed)
+	}
+}
 
-	// User token should still exist
-	userToken, err = GetUserToken()
+// TestRefAuthoritative proves nothing is hard-coded: a non-default ref in
+// config.yml drives the service/profile, and a value written under it is not
+// visible under the default ref (§1.3 — Codex Blocker).
+func TestRefAuthoritative(t *testing.T) {
+	testutil.Setup(t)
+	st, err := openWith(&appconfig.Config{CredentialRef: "slack-chat-api/work"}, false, true)
 	if err != nil {
-		t.Fatalf("GetUserToken after bot delete failed: %v", err)
+		t.Fatalf("openWith: %v", err)
 	}
-	if userToken != "xoxp-user-token" {
-		t.Errorf("user token should persist after bot token delete")
+	if st.Ref() != "slack-chat-api/work" {
+		t.Fatalf("Ref=%q", st.Ref())
 	}
+	if err := st.SetBotToken(botTok); err != nil {
+		t.Fatalf("set: %v", err)
+	}
+	_ = st.Close()
 
-	// Bot token should be gone
-	if HasStoredToken() {
-		t.Error("bot token should be deleted")
+	def, err := openWith(&appconfig.Config{CredentialRef: appconfig.DefaultCredentialRef}, false, true)
+	if err != nil {
+		t.Fatalf("open default: %v", err)
+	}
+	defer func() { _ = def.Close() }()
+	if def.HasBotToken() {
+		t.Fatalf("value leaked across profiles")
+	}
+}
+
+func writeLegacyFile(t *testing.T, kv map[string]string) string {
+	t.Helper()
+	dir := filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "slack-chat-api")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	p := filepath.Join(dir, "credentials")
+	var b strings.Builder
+	for k, v := range kv {
+		b.WriteString(k + "=" + v + "\n")
+	}
+	if err := os.WriteFile(p, []byte(b.String()), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return p
+}
+
+func TestMigratePlaintextFileRenamesAndCleansUp(t *testing.T) {
+	testutil.Setup(t)
+	legacy := writeLegacyFile(t, map[string]string{"api_token": botTok, "user_token": userTok})
+
+	st, err := Open()
+	if err != nil {
+		t.Fatalf("Open(migrate): %v", err)
+	}
+	defer func() { _ = st.Close() }()
+
+	if v, _ := st.BotToken(); v != botTok {
+		t.Fatalf("api_token did not migrate to bot_token: %q", v)
+	}
+	if v, _ := st.UserToken(); v != userTok {
+		t.Fatalf("user_token did not migrate: %q", v)
+	}
+	if _, err := os.Stat(legacy); !os.IsNotExist(err) {
+		t.Fatalf("legacy plaintext file not removed: %v", err)
+	}
+	if _, err := os.Stat(appconfig.Path()); err != nil {
+		t.Fatalf("config.yml not written: %v", err)
+	}
+}
+
+func TestMigrateIdempotent(t *testing.T) {
+	testutil.Setup(t)
+	writeLegacyFile(t, map[string]string{"api_token": botTok})
+	s1, err := Open()
+	if err != nil {
+		t.Fatalf("first Open: %v", err)
+	}
+	_ = s1.Close()
+	output.ResetMigration()
+
+	s2, err := Open()
+	if err != nil {
+		t.Fatalf("second Open: %v", err)
+	}
+	defer func() { _ = s2.Close() }()
+	if v, _ := s2.BotToken(); v != botTok {
+		t.Fatalf("value lost on idempotent re-open: %q", v)
+	}
+}
+
+func TestMigrateConflictFailsLoudWithoutLeaking(t *testing.T) {
+	testutil.Setup(t)
+	pre, err := Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := pre.SetBotToken("xoxb-KEYRING-existing-value"); err != nil {
+		t.Fatal(err)
+	}
+	_ = pre.Close()
+
+	legacy := writeLegacyFile(t, map[string]string{"api_token": "xoxb-LEGACY-different-value"})
+
+	_, err = Open()
+	if !errors.Is(err, credstore.ErrMigrationConflict) {
+		t.Fatalf("want ErrMigrationConflict, got %v", err)
+	}
+	msg := err.Error()
+	if !strings.Contains(msg, legacy) || !strings.Contains(msg, "slack-chat-api/default") {
+		t.Fatalf("conflict msg missing locations: %q", msg)
+	}
+	if leak := credstore.NoLeakAssertion([]byte(msg),
+		"xoxb-KEYRING-existing-value", "xoxb-LEGACY-different-value"); leak != nil {
+		t.Fatalf("conflict message leaked a secret value: %v", leak)
+	}
+	if _, statErr := os.Stat(legacy); statErr != nil {
+		t.Fatalf("legacy file deleted despite conflict: %v", statErr)
+	}
+}
+
+func TestMigrateConflictResolvedByOverwrite(t *testing.T) {
+	testutil.Setup(t)
+	pre, err := Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := pre.SetBotToken("xoxb-OLD-keyring"); err != nil {
+		t.Fatal(err)
+	}
+	_ = pre.Close()
+	legacy := writeLegacyFile(t, map[string]string{"api_token": "xoxb-NEW-legacy-forced"})
+
+	st, err := OpenForMigrationOverwrite()
+	if err != nil {
+		t.Fatalf("overwrite migrate: %v", err)
+	}
+	defer func() { _ = st.Close() }()
+	if v, _ := st.BotToken(); v != "xoxb-NEW-legacy-forced" {
+		t.Fatalf("overwrite did not force legacy: %q", v)
+	}
+	if _, e := os.Stat(legacy); !os.IsNotExist(e) {
+		t.Fatalf("legacy not removed after forced migrate")
+	}
+}
+
+func TestMigrateEqualValueCleansUpSilently(t *testing.T) {
+	testutil.Setup(t)
+	pre, err := Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := pre.SetBotToken(botTok); err != nil {
+		t.Fatal(err)
+	}
+	_ = pre.Close()
+	legacy := writeLegacyFile(t, map[string]string{"api_token": botTok})
+	output.ResetMigration()
+
+	st, err := Open()
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer func() { _ = st.Close() }()
+	if _, e := os.Stat(legacy); !os.IsNotExist(e) {
+		t.Fatalf("equal-value legacy not cleaned up")
+	}
+	if v, _ := st.BotToken(); v != botTok {
+		t.Fatalf("value changed: %q", v)
+	}
+}
+
+func TestDiscoverFileBranch(t *testing.T) {
+	testutil.Setup(t)
+	writeLegacyFile(t, map[string]string{"api_token": botTok, "ignored_key": "x"})
+	got := discover("slack-chat-api")
+	var sawBot bool
+	for _, c := range got {
+		if c.newKey == KeyBotToken {
+			sawBot = true
+			if c.legacyField != "api_token" {
+				t.Fatalf("legacyField=%q want api_token", c.legacyField)
+			}
+		}
+		if c.legacyField == "ignored_key" {
+			t.Fatalf("non-credential key discovered")
+		}
+	}
+	if !sawBot {
+		t.Fatalf("api_token not discovered from file: %+v", got)
 	}
 }

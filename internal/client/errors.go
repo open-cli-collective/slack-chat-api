@@ -9,8 +9,8 @@ import (
 var errorHints = map[string]string{
 	"channel_not_found":    "Verify the channel ID is correct. Use 'slck channels list' to find channel IDs.",
 	"not_in_channel":       "The bot must be invited to the channel. Use /invite @yourbot in Slack.",
-	"invalid_auth":         "Token is invalid or expired. Run 'slck config set-token' to set a new token.",
-	"token_revoked":        "Token has been revoked. Run 'slck config set-token' to set a new token.",
+	"invalid_auth":         "Token is invalid or expired. Run 'slck init' (or 'slck set-credential --key bot_token --stdin') to set a new token.",
+	"token_revoked":        "Token has been revoked. Run 'slck init' (or 'slck set-credential --key bot_token --stdin') to set a new token.",
 	"ratelimited":          "Rate limit exceeded. Wait a moment and try again.",
 	"user_not_found":       "Verify the user ID is correct. Use 'slck users list' to find user IDs.",
 	"message_not_found":    "Message not found. Verify the channel ID and timestamp are correct.",

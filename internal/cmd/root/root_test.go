@@ -1,131 +1,71 @@
 package root
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/open-cli-collective/slack-chat-api/internal/client"
+	"github.com/open-cli-collective/slack-chat-api/internal/testutil"
 )
 
 func TestAsUserAndAsBotMutualExclusivity(t *testing.T) {
-	// Save original flag values
-	originalAsUser := asUser
-	originalAsBot := asBot
+	originalAsUser, originalAsBot := asUser, asBot
 	defer func() {
-		asUser = originalAsUser
-		asBot = originalAsBot
+		asUser, asBot = originalAsUser, originalAsBot
 		client.ResetTokenMode()
 	}()
 
-	// Test: both flags set should return error
-	asUser = true
-	asBot = true
-
+	asUser, asBot = true, true
 	err := rootCmd.PersistentPreRunE(rootCmd, []string{})
 	if err == nil {
-		t.Error("Expected error when both --as-user and --as-bot are set, got nil")
+		t.Fatal("expected error when both --as-user and --as-bot are set")
 	}
-	if err != nil && err.Error() != "cannot use both --as-user and --as-bot flags together" {
-		t.Errorf("Unexpected error message: %s", err.Error())
+	if err.Error() != "cannot use both --as-user and --as-bot flags together" {
+		t.Errorf("unexpected error message: %s", err.Error())
 	}
 }
 
-func TestAsUserFlagSetsClientMode(t *testing.T) {
-	// Save original flag values
-	originalAsUser := asUser
-	originalAsBot := asBot
-	defer func() {
-		asUser = originalAsUser
-		asBot = originalAsBot
+// resolveErr runs PersistentPreRunE with the given flag state, then
+// client.New() against a hermetic empty keyring, returning the resulting
+// error text. testutil.Setup forces the file backend in a temp HOME so this
+// never touches the real OS keyring (§1.12 hermeticity).
+func resolveErr(t *testing.T, user, bot bool) string {
+	t.Helper()
+	testutil.Setup(t)
+	origU, origB := asUser, asBot
+	t.Cleanup(func() {
+		asUser, asBot = origU, origB
 		client.ResetTokenMode()
-	}()
-
-	// Test: --as-user flag should set client to user mode
-	asUser = true
-	asBot = false
+	})
+	asUser, asBot = user, bot
 	client.ResetTokenMode()
-
-	err := rootCmd.PersistentPreRunE(rootCmd, []string{})
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
+	if err := rootCmd.PersistentPreRunE(rootCmd, []string{}); err != nil {
+		t.Fatalf("PersistentPreRunE: %v", err)
 	}
-
-	// Verify by checking that New() would try to use user token
-	// We can't directly inspect the internal state, but we can verify
-	// the behavior by attempting to create a client and checking the error
-	_, err = client.New()
+	_, err := client.New()
 	if err == nil {
-		// If no error, client was created (token exists)
-		return
+		t.Fatal("expected a missing-credential error against an empty keyring")
 	}
-	// Error should mention user token since that's what we're trying to use
-	if err.Error() == "user token not found: set SLACK_USER_TOKEN or run: slck config set-user-token" {
-		// This confirms --as-user flag correctly set the client mode
-		return
-	}
-	// If we get here with a different error, that's also acceptable
-	// as long as it's not a bot token error when we expected user mode
+	return err.Error()
 }
 
-func TestAsBotFlagSetsClientMode(t *testing.T) {
-	// Save original flag values
-	originalAsUser := asUser
-	originalAsBot := asBot
-	defer func() {
-		asUser = originalAsUser
-		asBot = originalAsBot
-		client.ResetTokenMode()
-	}()
-
-	// Test: --as-bot flag should set client to bot mode
-	asUser = false
-	asBot = true
-	client.ResetTokenMode()
-
-	err := rootCmd.PersistentPreRunE(rootCmd, []string{})
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
+func TestAsUserFlagSelectsUserToken(t *testing.T) {
+	msg := resolveErr(t, true, false)
+	if !strings.Contains(msg, "user token") {
+		t.Errorf("--as-user should resolve the user token; got %q", msg)
 	}
+}
 
-	// Verify by checking that New() would try to use bot token
-	_, err = client.New()
-	if err == nil {
-		// If no error, client was created (token exists)
-		return
-	}
-	// Error should NOT mention user token since we're using bot mode
-	if err.Error() == "user token not found: set SLACK_USER_TOKEN or run: slck config set-user-token" {
-		t.Error("Expected bot token mode but got user token error")
+func TestAsBotFlagSelectsBotToken(t *testing.T) {
+	msg := resolveErr(t, false, true)
+	if !strings.Contains(msg, "bot token") || strings.Contains(msg, "user token") {
+		t.Errorf("--as-bot should resolve the bot token; got %q", msg)
 	}
 }
 
 func TestNoFlagsDefaultsBotMode(t *testing.T) {
-	// Save original flag values
-	originalAsUser := asUser
-	originalAsBot := asBot
-	defer func() {
-		asUser = originalAsUser
-		asBot = originalAsBot
-		client.ResetTokenMode()
-	}()
-
-	// Test: no flags should default to bot mode
-	asUser = false
-	asBot = false
-	client.ResetTokenMode()
-
-	err := rootCmd.PersistentPreRunE(rootCmd, []string{})
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-
-	// With no flags set, client.New() should try bot token by default
-	_, err = client.New()
-	if err == nil {
-		// If no error, client was created (token exists)
-		return
-	}
-	// Error should NOT mention user token since default is bot mode
-	if err.Error() == "user token not found: set SLACK_USER_TOKEN or run: slck config set-user-token" {
-		t.Error("Expected bot token mode by default but got user token error")
+	msg := resolveErr(t, false, false)
+	if !strings.Contains(msg, "bot token") || strings.Contains(msg, "user token") {
+		t.Errorf("default should resolve the bot token; got %q", msg)
 	}
 }
