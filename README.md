@@ -767,10 +767,19 @@ slck config delete-token
 
 #### Config Command Reference
 
+Ingress is at the top level, not under `config`:
+
 | Command | Flags | Description |
 |---------|-------|-------------|
-| `set-token [token]` | | Set API token (auto-detects bot/user type) |
-| `show` | | Show current configuration status |
+| `slck init` | `--bot-token-from-env`, `--user-token-from-env`, `--bot-token-stdin`, `--overwrite`, `--no-verify` | Guided setup; stores into the keyring |
+| `slck set-credential` | `--key`, `--stdin`, `--from-env`, `--ref` | Set one credential (stdin/env only) |
+
+`config` subcommands (none accept a secret value):
+
+| Command | Flags | Description |
+|---------|-------|-------------|
+| `set-token` | | Removed — errors out, points to `set-credential` |
+| `show` | | Show backend, ref, which keys are present (never values) |
 | `delete-token` | `--force`, `--type` | Delete stored token(s) |
 | `test` | | Test authentication for configured tokens |
 

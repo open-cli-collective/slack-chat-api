@@ -1,12 +1,12 @@
 module github.com/open-cli-collective/slack-chat-api
 
-go 1.25.0
+go 1.24.0
 
 require (
 	github.com/open-cli-collective/cli-common v0.0.0-20260516182733-b753d5c62d14
 	github.com/spf13/cobra v1.8.0
 	github.com/stretchr/testify v1.11.1
-	golang.org/x/term v0.43.0
+	golang.org/x/term v0.27.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -22,5 +22,5 @@ require (
 	github.com/mtibben/percent v0.2.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	golang.org/x/sys v0.44.0 // indirect
+	golang.org/x/sys v0.28.0 // indirect
 )

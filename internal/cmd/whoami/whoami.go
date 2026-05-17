@@ -100,7 +100,7 @@ func runWhoami(opts *whoamiOptions, botClient *client.Client, userClient *client
 	// Check if any token worked
 	if result.Bot == nil && result.User == nil {
 		output.Println("No valid tokens configured.")
-		output.Println("Run 'slck config set-token' to configure authentication.")
+		output.Println("Run 'slck init' to configure authentication.")
 		return nil
 	}
 

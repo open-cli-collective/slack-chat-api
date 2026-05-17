@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 
 	"github.com/open-cli-collective/slack-chat-api/internal/client"
 	appconfig "github.com/open-cli-collective/slack-chat-api/internal/config"
@@ -212,8 +213,19 @@ func (o *initOptions) resolveUser() (string, error) {
 	return promptToken(o.reader(), "User Token (xoxp-...)")
 }
 
+// promptToken reads a token interactively. When stdin is a real terminal it
+// is read WITHOUT echo (§1.12 — a typed token must not be displayed); the
+// test seam (an injected non-terminal reader) falls back to a line read.
 func promptToken(reader io.Reader, prompt string) (string, error) {
 	fmt.Printf("%s: ", prompt)
+	if f, ok := reader.(*os.File); ok && term.IsTerminal(int(f.Fd())) {
+		b, err := term.ReadPassword(int(f.Fd()))
+		fmt.Println()
+		if err != nil {
+			return "", err
+		}
+		return strings.TrimSpace(string(b)), nil
+	}
 	scanner := bufio.NewScanner(reader)
 	if scanner.Scan() {
 		return strings.TrimSpace(scanner.Text()), nil

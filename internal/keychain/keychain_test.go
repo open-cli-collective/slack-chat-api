@@ -76,7 +76,7 @@ func TestStoreRoundTripAndClear(t *testing.T) {
 // visible under the default ref (§1.3 — Codex Blocker).
 func TestRefAuthoritative(t *testing.T) {
 	testutil.Setup(t)
-	st, err := openWith(&appconfig.Config{CredentialRef: "slack-chat-api/work"}, false)
+	st, err := openWith(&appconfig.Config{CredentialRef: "slack-chat-api/work"}, false, true)
 	if err != nil {
 		t.Fatalf("openWith: %v", err)
 	}
@@ -88,7 +88,7 @@ func TestRefAuthoritative(t *testing.T) {
 	}
 	_ = st.Close()
 
-	def, err := openWith(&appconfig.Config{CredentialRef: appconfig.DefaultCredentialRef}, false)
+	def, err := openWith(&appconfig.Config{CredentialRef: appconfig.DefaultCredentialRef}, false, true)
 	if err != nil {
 		t.Fatalf("open default: %v", err)
 	}

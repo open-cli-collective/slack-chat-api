@@ -32,7 +32,10 @@ Idempotent and non-interactive.`,
 }
 
 func runClear(opts *clearOptions) error {
-	st, err := keychain.Open()
+	// No-migration open: clear is the §1.8 conflict remediation ("run
+	// config clear then re-run"). Running migration first would return
+	// ErrMigrationConflict before we could delete the keyring entry.
+	st, err := keychain.OpenNoMigrate()
 	if err != nil {
 		return err
 	}
@@ -51,6 +54,10 @@ func runClear(opts *clearOptions) error {
 	}
 
 	if opts.all {
+		// §1.7: --all returns the active profile to a pre-init state —
+		// keyring bundle (above) + config file + caches + empty dirs.
+		// slck has NO cache directory today (no command writes one); if
+		// one is ever added it must also be removed here.
 		p := appconfig.Path()
 		switch err := os.Remove(p); {
 		case err == nil:

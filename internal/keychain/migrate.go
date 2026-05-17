@@ -81,8 +81,10 @@ func migrateLegacyOverwrite(s *Store, cfg *config.Config, overwrite bool) error 
 		target, hasTarget := currentValue(s, k)
 
 		switch {
-		case len(distinct) > 1 && (!overwrite || hasTarget):
-			// Legacy sources disagree: overwrite can't pick among them either.
+		case len(distinct) > 1:
+			// Legacy sources disagree among themselves: --overwrite cannot
+			// pick a winner here either (§1.8 — the user must). Always a
+			// conflict, regardless of overwrite or target presence.
 			return conflict(s, group, target, hasTarget)
 		case hasTarget && !overwrite && disagrees(distinct, target):
 			return conflict(s, group, target, hasTarget)
@@ -120,9 +122,13 @@ func migrateLegacyOverwrite(s *Store, cfg *config.Config, overwrite bool) error 
 	}
 
 	// Phase 3: surface the signal (only for keys actually moved this run).
+	// Record the _migration block ONLY on a JSON run — recording it on a
+	// text run would leave a stale block that a later JSON command in the
+	// same (or test) process could splice into an unrelated response.
 	if len(changes) > 0 {
-		output.RecordMigration(credstore.NewMigrationBlock(changes...))
-		if !output.IsJSON() {
+		if output.IsJSON() {
+			output.RecordMigration(credstore.NewMigrationBlock(changes...))
+		} else {
 			for _, k := range keys {
 				if lf, ok := humanField[k]; ok {
 					credstore.EmitMigrationStderr(lf, s.ref)
@@ -272,13 +278,21 @@ func keychainRead(service, account string) (string, bool) {
 	return v, true
 }
 
+// securityErrItemNotFound is `security`'s exit status when the item is
+// absent (SecKeychainErrorCode errSecItemNotFound). Only this is treated as
+// idempotent success — a denial/locked/other failure must surface so we
+// don't silently leave a legacy secret behind after "migration".
+const securityErrItemNotFound = 44
+
 func keychainDelete(service, account string) error {
 	err := exec.Command("security", "delete-generic-password",
 		"-s", service, "-a", account).Run()
-	// Already-absent is success for an idempotent cleanup.
-	var ee *exec.ExitError
-	if err != nil && errors.As(err, &ee) {
+	if err == nil {
 		return nil
 	}
-	return err
+	var ee *exec.ExitError
+	if errors.As(err, &ee) && ee.ExitCode() == securityErrItemNotFound {
+		return nil // already absent — fine for idempotent cleanup
+	}
+	return fmt.Errorf("remove legacy keychain item %s/%s: %w", service, account, err)
 }
