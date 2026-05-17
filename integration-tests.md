@@ -467,7 +467,7 @@ Using **NEW_CHANNEL_ID** from step 5.1:
 
 | Step | Command | Expected |
 |------|---------|----------|
-| 1 | `slck config show` | Shows both Bot Token and User Token (masked) with storage location |
+| 1 | `slck config show` | `bot_token: present`, `user_token: present`, plus backend + ref (NO token characters, not even masked) |
 
 ### 6.2 Config Test (Dual Token)
 
@@ -488,7 +488,7 @@ Using **NEW_CHANNEL_ID** from step 5.1:
 | Step | Command | Expected |
 |------|---------|----------|
 | 1 | `slck config delete-token --type bot --force` | "Bot token deleted" |
-| 2 | `slck config show` | Bot Token: Not configured, User Token: still present |
+| 2 | `slck config show` | `bot_token: not configured`, `user_token: present` |
 | 3 | `slck workspace info` | Error: no bot token configured |
 | 4 | `slck search messages "test"` | Still works (uses user token) |
 | 5 | `slck config delete-token --type user --force` | "User token deleted" |
