@@ -47,7 +47,11 @@ func runDeleteToken(opts *deleteTokenOptions) error {
 		return fmt.Errorf("invalid token type: %s (must be bot, user, or all)", opts.tokenType)
 	}
 
-	st, err := keychain.Open()
+	// OpenNoMigrate (not Open): delete-token is a §1.8 remediation path —
+	// "delete the conflicting key, then re-run". Running the one-time
+	// migration first would surface ErrMigrationConflict and block the very
+	// command meant to resolve it (same reasoning as config clear).
+	st, err := keychain.OpenNoMigrate()
 	if err != nil {
 		return err
 	}

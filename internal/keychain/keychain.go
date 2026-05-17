@@ -72,7 +72,12 @@ func open(overwrite, runMigration bool) (*Store, error) {
 
 // OpenRef opens a store against an explicit ref instead of config.yml's
 // credential_ref — used by `slck set-credential --ref` (§1.5.2 ingress).
-// An empty ref falls back to the configured/default ref.
+// An empty ref falls back to the configured/default ref. Migration does NOT
+// run here: the one-time §1.8 migration only ever targets the canonical
+// configured ref (running it against an arbitrary --ref would discover the
+// default ref's legacy data and could write it under the wrong
+// service/profile). set-credential is pure ingress; migration still runs on
+// the next init / first API call via the default Open path.
 func OpenRef(ref string) (*Store, error) {
 	cfg, err := config.Load()
 	if err != nil {
@@ -81,7 +86,7 @@ func OpenRef(ref string) (*Store, error) {
 	if ref != "" {
 		cfg.CredentialRef = ref
 	}
-	return openWith(cfg, false, true)
+	return openWith(cfg, false, false)
 }
 
 // openWith is the seam unit tests drive with an injected config (e.g. a

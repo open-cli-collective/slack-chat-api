@@ -43,7 +43,11 @@ func runShow(_ *showOptions) error {
 	if err != nil {
 		return err
 	}
-	st, err := keychain.Open()
+	// OpenNoMigrate (not Open): config show is the §1.11 item 3 diagnostic.
+	// It must remain usable during an unresolved §1.8 conflict so the user
+	// can see which keys are where before remediating — running migration
+	// first would fail it with ErrMigrationConflict and hide that state.
+	st, err := keychain.OpenNoMigrate()
 	if err != nil {
 		return err
 	}

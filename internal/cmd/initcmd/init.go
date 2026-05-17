@@ -94,6 +94,12 @@ func runInit(opts *initOptions) error {
 			output.Println("Setup cancelled.")
 			return nil
 		}
+	} else if (st.HasBotToken() || st.HasUserToken()) && !opts.interactive() {
+		// Non-interactive ingress (env/stdin) cannot prompt, so an
+		// accidental CI re-run of `slck init` would silently replace a
+		// stored credential. Emit a stderr notice first — the ref is not
+		// secret and the value is never printed (§1.12).
+		fmt.Fprintf(os.Stderr, "Notice: overwriting existing credential(s) at %s\n", st.Ref())
 	}
 
 	botToken, err := opts.resolveBot()
@@ -109,6 +115,10 @@ func runInit(opts *initOptions) error {
 		return nil
 	}
 
+	// workspace stores info.TeamID — the stable machine identifier (e.g.
+	// T04AB1234), not the human-readable info.Team display name shown by
+	// verify(). The ID is durable across workspace renames; config show
+	// reports it as a non-secret correlation field, not for display polish.
 	workspace := ""
 
 	if botToken != "" {

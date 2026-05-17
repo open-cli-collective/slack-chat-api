@@ -90,7 +90,14 @@ func run(opts *options) error {
 
 func readValue(opts *options) (string, error) {
 	if opts.fromEnv != "" {
-		return os.Getenv(opts.fromEnv), nil
+		v := os.Getenv(opts.fromEnv)
+		if v == "" {
+			// Name the variable (parity with init's resolveBot/resolveUser)
+			// so the user knows which env var to populate — never echo a
+			// value (§1.12); the var name is not secret.
+			return "", fmt.Errorf("--from-env %s is empty or unset", opts.fromEnv)
+		}
+		return v, nil
 	}
 	r := opts.in
 	if r == nil {

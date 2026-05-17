@@ -2,18 +2,39 @@ package initcmd
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/open-cli-collective/cli-common/credstore"
+
 	"github.com/open-cli-collective/slack-chat-api/internal/client"
 	"github.com/open-cli-collective/slack-chat-api/internal/keychain"
 	"github.com/open-cli-collective/slack-chat-api/internal/testutil"
 )
+
+// writeLegacyCreds writes the legacy plaintext credentials file at the path
+// the one-time migration scans ($XDG_CONFIG_HOME/slack-chat-api/credentials,
+// per testutil.Setup's isolated XDG).
+func writeLegacyCreds(t *testing.T, kv map[string]string) string {
+	t.Helper()
+	dir := filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "slack-chat-api")
+	require.NoError(t, os.MkdirAll(dir, 0o700))
+	path := filepath.Join(dir, "credentials")
+	var b strings.Builder
+	for k, v := range kv {
+		b.WriteString(k + "=" + v + "\n")
+	}
+	require.NoError(t, os.WriteFile(path, []byte(b.String()), 0o600))
+	return path
+}
 
 func newMockServer(t *testing.T) *httptest.Server {
 	t.Helper()
@@ -117,6 +138,51 @@ func TestRunInit_Interactive_CancelOverwrite(t *testing.T) {
 	// Existing creds + interactive + "n" to overwrite → cancelled.
 	err = runInit(&initOptions{stdin: strings.NewReader("n\n"), noVerify: true})
 	require.NoError(t, err)
+}
+
+// A legacy value that disagrees with an existing keyring value must, WITHOUT
+// --overwrite, fail loud (§1.8) and never leak either secret — exercised
+// through the init command's default Open path, not just the resolver.
+func TestRunInit_MigrationConflict_FailsLoudWithoutLeaking(t *testing.T) {
+	testutil.Setup(t)
+	pre, err := keychain.Open()
+	require.NoError(t, err)
+	require.NoError(t, pre.SetBotToken("xoxb-OLD-keyring-value"))
+	_ = pre.Close()
+	writeLegacyCreds(t, map[string]string{"api_token": "xoxb-NEW-legacy-value"})
+
+	err = runInit(&initOptions{stdin: strings.NewReader("\nn\n"), noVerify: true})
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, credstore.ErrMigrationConflict),
+		"want ErrMigrationConflict, got %v", err)
+	assert.NotContains(t, err.Error(), "xoxb-OLD-keyring-value")
+	assert.NotContains(t, err.Error(), "xoxb-NEW-legacy-value")
+}
+
+// `slck init --overwrite` is the only path that forces a legacy value over a
+// conflicting keyring entry. Exercise the CLI flag → OpenForMigrationOverwrite
+// wiring end to end (the resolver itself is unit-tested separately).
+func TestRunInit_OverwriteResolvesMigrationConflict(t *testing.T) {
+	testutil.Setup(t)
+	pre, err := keychain.Open()
+	require.NoError(t, err)
+	require.NoError(t, pre.SetBotToken("xoxb-OLD-keyring-value"))
+	_ = pre.Close()
+	legacy := writeLegacyCreds(t, map[string]string{"api_token": "xoxb-NEW-legacy-value"})
+
+	// No tokens supplied: init resolves the conflict during Open, then exits
+	// on "no tokens provided" — the migration side effect is what we assert.
+	err = runInit(&initOptions{overwrite: true, stdin: strings.NewReader("\nn\n"), noVerify: true})
+	require.NoError(t, err)
+
+	st, err := keychain.OpenNoMigrate()
+	require.NoError(t, err)
+	defer func() { _ = st.Close() }()
+	v, err := st.BotToken()
+	require.NoError(t, err)
+	assert.Equal(t, "xoxb-NEW-legacy-value", v, "--overwrite must force the legacy value")
+	_, statErr := os.Stat(legacy)
+	assert.True(t, os.IsNotExist(statErr), "legacy file must be removed after forced migrate")
 }
 
 func TestRunInit_VerificationFailed(t *testing.T) {
