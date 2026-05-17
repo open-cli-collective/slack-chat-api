@@ -53,69 +53,20 @@ func migrateLegacyOverwrite(s *Store, cfg *config.Config, overwrite bool) error 
 		return nil // nothing legacy on disk/keychain — the steady state
 	}
 
-	// Group candidates by new key, in deterministic key order.
-	byKey := map[string][]candidate{}
-	for _, c := range cands {
-		byKey[c.newKey] = append(byKey[c.newKey], c)
-	}
-	keys := make([]string, 0, len(byKey))
-	for k := range byKey {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-
-	// Phase 1: resolve every key, detecting ALL conflicts before mutating.
-	writes := map[string]string{}            // newKey -> value to SetBundle
-	changes := []credstore.MigrationChange{} // for the _migration block
-	humanField := map[string]string{}        // newKey -> legacyField (stderr)
-	var cleanups []func() error              // run only after a clean write
-
-	for _, k := range keys {
-		group := byKey[k]
-		distinct := map[string]bool{}
-		for _, c := range group {
-			distinct[c.value] = true
-		}
-
-		target, hasTarget := currentValue(s, k)
-
-		switch {
-		case len(distinct) > 1:
-			// Legacy sources disagree among themselves: --overwrite cannot
-			// pick a winner here either (§1.8 — the user must). Always a
-			// conflict, regardless of overwrite or target presence.
-			return conflict(s, group, target, hasTarget)
-		case hasTarget && !overwrite && disagrees(distinct, target):
-			return conflict(s, group, target, hasTarget)
-		case hasTarget && !disagrees(distinct, target):
-			// Already migrated (values match): no write, just clean up the
-			// leftover originals from an interrupted prior run. No signal.
-			for _, c := range group {
-				cleanups = append(cleanups, c.deleter)
-			}
-		default:
-			// Resolvable migration: one value (or overwrite forcing one).
-			val := group[0].value
-			writes[k] = val
-			lf := group[0].legacyField
-			humanField[k] = lf
-			changes = append(changes, credstore.MigrationJSONEntry(
-				lf, group[0].location,
-				fmt.Sprintf("keyring:%s/%s/%s", s.service, s.profile, k)))
-			for _, c := range group {
-				cleanups = append(cleanups, c.deleter)
-			}
-		}
+	plan, err := planMigration(s.service, s.profile, s.ref, cands,
+		func(k string) (string, bool) { return currentValue(s, k) }, overwrite)
+	if err != nil {
+		return err
 	}
 
 	// Phase 2: write the new bundle (no overwrite needed when target absent;
 	// WithOverwrite only when the caller forced it).
-	if len(writes) > 0 {
+	if len(plan.writes) > 0 {
 		var opts []credstore.SetOpt
 		if overwrite {
 			opts = append(opts, credstore.WithOverwrite())
 		}
-		if _, err := s.cs.SetBundle(s.profile, writes, opts...); err != nil {
+		if _, err := s.cs.SetBundle(s.profile, plan.writes, opts...); err != nil {
 			return fmt.Errorf("migrate to keyring %s: %w", s.ref, err)
 		}
 	}
@@ -124,17 +75,19 @@ func migrateLegacyOverwrite(s *Store, cfg *config.Config, overwrite bool) error 
 	// Record the _migration block ONLY on a JSON run — recording it on a
 	// text run would leave a stale block that a later JSON command in the
 	// same (or test) process could splice into an unrelated response.
-	if len(changes) > 0 {
+	if len(plan.changes) > 0 {
 		if output.IsJSON() {
-			output.RecordMigration(credstore.NewMigrationBlock(changes...))
+			output.RecordMigration(credstore.NewMigrationBlock(plan.changes...))
 		} else {
-			for _, k := range keys {
-				if lf, ok := humanField[k]; ok {
+			for _, k := range plan.keys {
+				if lf, ok := plan.humanField[k]; ok {
 					credstore.EmitMigrationStderr(lf, s.ref)
 				}
 			}
 		}
 	}
+
+	cleanups := plan.cleanups
 
 	// Phase 4: delete the legacy originals, then persist credential_ref so
 	// the migration is not re-attempted (§1.8 "adding credential_ref").
@@ -147,6 +100,72 @@ func migrateLegacyOverwrite(s *Store, cfg *config.Config, overwrite bool) error 
 		return fmt.Errorf("migration succeeded but writing config.yml failed: %w", err)
 	}
 	return nil
+}
+
+// migrationPlan is the pure result of resolving discovered candidates: what
+// to write, the §1.8 signal, and the legacy originals to delete on success.
+type migrationPlan struct {
+	writes     map[string]string           // newKey -> value to SetBundle
+	changes    []credstore.MigrationChange // _migration block entries
+	humanField map[string]string           // newKey -> legacyField (stderr)
+	cleanups   []func() error              // legacy deleters (post-write)
+	keys       []string                    // sorted newKeys (deterministic)
+}
+
+// planMigration is the pure §1.8 resolver: group candidates by new key and,
+// detecting EVERY conflict before any mutation is proposed, decide writes /
+// cleanups / signal. It performs no I/O — `current` injects the existing
+// keyring value lookup — so all branches (legacy-vs-legacy disagreement,
+// legacy-vs-target, idempotent equal, overwrite) are unit-testable with
+// synthetic candidates.
+func planMigration(service, profile, ref string, cands []candidate,
+	current func(key string) (string, bool), overwrite bool) (migrationPlan, error) {
+
+	byKey := map[string][]candidate{}
+	for _, c := range cands {
+		byKey[c.newKey] = append(byKey[c.newKey], c)
+	}
+	p := migrationPlan{writes: map[string]string{}, humanField: map[string]string{}}
+	for k := range byKey {
+		p.keys = append(p.keys, k)
+	}
+	sort.Strings(p.keys)
+
+	for _, k := range p.keys {
+		group := byKey[k]
+		distinct := map[string]bool{}
+		for _, c := range group {
+			distinct[c.value] = true
+		}
+		target, hasTarget := current(k)
+
+		switch {
+		case len(distinct) > 1:
+			// Legacy sources disagree among themselves: --overwrite cannot
+			// pick a winner here either (§1.8 — the user must). Always a
+			// conflict, regardless of overwrite or target presence.
+			return migrationPlan{}, conflictErr(service, profile, ref, group, hasTarget)
+		case hasTarget && !overwrite && disagrees(distinct, target):
+			return migrationPlan{}, conflictErr(service, profile, ref, group, hasTarget)
+		case hasTarget && !disagrees(distinct, target):
+			// Already migrated (values match): no write, just clean up the
+			// leftover originals from an interrupted prior run. No signal.
+			for _, c := range group {
+				p.cleanups = append(p.cleanups, c.deleter)
+			}
+		default:
+			// Resolvable migration: one value (or overwrite forcing one).
+			p.writes[k] = group[0].value
+			p.humanField[k] = group[0].legacyField
+			p.changes = append(p.changes, credstore.MigrationJSONEntry(
+				group[0].legacyField, group[0].location,
+				fmt.Sprintf("keyring:%s/%s/%s", service, profile, k)))
+			for _, c := range group {
+				p.cleanups = append(p.cleanups, c.deleter)
+			}
+		}
+	}
+	return p, nil
 }
 
 // currentValue reports the existing credstore value for a key (post-Open).
@@ -167,18 +186,18 @@ func disagrees(distinct map[string]bool, target string) bool {
 	return false
 }
 
-// conflict builds the §1.8 error: names every legacy source and the keyring
-// target, never a value (masked or not). Reports the legacy field name.
-func conflict(s *Store, group []candidate, target string, hasTarget bool) error {
+// conflictErr builds the §1.8 error: names every legacy source and the
+// keyring target, never a value (masked or not). Reports the legacy field
+// name. Pure — no *Store — so it is testable in isolation.
+func conflictErr(service, profile, ref string, group []candidate, hasTarget bool) error {
 	locs := make([]string, 0, len(group)+1)
 	for _, c := range group {
 		locs = append(locs, c.location)
 	}
 	if hasTarget {
-		_ = target // value intentionally unused — never printed
-		locs = append(locs, fmt.Sprintf("keyring:%s/%s/%s", s.service, s.profile, group[0].newKey))
+		locs = append(locs, fmt.Sprintf("keyring:%s/%s/%s", service, profile, group[0].newKey))
 	}
-	return credstore.MigrationConflictError("slck", group[0].legacyField, strings.Join(locs, ", "), s.ref)
+	return credstore.MigrationConflictError("slck", group[0].legacyField, strings.Join(locs, ", "), ref)
 }
 
 // legacyKeychainScanDisabledEnv is a test-only seam: when set, discover()

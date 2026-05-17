@@ -19,6 +19,73 @@ const (
 	userTok = "xoxp-2222-distinctive-user-secret"
 )
 
+// TestPlanMigration exercises the pure §1.8 resolver directly — including
+// the legacy-vs-legacy disagreement branch, which the file/keychain
+// plumbing can't reach (a key=value file yields one value per key and the
+// darwin Keychain scan is disabled in tests).
+func TestPlanMigration(t *testing.T) {
+	cand := func(val, loc string) candidate {
+		return candidate{newKey: KeyBotToken, legacyField: "api_token", value: val,
+			location: loc, deleter: func() error { return nil }}
+	}
+	none := func(string) (string, bool) { return "", false }
+	has := func(v string) func(string) (string, bool) {
+		return func(string) (string, bool) { return v, true }
+	}
+
+	t.Run("legacy-vs-legacy disagreement is always a conflict", func(t *testing.T) {
+		for _, ow := range []bool{false, true} { // overwrite cannot resolve it
+			_, err := planMigration("slack-chat-api", "default", "slack-chat-api/default",
+				[]candidate{cand("xoxb-AAA", "keychain:slck/api_token"),
+					cand("xoxb-BBB", "file:/p/credentials#api_token")}, none, ow)
+			if !errors.Is(err, credstore.ErrMigrationConflict) {
+				t.Fatalf("overwrite=%v: want ErrMigrationConflict, got %v", ow, err)
+			}
+			if leak := credstore.NoLeakAssertion([]byte(err.Error()),
+				"xoxb-AAA", "xoxb-BBB"); leak != nil {
+				t.Fatalf("conflict leaked a value: %v", leak)
+			}
+			if !strings.Contains(err.Error(), "keychain:slck/api_token") ||
+				!strings.Contains(err.Error(), "file:/p/credentials#api_token") {
+				t.Fatalf("conflict must name all sources: %q", err.Error())
+			}
+		}
+	})
+
+	t.Run("legacy-vs-target differs, no overwrite -> conflict", func(t *testing.T) {
+		_, err := planMigration("svc", "default", "svc/default",
+			[]candidate{cand("xoxb-LEGACY", "file:x#api_token")}, has("xoxb-TARGET"), false)
+		if !errors.Is(err, credstore.ErrMigrationConflict) {
+			t.Fatalf("want conflict, got %v", err)
+		}
+	})
+
+	t.Run("legacy-vs-target differs, overwrite -> write", func(t *testing.T) {
+		p, err := planMigration("svc", "default", "svc/default",
+			[]candidate{cand("xoxb-LEGACY", "file:x#api_token")}, has("xoxb-TARGET"), true)
+		if err != nil || p.writes[KeyBotToken] != "xoxb-LEGACY" || len(p.changes) != 1 {
+			t.Fatalf("overwrite should force legacy: plan=%+v err=%v", p, err)
+		}
+	})
+
+	t.Run("equal target -> cleanup only, no write/signal", func(t *testing.T) {
+		p, err := planMigration("svc", "default", "svc/default",
+			[]candidate{cand("xoxb-SAME", "file:x#api_token")}, has("xoxb-SAME"), false)
+		if err != nil || len(p.writes) != 0 || len(p.changes) != 0 || len(p.cleanups) != 1 {
+			t.Fatalf("equal value should clean up silently: plan=%+v err=%v", p, err)
+		}
+	})
+
+	t.Run("identical duplicate legacy values -> single write", func(t *testing.T) {
+		p, err := planMigration("svc", "default", "svc/default",
+			[]candidate{cand("xoxb-DUP", "keychain:slck/api_token"),
+				cand("xoxb-DUP", "file:x#api_token")}, none, false)
+		if err != nil || p.writes[KeyBotToken] != "xoxb-DUP" || len(p.cleanups) != 2 {
+			t.Fatalf("byte-identical dup should migrate once: plan=%+v err=%v", p, err)
+		}
+	})
+}
+
 func TestDetectTokenType(t *testing.T) {
 	cases := map[string]string{
 		"xoxb-abc": "bot", "xoxp-abc": "user", "xoxc-abc": "unknown", "": "unknown",
@@ -27,6 +94,31 @@ func TestDetectTokenType(t *testing.T) {
 		if got := DetectTokenType(in); got != want {
 			t.Fatalf("DetectTokenType(%q)=%q want %q", in, got, want)
 		}
+	}
+}
+
+// TestRuntimeEnvNotReadAsCredential locks the headline §1.11 invariant:
+// SLACK_API_TOKEN / SLACK_USER_TOKEN must NOT be consulted at runtime, even
+// when set. With an empty keyring, reads must still fail-missing.
+func TestRuntimeEnvNotReadAsCredential(t *testing.T) {
+	testutil.Setup(t)
+	t.Setenv("SLACK_API_TOKEN", "xoxb-env-must-be-ignored")
+	t.Setenv("SLACK_USER_TOKEN", "xoxp-env-must-be-ignored")
+
+	st, err := Open()
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer func() { _ = st.Close() }()
+
+	if _, err := st.BotToken(); !errors.Is(err, ErrMissingBotToken) {
+		t.Fatalf("SLACK_API_TOKEN was consulted at runtime (err=%v)", err)
+	}
+	if _, err := st.UserToken(); !errors.Is(err, ErrMissingUserToken) {
+		t.Fatalf("SLACK_USER_TOKEN was consulted at runtime (err=%v)", err)
+	}
+	if st.HasBotToken() || st.HasUserToken() {
+		t.Fatal("Has*Token true purely from env — §1.11 violation")
 	}
 }
 
