@@ -65,6 +65,13 @@ read at runtime (they are accepted only as ingress during setup).`,
 	},
 }
 
+// Command returns the fully-configured root command (persistent --output
+// flag, PersistentPreRunE, all subcommands). Exposed so tests — notably the
+// §1.12 no-leak suite — can drive the real top-level command exactly as a
+// user would, instead of constructing a subcommand without root's
+// persistent flags (which would error out before the command ever runs).
+func Command() *cobra.Command { return rootCmd }
+
 // Execute runs the root command
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {

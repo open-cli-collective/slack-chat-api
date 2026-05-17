@@ -160,18 +160,35 @@ func TestNoLeak_APICommandClasses(t *testing.T) {
 		name string
 		cmd  func() *cobra.Command
 		args []string
+		json bool
 	}{
-		{"channels list", channels.NewCmd, []string{"list"}},
-		{"channels list -o json", channels.NewCmd, []string{"list", "-o", "json"}},
-		{"messages history", messages.NewCmd, []string{"history", "C123"}},
+		{"channels list", channels.NewCmd, []string{"list"}, false},
+		// JSON mode is toggled via output.JSON (the real IsJSON() path),
+		// NOT a `-o json` arg: -o is a ROOT persistent flag, so passing it
+		// to a bare subcommand errors during parsing and would make this a
+		// vacuous no-leak pass.
+		{"channels list (json)", channels.NewCmd, []string{"list"}, true},
+		{"messages history", messages.NewCmd, []string{"history", "C123"}, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			testutil.Setup(t)
 			seed(t)
+			if tc.json {
+				output.JSON = true
+				t.Cleanup(func() { output.JSON = false })
+			}
 			c := tc.cmd()
 			c.SetArgs(tc.args)
-			assertNoLeak(t, tc.name, captureAll(t, "", func() { _ = c.Execute() }))
+			var execErr error
+			out := captureAll(t, "", func() { execErr = c.Execute() })
+			// In the hermetic env these must actually run and fail at the
+			// API/auth boundary — a nil error or a cobra usage/flag error
+			// would mean the command never executed (vacuous pass).
+			require.Error(t, execErr, "%s should fail at the API boundary, not pass vacuously", tc.name)
+			require.NotContains(t, execErr.Error(), "unknown flag")
+			require.NotContains(t, execErr.Error(), "unknown command")
+			assertNoLeak(t, tc.name, out)
 		})
 	}
 }

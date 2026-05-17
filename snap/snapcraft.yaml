@@ -12,7 +12,7 @@ description: |
   - Message reactions and threads
   - JSON output for scripting
 
-  Run 'slck config set-token' to configure your Slack token.
+  Run 'slck init' to configure your Slack credentials (stored in the OS keyring).
 
 grade: stable
 confinement: strict
