@@ -116,16 +116,28 @@ The `internal/client` package wraps the Slack API:
 
 ## Common Issues
 
-- **Token not found**: Run `slck config set-token` or set `SLACK_API_TOKEN`
+- **Token not found**: Run `slck init` or `slck set-credential --key bot_token --stdin`. Environment variables are NOT read at runtime (only as setup ingress, e.g. `init --bot-token-from-env`).
 - **Permission denied**: Check bot token scopes in Slack app settings
 - **Lint failures**: Run `make lint` locally before pushing
 - **golangci-lint version**: CI uses v2.0.2 with v2 config format
 
+## Credentials
+
+slck stores credentials in the OS keyring via `cli-common/credstore` (Open
+CLI Collective Secret-Handling Standard §2.4). The `internal/keychain`
+package is a credstore adapter (no `security` shell-out, no plaintext file).
+Non-secret config (`credential_ref`, `workspace`, `keyring.backend`) lives in
+`~/.config/slack-chat-api/config.yml`. Ingress is only `slck init` /
+`slck set-credential` (stdin or `--from-env`); never a flag/positional value.
+
 ## Dependencies
 
-- `github.com/slack-go/slack` - Slack API client
+- `github.com/open-cli-collective/cli-common` - shared credstore (OS keyring)
 - `github.com/spf13/cobra` - CLI framework
-- `github.com/zalando/go-keyring` - Cross-platform keychain
+- `golang.org/x/term` - no-echo passphrase prompt (file-backend opt-in)
+
+(The HTTP Slack client is hand-rolled in `internal/client`; there is no
+`slack-go`/`zalando` dependency.)
 
 ## Commit Conventions
 

@@ -1,58 +1,65 @@
 package config
 
 import (
+	"os"
+
 	"github.com/spf13/cobra"
 
+	appconfig "github.com/open-cli-collective/slack-chat-api/internal/config"
 	"github.com/open-cli-collective/slack-chat-api/internal/keychain"
 	"github.com/open-cli-collective/slack-chat-api/internal/output"
 )
 
-func newClearCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "clear",
-		Short: "Remove all stored credentials",
-		Long: `Remove all stored Slack API tokens at once.
-
-This is equivalent to running:
-  slck config delete-token --type all --force
-
-Note: Environment variables (SLACK_API_TOKEN, SLACK_USER_TOKEN) are not affected.`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return runClear()
-		},
-	}
+type clearOptions struct {
+	all bool
 }
 
-func runClear() error {
-	clearedAny := false
+func newClearCmd() *cobra.Command {
+	opts := &clearOptions{}
+	cmd := &cobra.Command{
+		Use:   "clear",
+		Short: "Remove stored credentials for the active profile",
+		Long: `Remove the keyring credentials under the active credential_ref
+(§1.7). Scope is the active profile only — other profiles and other CLIs are
+untouched. With --all, also remove config.yml (return to a pre-init state).
+Idempotent and non-interactive.`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runClear(opts)
+		},
+	}
+	cmd.Flags().BoolVar(&opts.all, "all", false, "Also remove config.yml (pre-init state)")
+	return cmd
+}
 
-	if keychain.HasStoredToken() {
-		if err := keychain.DeleteAPIToken(); err != nil {
+func runClear(opts *clearOptions) error {
+	st, err := keychain.Open()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = st.Close() }()
+
+	removed, err := st.Clear()
+	if err != nil {
+		return err
+	}
+	if len(removed) == 0 {
+		output.Printf("No keyring credentials under %s.\n", st.Ref())
+	} else {
+		for _, k := range removed {
+			output.Printf("Removed %s from %s\n", k, st.Ref())
+		}
+	}
+
+	if opts.all {
+		p := appconfig.Path()
+		switch err := os.Remove(p); {
+		case err == nil:
+			output.Printf("Removed %s\n", p)
+		case os.IsNotExist(err):
+			// idempotent
+		default:
 			return err
 		}
-		output.Println("Cleared bot token")
-		clearedAny = true
 	}
-
-	if keychain.HasStoredUserToken() {
-		if err := keychain.DeleteUserToken(); err != nil {
-			return err
-		}
-		output.Println("Cleared user token")
-		clearedAny = true
-	}
-
-	if !clearedAny {
-		output.Println("No stored tokens to clear.")
-	}
-
-	// Warn about env vars
-	hasEnvBot := keychain.GetTokenSource() == "environment variable"
-	hasEnvUser := keychain.GetUserTokenSource() == "environment variable"
-	if hasEnvBot || hasEnvUser {
-		output.Println()
-		output.Println("Note: Environment variable SLACK_API_TOKEN and/or SLACK_USER_TOKEN will still be used if set.")
-	}
-
 	return nil
 }

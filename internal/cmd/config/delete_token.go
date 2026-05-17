@@ -24,8 +24,8 @@ func newDeleteTokenCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "delete-token",
-		Short: "Delete stored Slack API token(s)",
-		Long: `Delete stored Slack API token(s).
+		Short: "Delete stored Slack token(s) from the keyring",
+		Long: `Delete stored Slack token(s) from the OS keyring.
 
 Use --type to specify which token to delete:
   - bot: Delete the bot token (xoxb-*)
@@ -43,58 +43,43 @@ Use --type to specify which token to delete:
 }
 
 func runDeleteToken(opts *deleteTokenOptions) error {
-	// Validate token type
 	if opts.tokenType != "bot" && opts.tokenType != "user" && opts.tokenType != "all" {
 		return fmt.Errorf("invalid token type: %s (must be bot, user, or all)", opts.tokenType)
 	}
 
-	// Check what tokens exist
-	hasBotToken := keychain.HasStoredToken()
-	hasUserToken := keychain.HasStoredUserToken()
+	st, err := keychain.Open()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = st.Close() }()
 
-	// Determine what we're deleting
-	deleteBot := (opts.tokenType == "bot" || opts.tokenType == "all") && hasBotToken
-	deleteUser := (opts.tokenType == "user" || opts.tokenType == "all") && hasUserToken
+	hasBot := st.HasBotToken()
+	hasUser := st.HasUserToken()
+	deleteBot := (opts.tokenType == "bot" || opts.tokenType == "all") && hasBot
+	deleteUser := (opts.tokenType == "user" || opts.tokenType == "all") && hasUser
 
 	if !deleteBot && !deleteUser {
-		switch opts.tokenType {
-		case "bot":
-			output.Println("No bot token stored to delete.")
-			if os.Getenv("SLACK_API_TOKEN") != "" {
-				output.Println("Note: Bot token is set via SLACK_API_TOKEN environment variable.")
-			}
-		case "user":
-			output.Println("No user token stored to delete.")
-			if os.Getenv("SLACK_USER_TOKEN") != "" {
-				output.Println("Note: User token is set via SLACK_USER_TOKEN environment variable.")
-			}
-		default:
-			output.Println("No tokens stored to delete.")
-			if os.Getenv("SLACK_API_TOKEN") != "" || os.Getenv("SLACK_USER_TOKEN") != "" {
-				output.Println("Note: Tokens may be set via environment variables.")
-			}
-		}
+		output.Println("No matching tokens stored to delete.")
 		return nil
 	}
 
-	// Prompt for confirmation unless --force
 	if !opts.force {
 		reader := opts.stdin
 		if reader == nil {
 			reader = os.Stdin
 		}
 
-		var tokenDesc string
+		var desc string
 		switch {
 		case deleteBot && deleteUser:
-			tokenDesc = "bot and user tokens"
+			desc = "bot and user tokens"
 		case deleteBot:
-			tokenDesc = "bot token"
+			desc = "bot token"
 		case deleteUser:
-			tokenDesc = "user token"
+			desc = "user token"
 		}
 
-		output.Printf("About to delete the stored %s.\n", tokenDesc)
+		output.Printf("About to delete the stored %s.\n", desc)
 		output.Printf("Are you sure? [y/N]: ")
 
 		scanner := bufio.NewScanner(reader)
@@ -107,28 +92,17 @@ func runDeleteToken(opts *deleteTokenOptions) error {
 		}
 	}
 
-	// Delete tokens
 	if deleteBot {
-		if err := keychain.DeleteAPIToken(); err != nil {
+		if err := st.DeleteBotToken(); err != nil {
 			return fmt.Errorf("failed to delete bot token: %w", err)
 		}
-		if keychain.IsSecureStorage() {
-			output.Println("Bot token deleted from Keychain")
-		} else {
-			output.Println("Bot token deleted from config file")
-		}
+		output.Printf("Deleted bot_token from %s\n", st.Ref())
 	}
-
 	if deleteUser {
-		if err := keychain.DeleteUserToken(); err != nil {
+		if err := st.DeleteUserToken(); err != nil {
 			return fmt.Errorf("failed to delete user token: %w", err)
 		}
-		if keychain.IsSecureStorage() {
-			output.Println("User token deleted from Keychain")
-		} else {
-			output.Println("User token deleted from config file")
-		}
+		output.Printf("Deleted user_token from %s\n", st.Ref())
 	}
-
 	return nil
 }

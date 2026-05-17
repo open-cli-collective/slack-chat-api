@@ -1,10 +1,11 @@
 package config
 
 import (
-	"strings"
-
 	"github.com/spf13/cobra"
 
+	"github.com/open-cli-collective/cli-common/credstore"
+
+	appconfig "github.com/open-cli-collective/slack-chat-api/internal/config"
 	"github.com/open-cli-collective/slack-chat-api/internal/keychain"
 	"github.com/open-cli-collective/slack-chat-api/internal/output"
 )
@@ -17,45 +18,76 @@ func newShowCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "show",
 		Short: "Show current configuration status",
+		Long: `Show credential configuration: backend, ref, and which keys are
+present. Secret values are never displayed (§1.11).`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runShow(opts)
 		},
 	}
 }
 
-func maskToken(token string) string {
-	if len(token) < 12 {
-		return strings.Repeat("*", len(token))
-	}
-	return token[:8] + strings.Repeat("*", len(token)-12) + token[len(token)-4:]
+// showStatus is the non-secret view (§1.11 item 3): presence, backend, ref,
+// workspace — never a token value, not even a masked prefix.
+type showStatus struct {
+	Ref              string `json:"credential_ref"`
+	Backend          string `json:"backend"`
+	BackendSource    string `json:"backend_source"`
+	PassphraseSource string `json:"passphrase_source,omitempty"`
+	Workspace        string `json:"workspace,omitempty"`
+	BotToken         bool   `json:"bot_token_present"`
+	UserToken        bool   `json:"user_token_present"`
 }
 
-func runShow(opts *showOptions) error {
-	hasAnyToken := false
+func runShow(_ *showOptions) error {
+	cfg, err := appconfig.Load()
+	if err != nil {
+		return err
+	}
+	st, err := keychain.Open()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = st.Close() }()
 
-	// Bot token
-	botToken, botErr := keychain.GetAPIToken()
-	if botErr == nil {
-		hasAnyToken = true
-		source := keychain.GetTokenSource()
-		output.Printf("Bot Token: %s (from %s)\n", maskToken(botToken), source)
-	} else {
-		output.Println("Bot Token: Not configured")
+	backend, src := st.Backend()
+	status := showStatus{
+		Ref:           st.Ref(),
+		Backend:       string(backend),
+		BackendSource: string(src),
+		Workspace:     cfg.Workspace,
+		BotToken:      st.HasBotToken(),
+		UserToken:     st.HasUserToken(),
+	}
+	if backend == credstore.BackendFile {
+		svc, _, _ := credstore.ParseRef(st.Ref())
+		status.PassphraseSource = keychain.PassphraseSource(svc)
 	}
 
-	// User token
-	userToken, userErr := keychain.GetUserToken()
-	if userErr == nil {
-		hasAnyToken = true
-		source := keychain.GetUserTokenSource()
-		output.Printf("User Token: %s (from %s)\n", maskToken(userToken), source)
-	} else {
-		output.Println("User Token: Not configured (required for search)")
+	if output.IsJSON() {
+		return output.PrintJSON(status)
 	}
 
-	if !hasAnyToken {
-		output.Println("\nRun 'slck config set-token' to configure")
+	output.Printf("Credential ref: %s\n", status.Ref)
+	output.Printf("Backend:        %s (%s)\n", status.Backend, status.BackendSource)
+	if status.PassphraseSource != "" {
+		output.Printf("Passphrase:     %s\n", status.PassphraseSource)
 	}
-
+	if status.Workspace != "" {
+		output.Printf("Workspace:      %s\n", status.Workspace)
+	}
+	output.Printf("bot_token:      %s\n", presence(status.BotToken))
+	output.Printf("user_token:     %s\n", presence(status.UserToken))
+	if !status.BotToken && !status.UserToken {
+		output.Println()
+		output.Println("No credentials configured. Run 'slck init' or")
+		output.Println("'slck set-credential --key bot_token --stdin'.")
+	}
 	return nil
+}
+
+func presence(ok bool) string {
+	if ok {
+		return "present"
+	}
+	return "not configured"
 }

@@ -15,6 +15,7 @@ import (
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/initcmd"
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/messages"
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/search"
+	"github.com/open-cli-collective/slack-chat-api/internal/cmd/setcred"
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/users"
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/whoami"
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/workspace"
@@ -34,10 +35,12 @@ var rootCmd = &cobra.Command{
 It provides commands for managing channels, users, messages,
 and other Slack workspace operations.
 
-Configure your API token with:
-  slck config set-token <your-token>
+Configure credentials with:
+  slck init
+  slck set-credential --key bot_token --stdin   (e.g. via 'op read | ...')
 
-Or set the SLACK_API_TOKEN environment variable.`,
+Credentials are stored in the OS keyring; environment variables are not
+read at runtime (they are accepted only as ingress during setup).`,
 	Version: version.Version,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		// Parse and validate output format
@@ -91,4 +94,5 @@ func init() {
 	rootCmd.AddCommand(emoji.NewCmd())
 	rootCmd.AddCommand(files.NewCmd())
 	rootCmd.AddCommand(initcmd.NewCmd())
+	rootCmd.AddCommand(setcred.NewCmd())
 }

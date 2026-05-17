@@ -10,42 +10,51 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/open-cli-collective/slack-chat-api/internal/client"
+	appconfig "github.com/open-cli-collective/slack-chat-api/internal/config"
 	"github.com/open-cli-collective/slack-chat-api/internal/keychain"
 	"github.com/open-cli-collective/slack-chat-api/internal/output"
 )
 
+// initOptions: tokens are NOT accepted as flag/positional values (§1.5/§1.12).
+// They arrive only via a named env var, single-secret stdin, or an
+// interactive prompt — all valid *ingress* mechanisms during setup.
 type initOptions struct {
-	botToken  string
-	userToken string
+	botEnv    string // --bot-token-from-env NAME
+	userEnv   string // --user-token-from-env NAME
+	botStdin  bool   // --bot-token-stdin (single-secret stdin)
 	noVerify  bool
-	stdin     io.Reader                                  // For testing
-	newClient func(baseURL, token string) *client.Client // For testing
+	overwrite bool // --overwrite: resolve a §1.8 legacy/keyring conflict
+
+	stdin     io.Reader                                  // test seam (prompts / --bot-token-stdin)
+	newClient func(baseURL, token string) *client.Client // test seam
 }
 
-// NewCmd creates the init command
+// NewCmd creates the init command.
 func NewCmd() *cobra.Command {
 	opts := &initOptions{}
 
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Interactive setup wizard",
-		Long: `Set up slck with guided configuration.
+		Long: `Set up slck.
 
-This wizard walks you through configuring bot and user tokens
-for Slack API access. Tokens are verified against the Slack API
-unless --no-verify is passed.
+Tokens are read from a named environment variable, single-secret stdin, or
+an interactive prompt — never from a flag value (which would leak via shell
+history / process listings, §1.5/§1.12). Examples:
 
-For non-interactive use, provide tokens via flags:
-  slck init --bot-token xoxb-... --user-token xoxp-...`,
+  slck init --bot-token-from-env SLACK_BOT_TOKEN --user-token-from-env SLACK_USER_TOKEN
+  op read 'op://Vault/Slack/bot' | slck init --bot-token-stdin
+  slck init                       # interactive`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runInit(opts)
 		},
 	}
 
-	cmd.Flags().StringVar(&opts.botToken, "bot-token", "", "Bot token (xoxb-*) for non-interactive setup")
-	cmd.Flags().StringVar(&opts.userToken, "user-token", "", "User token (xoxp-*) for non-interactive setup")
+	cmd.Flags().StringVar(&opts.botEnv, "bot-token-from-env", "", "Read the bot token from this env var")
+	cmd.Flags().StringVar(&opts.userEnv, "user-token-from-env", "", "Read the user token from this env var")
+	cmd.Flags().BoolVar(&opts.botStdin, "bot-token-stdin", false, "Read the bot token from stdin")
 	cmd.Flags().BoolVar(&opts.noVerify, "no-verify", false, "Skip token verification")
-
+	cmd.Flags().BoolVar(&opts.overwrite, "overwrite", false, "Resolve a legacy/keyring migration conflict by forcing the legacy value")
 	return cmd
 }
 
@@ -67,116 +76,140 @@ func runInit(opts *initOptions) error {
 	output.Println("Slack CLI Setup")
 	output.Println()
 
-	// Check for existing config
-	hasBotToken := keychain.HasStoredToken()
-	hasUserToken := keychain.HasStoredUserToken()
-	if hasBotToken || hasUserToken {
-		output.Println("Existing configuration detected.")
-		if !promptYesNo(opts.reader(), "Overwrite existing configuration?", false) {
+	// Opening the store runs the one-time legacy migration (§1.8). With
+	// --overwrite a legacy/keyring conflict is resolved by forcing legacy.
+	open := keychain.Open
+	if opts.overwrite {
+		open = keychain.OpenForMigrationOverwrite
+	}
+	st, err := open()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = st.Close() }()
+
+	if (st.HasBotToken() || st.HasUserToken()) && !opts.overwrite && opts.interactive() {
+		if !promptYesNo(opts.reader(), "Credentials already exist. Overwrite?", false) {
 			output.Println("Setup cancelled.")
 			return nil
 		}
-		output.Println()
 	}
 
-	output.Println("This CLI supports both bot tokens (xoxb-*) and user tokens (xoxp-*).")
-	output.Println("Bot tokens are recommended for most use cases.")
-	output.Println()
-
-	// Bot token
-	botToken := opts.botToken
-	if botToken == "" {
-		var err error
-		botToken, err = promptToken(opts.reader(), "Bot Token (xoxb-...)")
-		if err != nil {
-			return err
-		}
+	botToken, err := opts.resolveBot()
+	if err != nil {
+		return err
 	}
-
-	if botToken != "" {
-		tokenType := keychain.DetectTokenType(botToken)
-		if tokenType != "bot" {
-			return fmt.Errorf("expected bot token (xoxb-*), got %s token", tokenType)
-		}
-
-		if !opts.noVerify {
-			output.Println()
-			output.Println("Testing connection...")
-			c := opts.makeClient(botToken)
-			info, err := c.AuthTest()
-			if err != nil {
-				return fmt.Errorf("bot token verification failed: %w", err)
-			}
-			output.Println("  Bot token valid")
-			output.Printf("  Connected to workspace: %s\n", info.Team)
-			output.Printf("  User: %s\n", info.User)
-			if info.BotID != "" {
-				output.Printf("  Bot ID: %s\n", info.BotID)
-			}
-		}
-
-		if err := keychain.SetAPIToken(botToken); err != nil {
-			return fmt.Errorf("failed to store bot token: %w", err)
-		}
-		output.Println()
-		output.Println("Bot token saved.")
+	userToken, err := opts.resolveUser()
+	if err != nil {
+		return err
 	}
-
-	// User token
-	userToken := opts.userToken
-	if userToken == "" {
-		output.Println()
-		if promptYesNo(opts.reader(), "Would you like to add a user token as well? (needed for search)", false) {
-			var err error
-			userToken, err = promptToken(opts.reader(), "User Token (xoxp-...)")
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	if userToken != "" {
-		tokenType := keychain.DetectTokenType(userToken)
-		if tokenType != "user" {
-			return fmt.Errorf("expected user token (xoxp-*), got %s token", tokenType)
-		}
-
-		if !opts.noVerify {
-			output.Println()
-			output.Println("Testing connection...")
-			c := opts.makeClient(userToken)
-			info, err := c.AuthTest()
-			if err != nil {
-				return fmt.Errorf("user token verification failed: %w", err)
-			}
-			output.Println("  User token valid")
-			output.Printf("  Connected to workspace: %s\n", info.Team)
-			output.Printf("  User: %s\n", info.User)
-		}
-
-		if err := keychain.SetUserToken(userToken); err != nil {
-			return fmt.Errorf("failed to store user token: %w", err)
-		}
-		output.Println()
-		output.Println("User token saved.")
-	}
-
 	if botToken == "" && userToken == "" {
 		output.Println("No tokens provided. Setup cancelled.")
 		return nil
+	}
+
+	workspace := ""
+
+	if botToken != "" {
+		if t := keychain.DetectTokenType(botToken); t != "bot" {
+			return fmt.Errorf("expected bot token (xoxb-*), got %s token", t)
+		}
+		if !opts.noVerify {
+			info, err := opts.verify(botToken, "Bot")
+			if err != nil {
+				return fmt.Errorf("bot token verification failed: %w", err)
+			}
+			workspace = info.TeamID
+		}
+		if err := st.SetBotToken(botToken); err != nil {
+			return err
+		}
+		output.Println("Bot token saved.")
+	}
+
+	if userToken != "" {
+		if t := keychain.DetectTokenType(userToken); t != "user" {
+			return fmt.Errorf("expected user token (xoxp-*), got %s token", t)
+		}
+		if !opts.noVerify {
+			info, err := opts.verify(userToken, "User")
+			if err != nil {
+				return fmt.Errorf("user token verification failed: %w", err)
+			}
+			if workspace == "" {
+				workspace = info.TeamID
+			}
+		}
+		if err := st.SetUserToken(userToken); err != nil {
+			return err
+		}
+		output.Println("User token saved.")
+	}
+
+	// Persist non-secret config (credential_ref + workspace, §1.2/§2.4).
+	cfg, err := appconfig.Load()
+	if err != nil {
+		return err
+	}
+	if workspace != "" {
+		cfg.Workspace = workspace
+	}
+	if err := cfg.Save(); err != nil {
+		return err
 	}
 
 	output.Println()
 	output.Println("Configuration saved. Try it out:")
 	if botToken != "" {
 		output.Println("  slck channels list")
-		output.Println("  slck users list")
 	}
 	if userToken != "" {
 		output.Println("  slck search messages \"hello\"")
 	}
-
 	return nil
+}
+
+// interactive reports whether init will prompt (no ingress flags given).
+func (o *initOptions) interactive() bool {
+	return o.botEnv == "" && o.userEnv == "" && !o.botStdin
+}
+
+func (o *initOptions) verify(token, label string) (*client.AuthTestResponse, error) {
+	output.Printf("Verifying %s token...\n", label)
+	info, err := o.makeClient(token).AuthTest()
+	if err != nil {
+		return nil, err
+	}
+	output.Printf("  Connected to workspace: %s\n", info.Team)
+	return info, nil
+}
+
+func (o *initOptions) resolveBot() (string, error) {
+	switch {
+	case o.botEnv != "":
+		return os.Getenv(o.botEnv), nil
+	case o.botStdin:
+		b, err := io.ReadAll(o.reader())
+		if err != nil {
+			return "", fmt.Errorf("read bot token from stdin: %w", err)
+		}
+		return strings.TrimRight(string(b), "\r\n"), nil
+	default:
+		return promptToken(o.reader(), "Bot Token (xoxb-...)")
+	}
+}
+
+func (o *initOptions) resolveUser() (string, error) {
+	if o.userEnv != "" {
+		return os.Getenv(o.userEnv), nil
+	}
+	if !o.interactive() {
+		return "", nil // non-interactive run only sets what was supplied
+	}
+	if !promptYesNo(o.reader(), "Add a user token as well? (needed for search)", false) {
+		return "", nil
+	}
+	return promptToken(o.reader(), "User Token (xoxp-...)")
 }
 
 func promptToken(reader io.Reader, prompt string) (string, error) {

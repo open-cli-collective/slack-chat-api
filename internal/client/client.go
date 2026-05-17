@@ -41,7 +41,12 @@ type Client struct {
 
 // NewBotClient creates a new Slack client using the bot token
 func NewBotClient() (*Client, error) {
-	token, err := keychain.GetAPIToken()
+	st, err := keychain.Open()
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = st.Close() }()
+	token, err := st.BotToken()
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +96,12 @@ func NewWithConfig(baseURL, token string, httpClient *http.Client) *Client {
 
 // NewUserClient creates a new Slack client using the user token (for search)
 func NewUserClient() (*Client, error) {
-	token, err := keychain.GetUserToken()
+	st, err := keychain.Open()
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = st.Close() }()
+	token, err := st.UserToken()
 	if err != nil {
 		return nil, fmt.Errorf("user token required for search: %w", err)
 	}

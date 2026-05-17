@@ -1,6 +1,7 @@
 package output
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -37,8 +38,23 @@ func IsJSON() bool {
 	return OutputFormat == FormatJSON || JSON
 }
 
-// PrintJSON outputs data as formatted JSON
+// PrintJSON outputs data as formatted JSON. If a §1.8 migration block was
+// recorded this run, it is spliced in (consume-once) per the policy in
+// migration.go and never appears again.
 func PrintJSON(data interface{}) error {
+	if mig := takeMigration(); mig != nil {
+		body, err := json.Marshal(data)
+		if err != nil {
+			return err
+		}
+		var buf bytes.Buffer
+		if err := json.Indent(&buf, spliceMigration(body, mig), "", "  "); err != nil {
+			return err
+		}
+		buf.WriteByte('\n')
+		_, err = Writer.Write(buf.Bytes())
+		return err
+	}
 	enc := json.NewEncoder(Writer)
 	enc.SetIndent("", "  ")
 	return enc.Encode(data)
