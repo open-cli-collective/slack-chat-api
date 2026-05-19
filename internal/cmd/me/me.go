@@ -1,4 +1,4 @@
-package whoami
+package me
 
 import (
 	"github.com/spf13/cobra"
@@ -7,10 +7,10 @@ import (
 	"github.com/open-cli-collective/slack-chat-api/internal/output"
 )
 
-type whoamiOptions struct{}
+type meOptions struct{}
 
-// WhoamiResult represents the authenticated identity info
-type WhoamiResult struct {
+// MeResult represents the authenticated identity info
+type MeResult struct {
 	Bot       *BotInfo       `json:"bot,omitempty"`
 	User      *UserInfo      `json:"user,omitempty"`
 	Workspace *WorkspaceInfo `json:"workspace"`
@@ -34,25 +34,25 @@ type WorkspaceInfo struct {
 	ID   string `json:"id"`
 }
 
-// NewCmd creates the whoami command
+// NewCmd creates the me command
 func NewCmd() *cobra.Command {
-	opts := &whoamiOptions{}
+	opts := &meOptions{}
 
 	return &cobra.Command{
-		Use:   "whoami",
+		Use:   "me",
 		Short: "Show the authenticated identity",
 		Long: `Show the identity associated with the configured API tokens.
 
 This is a quick way to verify which bot or user account will be used
 for operations, and which workspace the tokens are associated with.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runWhoami(opts, nil, nil)
+			return runMe(opts, nil, nil)
 		},
 	}
 }
 
-func runWhoami(opts *whoamiOptions, botClient *client.Client, userClient *client.Client) error {
-	result := &WhoamiResult{}
+func runMe(opts *meOptions, botClient *client.Client, userClient *client.Client) error {
+	result := &MeResult{}
 	var workspace *WorkspaceInfo
 
 	// Test bot token

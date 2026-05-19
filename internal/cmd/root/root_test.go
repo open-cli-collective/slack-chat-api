@@ -69,3 +69,26 @@ func TestNoFlagsDefaultsBotMode(t *testing.T) {
 		t.Errorf("default should resolve the bot token; got %q", msg)
 	}
 }
+
+// TestRootRegistersMeNotWhoami locks the issue #159 contract: the identity
+// command is registered as `me` (matching sibling CLIs) and `whoami` is gone
+// with no alias fallback (no backwards compatibility).
+func TestRootRegistersMeNotWhoami(t *testing.T) {
+	var meCount int
+	for _, c := range rootCmd.Commands() {
+		if c.Name() == "whoami" {
+			t.Errorf("whoami command must not be registered (issue #159)")
+		}
+		if c.Name() == "me" {
+			meCount++
+		}
+		for _, a := range c.Aliases {
+			if a == "whoami" {
+				t.Errorf("command %q must not alias whoami (no backwards compatibility)", c.Name())
+			}
+		}
+	}
+	if meCount != 1 {
+		t.Errorf("expected exactly one `me` command, found %d", meCount)
+	}
+}

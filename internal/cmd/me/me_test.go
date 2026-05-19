@@ -1,4 +1,4 @@
-package whoami
+package me
 
 import (
 	"encoding/json"
@@ -13,7 +13,7 @@ import (
 	"github.com/open-cli-collective/slack-chat-api/internal/testutil"
 )
 
-func TestRunWhoami_BotTokenOnly(t *testing.T) {
+func TestRunMe_BotTokenOnly(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/auth.test", r.URL.Path)
 		w.Header().Set("Content-Type", "application/json")
@@ -29,14 +29,14 @@ func TestRunWhoami_BotTokenOnly(t *testing.T) {
 	defer server.Close()
 
 	botClient := client.NewWithConfig(server.URL, "xoxb-test", nil)
-	opts := &whoamiOptions{}
+	opts := &meOptions{}
 
 	// Pass bot client, nil for user client
-	err := runWhoami(opts, botClient, nil)
+	err := runMe(opts, botClient, nil)
 	require.NoError(t, err)
 }
 
-func TestRunWhoami_UserTokenOnly(t *testing.T) {
+func TestRunMe_UserTokenOnly(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/auth.test", r.URL.Path)
 		w.Header().Set("Content-Type", "application/json")
@@ -51,14 +51,14 @@ func TestRunWhoami_UserTokenOnly(t *testing.T) {
 	defer server.Close()
 
 	userClient := client.NewWithConfig(server.URL, "xoxp-test", nil)
-	opts := &whoamiOptions{}
+	opts := &meOptions{}
 
 	// Pass nil for bot client, user client provided
-	err := runWhoami(opts, nil, userClient)
+	err := runMe(opts, nil, userClient)
 	require.NoError(t, err)
 }
 
-func TestRunWhoami_BothTokens(t *testing.T) {
+func TestRunMe_BothTokens(t *testing.T) {
 	botServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{
@@ -86,24 +86,24 @@ func TestRunWhoami_BothTokens(t *testing.T) {
 
 	botClient := client.NewWithConfig(botServer.URL, "xoxb-test", nil)
 	userClient := client.NewWithConfig(userServer.URL, "xoxp-test", nil)
-	opts := &whoamiOptions{}
+	opts := &meOptions{}
 
-	err := runWhoami(opts, botClient, userClient)
+	err := runMe(opts, botClient, userClient)
 	require.NoError(t, err)
 }
 
-func TestRunWhoami_NoTokens(t *testing.T) {
+func TestRunMe_NoTokens(t *testing.T) {
 	// Hermetic empty keyring (file backend, temp HOME) — no real keychain.
 	testutil.Setup(t)
 
-	opts := &whoamiOptions{}
+	opts := &meOptions{}
 
 	// Pass nil clients to trigger token lookup
-	err := runWhoami(opts, nil, nil)
+	err := runMe(opts, nil, nil)
 	require.NoError(t, err)
 }
 
-func TestRunWhoami_AuthFailed(t *testing.T) {
+func TestRunMe_AuthFailed(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{
@@ -114,14 +114,14 @@ func TestRunWhoami_AuthFailed(t *testing.T) {
 	defer server.Close()
 
 	botClient := client.NewWithConfig(server.URL, "bad-token", nil)
-	opts := &whoamiOptions{}
+	opts := &meOptions{}
 
 	// Auth fails, but function should handle gracefully
-	err := runWhoami(opts, botClient, nil)
+	err := runMe(opts, botClient, nil)
 	require.NoError(t, err)
 }
 
-func TestRunWhoami_BotWithoutBotID(t *testing.T) {
+func TestRunMe_BotWithoutBotID(t *testing.T) {
 	// Some tokens may not have a bot_id
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -136,8 +136,8 @@ func TestRunWhoami_BotWithoutBotID(t *testing.T) {
 	defer server.Close()
 
 	botClient := client.NewWithConfig(server.URL, "xoxb-test", nil)
-	opts := &whoamiOptions{}
+	opts := &meOptions{}
 
-	err := runWhoami(opts, botClient, nil)
+	err := runMe(opts, botClient, nil)
 	require.NoError(t, err)
 }

@@ -746,7 +746,7 @@ slck canvas delete F12345ABC
 
 ```bash
 # Show authenticated identity (bot, user, workspace)
-slck whoami
+slck me
 ```
 
 ### Config
