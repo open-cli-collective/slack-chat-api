@@ -16,7 +16,10 @@ permissions:
 
 jobs:
   goreleaser:
-    runs-on: ubuntu-latest
+    # INT-446: darwin must build with cgo (Keychain backend). cgo+darwin
+    # cannot cross-compile from Linux, so this job runs on macOS. Pinned
+    # image (not the moving macos-latest label) for a reproducible release.
+    runs-on: macos-15
     env:
       TAG: ${{ github.ref_name || inputs.tag }}
     steps:
@@ -29,13 +32,84 @@ jobs:
         with:
           go-version: "1.24"
 
-      - name: Run GoReleaser
+      - name: Install GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
-          version: latest
-          args: release --clean
+          version: "~> v2"
+          install-only: true
+
+      - name: GoReleaser check
+        run: goreleaser check
+
+      - name: Build (snapshot, no publish)
+        run: goreleaser release --snapshot --clean
+
+      # INT-446 pre-publish gate: prove the darwin binaries actually carry
+      # the Keychain backend BEFORE anything is published. A CGO_ENABLED=0
+      # darwin build links no Security.framework and fails closed at
+      # runtime; this gate makes that impossible to ship silently.
+      - name: Pre-publish gate — darwin Keychain backend present
+        run: |
+          set -euo pipefail
+          art=dist/artifacts.json
+          arm_bin=$(jq -r '.[]|select(.type=="Binary" and .goos=="darwin" and .goarch=="arm64")|.path' "$art")
+          amd_bin=$(jq -r '.[]|select(.type=="Binary" and .goos=="darwin" and .goarch=="amd64")|.path' "$art")
+          [ -n "$arm_bin" ] && [ -n "$amd_bin" ] || { echo "missing a darwin binary in artifacts.json"; exit 1; }
+          # darwin archives: exactly one per arch, no duplicate names
+          tot=$(jq '[.[]|select(.type=="Archive" and .goos=="darwin")|.name]|length' "$art")
+          uniq=$(jq '[.[]|select(.type=="Archive" and .goos=="darwin")|.name]|unique|length' "$art")
+          [ "$tot" = "$uniq" ] || { echo "duplicate darwin archive names"; exit 1; }
+          [ "$(jq '[.[]|select(.type=="Archive" and .goos=="darwin" and .goarch=="arm64")]|length' "$art")" = 1 ] || { echo "expected exactly one darwin/arm64 archive"; exit 1; }
+          [ "$(jq '[.[]|select(.type=="Archive" and .goos=="darwin" and .goarch=="amd64")]|length' "$art")" = 1 ] || { echo "expected exactly one darwin/amd64 archive"; exit 1; }
+          # Mach-O arch sanity (both slices)
+          file "$arm_bin" | grep -q 'arm64'  || { echo "arm64 binary is not arm64 Mach-O";  exit 1; }
+          file "$amd_bin" | grep -q 'x86_64' || { echo "amd64 binary is not x86_64 Mach-O"; exit 1; }
+          lipo -archs "$arm_bin" | grep -qw arm64  || { echo "lipo: arm64 slice missing";  exit 1; }
+          lipo -archs "$amd_bin" | grep -qw x86_64 || { echo "lipo: x86_64 slice missing"; exit 1; }
+          # amd64 cannot run on the arm64 runner: assert Security.framework
+          # is linked. CGO_ENABLED=0 omits it entirely, so its presence is a
+          # sound *necessary* cgo signal for the slice we can't execute.
+          otool -L "$amd_bin" | grep -q '/System/Library/Frameworks/Security.framework' \
+            || { echo "amd64 binary not linked against Security.framework (cgo missing)"; exit 1; }
+          # arm64 authoritative functional check: with no backend override
+          # and a seeded config, credstore must auto-select the Keychain.
+          tmp=$(mktemp -d)
+          mkdir -p "$tmp/xdg/slack-chat-api"
+          printf 'credential_ref: slack-chat-api/default\nworkspace: smoke\n' > "$tmp/xdg/slack-chat-api/config.yml"
+          out=$(env -u SLACK_CHAT_API_KEYRING_BACKEND HOME="$tmp" XDG_CONFIG_HOME="$tmp/xdg" "$arm_bin" --output json config show)
+          echo "$out"
+          b=$(echo "$out" | jq -r '.backend'); s=$(echo "$out" | jq -r '.backend_source'); r=$(echo "$out" | jq -r '.credential_ref')
+          [ "$b" = "keychain" ] && [ "$s" = "auto" ] && [ "$r" = "slack-chat-api/default" ] \
+            || { echo "GATE FAIL: backend=$b source=$s ref=$r (want keychain/auto/slack-chat-api/default)"; exit 1; }
+          echo "GATE OK: darwin/arm64 backend=keychain source=auto; darwin/amd64 Security.framework linked"
+
+      - name: Release notes
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/release-notes.md" <<'EOF'
+          ### macOS Keychain storage restored
+
+          Builds since the credential-store migration were compiled without
+          cgo and failed closed on macOS (no Keychain backend). This release
+          builds the darwin binaries with cgo enabled, restoring native
+          macOS Keychain storage. Upgrade and re-run your normal commands;
+          no other action is required.
+          EOF
+
+      - name: Release (publish)
+        run: goreleaser release --clean --release-notes="$RUNNER_TEMP/release-notes.md"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify release notes published
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          body=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body -q .body)
+          if ! printf '%s' "$body" | grep -q 'macOS Keychain'; then
+            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes-file "$RUNNER_TEMP/release-notes.md"
+          fi
 
   update-homebrew:
     needs: goreleaser
@@ -53,6 +127,7 @@ jobs:
       - name: Parse checksums
         id: checksums
         run: |
+          set -euo pipefail
           VERSION="${{ env.TAG }}"
           VERSION_NUM="${VERSION#v}"
 
@@ -61,6 +136,16 @@ jobs:
           DARWIN_AMD64_SHA=$(grep "darwin_amd64.tar.gz" checksums.txt | cut -d' ' -f1)
           LINUX_ARM64_SHA=$(grep "linux_arm64.tar.gz" checksums.txt | cut -d' ' -f1)
           LINUX_AMD64_SHA=$(grep "linux_amd64.tar.gz" checksums.txt | cut -d' ' -f1)
+
+          # Fail loudly rather than write a cask with an empty sha256 if an
+          # archive was renamed/missing (INT-446: blast radius of the build
+          # split).
+          for pair in \
+            "darwin_arm64:$DARWIN_ARM64_SHA" "darwin_amd64:$DARWIN_AMD64_SHA" \
+            "linux_arm64:$LINUX_ARM64_SHA" "linux_amd64:$LINUX_AMD64_SHA"; do
+            name="${pair%%:*}"; sha="${pair#*:}"
+            if [ -z "$sha" ]; then echo "empty checksum for ${name} archive"; exit 1; fi
+          done
 
           echo "version=${VERSION_NUM}" >> $GITHUB_OUTPUT
           echo "darwin_arm64_sha=${DARWIN_ARM64_SHA}" >> $GITHUB_OUTPUT
