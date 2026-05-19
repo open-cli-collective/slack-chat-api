@@ -11,6 +11,9 @@
 - `messages thread` and `messages history` now surface file attachments in text output as `[file] <name> (<type>, <size>) — slck files download <id>` hints, giving readers a valid download command inline (#141)
 - `messages thread` and `messages history` now render Slack rich-text blocks (previously dropped), so messages pasted as tables, lists, or formatted content are visible in the default text output (#141)
 
+### Changed
+- Renamed the `whoami` command to `me` for consistency with sibling CLIs; `whoami` has been removed with no backwards-compatible alias (#159)
+
 ### Fixed
 - `messages thread` text output no longer truncates at 80 characters (#134)
 - `messages thread` / `messages history` no longer silently drop file attachments or rich-text block content (#141)

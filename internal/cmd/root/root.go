@@ -13,11 +13,11 @@ import (
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/emoji"
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/files"
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/initcmd"
+	"github.com/open-cli-collective/slack-chat-api/internal/cmd/me"
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/messages"
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/search"
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/setcred"
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/users"
-	"github.com/open-cli-collective/slack-chat-api/internal/cmd/whoami"
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/workspace"
 	"github.com/open-cli-collective/slack-chat-api/internal/output"
 	"github.com/open-cli-collective/slack-chat-api/internal/version"
@@ -96,7 +96,7 @@ func init() {
 	rootCmd.AddCommand(messages.NewCmd())
 	rootCmd.AddCommand(search.NewCmd())
 	rootCmd.AddCommand(workspace.NewCmd())
-	rootCmd.AddCommand(whoami.NewCmd())
+	rootCmd.AddCommand(me.NewCmd())
 	rootCmd.AddCommand(config.NewCmd())
 	rootCmd.AddCommand(emoji.NewCmd())
 	rootCmd.AddCommand(files.NewCmd())

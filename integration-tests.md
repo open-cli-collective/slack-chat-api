@@ -573,12 +573,12 @@ These are read-only tests with no side effects.
 
 No additional scopes required (uses `auth.test` which works with any valid token).
 
-### 9.1 Whoami
+### 9.1 Me
 
 | Step | Command | Expected |
 |------|---------|----------|
-| 1 | `slck whoami` | Shows Bot name/ID, Workspace name |
-| 2 | `slck whoami -o json` | JSON with bot, workspace fields |
+| 1 | `slck me` | Shows Bot name/ID, Workspace name |
+| 2 | `slck me -o json` | JSON with bot, workspace fields |
 
 ---
 

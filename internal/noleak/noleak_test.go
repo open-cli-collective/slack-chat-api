@@ -21,9 +21,9 @@ import (
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/channels"
 	cfgcmd "github.com/open-cli-collective/slack-chat-api/internal/cmd/config"
 	initcmd "github.com/open-cli-collective/slack-chat-api/internal/cmd/initcmd"
+	"github.com/open-cli-collective/slack-chat-api/internal/cmd/me"
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/messages"
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/setcred"
-	"github.com/open-cli-collective/slack-chat-api/internal/cmd/whoami"
 	"github.com/open-cli-collective/slack-chat-api/internal/keychain"
 	"github.com/open-cli-collective/slack-chat-api/internal/output"
 	"github.com/open-cli-collective/slack-chat-api/internal/testutil"
@@ -133,14 +133,14 @@ func TestNoLeak_InitFromEnv(t *testing.T) {
 	assertNoLeak(t, "init --bot-token-from-env", out)
 }
 
-func TestNoLeak_Whoami(t *testing.T) {
+func TestNoLeak_Me(t *testing.T) {
 	testutil.Setup(t)
 	seed(t)
-	c := whoami.NewCmd()
+	c := me.NewCmd()
 	c.SetArgs([]string{})
-	// whoami will fail to reach Slack (hermetic env); we only care that no
+	// me will fail to reach Slack (hermetic env); we only care that no
 	// output channel echoes the seeded token.
-	assertNoLeak(t, "whoami", captureAll(t, "", func() { _ = c.Execute() }))
+	assertNoLeak(t, "me", captureAll(t, "", func() { _ = c.Execute() }))
 }
 
 func TestNoLeak_ConfigTest(t *testing.T) {
