@@ -249,6 +249,12 @@ func TestRunInit_RelocationGate_DivergentAbortsBeforeMutation(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(newDir, "config.yml"),
 		[]byte("credential_ref: slack-chat-api/new\n"), 0o600))
 
+	// Seed a legacy credentials file too. If the relocation gate were
+	// accidentally moved AFTER keychain.Open, the migrator would consume
+	// this file before the abort and the post-abort stat would fail. With
+	// the gate ordered correctly, the legacy file stays untouched.
+	legacy := writeLegacyCreds(t, map[string]string{"api_token": "xoxb-MUST-NOT-BE-MIGRATED"})
+
 	// Snapshot pre-init bytes to assert mutate-nothing.
 	oldBefore, _ := os.ReadFile(filepath.Join(oldDir, "config.yml"))
 	newBefore, _ := os.ReadFile(filepath.Join(newDir, "config.yml"))
@@ -258,11 +264,18 @@ func TestRunInit_RelocationGate_DivergentAbortsBeforeMutation(t *testing.T) {
 	assert.Contains(t, err.Error(), "detecting config relocation",
 		"init must abort at the relocation gate")
 
-	// Nothing mutated.
+	// Nothing mutated by the abort.
 	oldAfter, _ := os.ReadFile(filepath.Join(oldDir, "config.yml"))
 	newAfter, _ := os.ReadFile(filepath.Join(newDir, "config.yml"))
 	assert.Equal(t, string(oldBefore), string(oldAfter), "old config must not be mutated by aborted init")
 	assert.Equal(t, string(newBefore), string(newAfter), "new config must not be mutated by aborted init")
+
+	// Critical proof the gate ran BEFORE keychain.Open / migration: the
+	// legacy credentials file must still exist. If migration had run, it
+	// would have consumed and removed this file.
+	if _, statErr := os.Stat(legacy); statErr != nil {
+		t.Errorf("legacy credentials file must still exist (gate must abort before migration); stat err=%v", statErr)
+	}
 }
 
 func TestRunInit_VerificationFailed(t *testing.T) {
