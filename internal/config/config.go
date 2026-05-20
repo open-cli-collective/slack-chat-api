@@ -88,12 +88,22 @@ func Path() (string, error) {
 // Load reads config.yml. The strict variant — used by `slck init`'s
 // relocation gate. Returns ErrRelocationConflict (with a wrapped detail
 // message) when both the old hand-rolled and new statedir-resolved dirs
-// contain materially-different config.yml files; on conflict, the canonical
-// new-dir config is still returned alongside the error when canonical was
-// readable. If Load couldn't populate cfg (e.g. malformed canonical YAML),
-// returns (nil, ErrRelocationConflict) so LoadForRuntime hard-fails instead
-// of warning-and-defaulting (MON-5371 lesson). An absent file is not an
-// error: defaults are applied and a usable Config is returned.
+// contain materially-different config.yml files.
+//
+// DUAL-RETURN CONTRACT: on a relocation conflict, Load can return BOTH a
+// non-nil *Config (the canonical new-dir config, if readable) AND a non-nil
+// error wrapping ErrRelocationConflict — so the caller can choose to
+// soft-degrade. The standard `if err != nil { return err }` idiom would
+// silently DISCARD a valid config in the conflict case; callers must check
+// `errors.Is(err, ErrRelocationConflict)` explicitly, or use the
+// LoadForRuntime wrapper which encodes the right discipline. Runtime call
+// sites have all been migrated to LoadForRuntime; init uses Load directly
+// only AFTER its own DetectConfigRelocation gate succeeded (so no conflict
+// can be observed at that callsite). If Load couldn't populate cfg (e.g.
+// malformed canonical YAML), returns (nil, ErrRelocationConflict) so
+// LoadForRuntime hard-fails instead of warning-and-defaulting (MON-5371
+// lesson). An absent file is not an error: defaults are applied and a
+// usable Config is returned.
 func Load() (*Config, error) {
 	newDir, err := Dir()
 	if err != nil {
@@ -118,7 +128,11 @@ func loadFromNewDir(newDir string) (*Config, error) {
 	c := &Config{}
 	read := false
 	// Attempt new-dir read unconditionally so soft-degrading callers get the
-	// user's actual settings alongside relErr.
+	// user's actual settings alongside relErr. Under conflict we don't
+	// re-surface a bare parse error (LoadForRuntime needs the wrapped
+	// ErrRelocationConflict so it can soft-degrade), but we DO append the
+	// parse diagnostic to relErr so the user sees both the conflict path
+	// and the corruption detail in one message.
 	if reloc.NewPath != "" {
 		newYML := filepath.Join(reloc.NewPath, configFileName)
 		if data, err := os.ReadFile(newYML); err == nil { //nolint:gosec // path from validated dir
@@ -126,6 +140,7 @@ func loadFromNewDir(newDir string) (*Config, error) {
 				if relErr == nil {
 					return nil, fmt.Errorf("parse config %s: %w", newYML, uerr)
 				}
+				relErr = fmt.Errorf("%w; canonical also malformed: %v", relErr, uerr)
 			} else {
 				read = true
 			}
@@ -133,6 +148,7 @@ func loadFromNewDir(newDir string) (*Config, error) {
 			if relErr == nil {
 				return nil, fmt.Errorf("read config %s: %w", newYML, err)
 			}
+			relErr = fmt.Errorf("%w; canonical also unreadable: %v", relErr, err)
 		}
 	}
 	if !read && reloc.Kind == relocOldOnly && reloc.OldPath != "" {
@@ -142,6 +158,7 @@ func loadFromNewDir(newDir string) (*Config, error) {
 				if relErr == nil {
 					return nil, fmt.Errorf("parse config %s: %w", oldYML, uerr)
 				}
+				relErr = fmt.Errorf("%w; old also malformed: %v", relErr, uerr)
 			} else {
 				read = true
 			}
@@ -149,6 +166,7 @@ func loadFromNewDir(newDir string) (*Config, error) {
 			if relErr == nil {
 				return nil, fmt.Errorf("read config %s: %w", oldYML, err)
 			}
+			relErr = fmt.Errorf("%w; old also unreadable: %v", relErr, err)
 		}
 	}
 	// Malformed canonical under conflict: soft-degrade is unsafe (would swap

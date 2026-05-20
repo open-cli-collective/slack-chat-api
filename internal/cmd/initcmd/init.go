@@ -172,7 +172,12 @@ func runInit(opts *initOptions) error {
 	}
 
 	// Persist non-secret config (credential_ref + workspace, §1.2/§2.4).
-	cfg, err := appconfig.Load()
+	// Use LoadForRuntime even here so the dual-return-on-conflict contract
+	// is never exposed to a `if err != nil` callsite: by this point the
+	// init relocation gate above has reconciled or aborted, so soft-degrade
+	// is moot — but routing through LoadForRuntime keeps the read pattern
+	// uniform and the contract harder to misuse.
+	cfg, err := appconfig.LoadForRuntime()
 	if err != nil {
 		return err
 	}

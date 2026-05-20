@@ -150,24 +150,16 @@ func loadConfigFromFile(path string) (Config, error) {
 	return c, nil
 }
 
-// configsMaterialEqual compares the user-meaningful subset of two Configs.
-// applyDefaults is called on both sides first so an omitted `credential_ref`
-// (which is semantically DefaultCredentialRef per applyDefaults) compares
-// equal to an explicit DefaultCredentialRef. reflect.DeepEqual on the whole
-// Keyring sub-struct so future KeyringConfig fields are auto-covered.
+// configsMaterialEqual compares two Configs after applying defaults on both
+// sides (so an omitted `credential_ref` — semantically DefaultCredentialRef
+// — compares equal to an explicit DefaultCredentialRef). reflect.DeepEqual
+// on the whole default-applied struct so any future Config field is
+// automatically covered as a divergence-trigger; we don't need to remember
+// to update this comparator when Config grows.
 func configsMaterialEqual(a, b Config) bool {
 	a.applyDefaults()
 	b.applyDefaults()
-	if a.CredentialRef != b.CredentialRef {
-		return false
-	}
-	if a.Workspace != b.Workspace {
-		return false
-	}
-	if !reflect.DeepEqual(a.Keyring, b.Keyring) {
-		return false
-	}
-	return true
+	return reflect.DeepEqual(a, b)
 }
 
 // ApplyConfigRelocation copies the single config.yml file from old → new
@@ -225,9 +217,18 @@ func copyFileAtomic(src, dst string) error {
 	return nil
 }
 
+// fileExists distinguishes "not present" from other stat errors. A
+// permission-denied (or any other non-IsNotExist) error must NOT silently
+// degrade to "absent" — that would let an oddly-permissioned old dir
+// collapse an old-only relocation to a no-op. Treat unknown errors as
+// "present" so the relocation flow's subsequent open/read surfaces the
+// real error instead of skipping the gate.
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
-	return err == nil
+	if err == nil {
+		return true
+	}
+	return !os.IsNotExist(err)
 }
 
 // LoadForRuntime is the soft-conflict variant of Load for non-init callers.
