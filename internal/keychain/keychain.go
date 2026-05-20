@@ -63,7 +63,7 @@ func OpenForMigrationOverwrite() (*Store, error) { return open(true, true) }
 func OpenNoMigrate() (*Store, error) { return open(false, false) }
 
 func open(overwrite, runMigration bool) (*Store, error) {
-	cfg, err := config.Load()
+	cfg, err := config.LoadForRuntime()
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +79,7 @@ func open(overwrite, runMigration bool) (*Store, error) {
 // service/profile). set-credential is pure ingress; migration still runs on
 // the next init / first API call via the default Open path.
 func OpenRef(ref string) (*Store, error) {
-	cfg, err := config.Load()
+	cfg, err := config.LoadForRuntime()
 	if err != nil {
 		return nil, err
 	}

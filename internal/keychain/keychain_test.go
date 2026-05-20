@@ -3,7 +3,6 @@ package keychain
 import (
 	"errors"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -192,11 +191,10 @@ func TestRefAuthoritative(t *testing.T) {
 
 func writeLegacyFile(t *testing.T, kv map[string]string) string {
 	t.Helper()
-	dir := filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "slack-chat-api")
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		t.Fatal(err)
-	}
-	p := filepath.Join(dir, "credentials")
+	// Legacy plaintext credentials file at the path the keychain migrator's
+	// legacyCredentialsPath() scans (the hand-rolled XDG/$HOME/.config path,
+	// distinct from the new canonical config dir on macOS/Windows).
+	p := testutil.LegacyCredentialsPath(t)
 	var b strings.Builder
 	for k, v := range kv {
 		b.WriteString(k + "=" + v + "\n")
@@ -226,7 +224,11 @@ func TestMigratePlaintextFileRenamesAndCleansUp(t *testing.T) {
 	if _, err := os.Stat(legacy); !os.IsNotExist(err) {
 		t.Fatalf("legacy plaintext file not removed: %v", err)
 	}
-	if _, err := os.Stat(appconfig.Path()); err != nil {
+	cfgPath, perr := appconfig.Path()
+	if perr != nil {
+		t.Fatal(perr)
+	}
+	if _, err := os.Stat(cfgPath); err != nil {
 		t.Fatalf("config.yml not written: %v", err)
 	}
 }

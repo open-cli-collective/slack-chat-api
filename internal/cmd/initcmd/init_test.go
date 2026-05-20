@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -21,13 +20,12 @@ import (
 )
 
 // writeLegacyCreds writes the legacy plaintext credentials file at the path
-// the one-time migration scans ($XDG_CONFIG_HOME/slack-chat-api/credentials,
-// per testutil.Setup's isolated XDG).
+// the keychain migrator's legacyCredentialsPath() scans (the hand-rolled
+// XDG/$HOME/.config path — distinct from the new canonical config dir on
+// macOS/Windows post-MON-5372).
 func writeLegacyCreds(t *testing.T, kv map[string]string) string {
 	t.Helper()
-	dir := filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "slack-chat-api")
-	require.NoError(t, os.MkdirAll(dir, 0o700))
-	path := filepath.Join(dir, "credentials")
+	path := testutil.LegacyCredentialsPath(t)
 	var b strings.Builder
 	for k, v := range kv {
 		b.WriteString(k + "=" + v + "\n")

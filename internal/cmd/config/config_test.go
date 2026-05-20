@@ -2,6 +2,8 @@ package config
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -10,6 +12,7 @@ import (
 
 	"github.com/open-cli-collective/cli-common/credstore"
 
+	appconfig "github.com/open-cli-collective/slack-chat-api/internal/config"
 	"github.com/open-cli-collective/slack-chat-api/internal/keychain"
 	"github.com/open-cli-collective/slack-chat-api/internal/output"
 	"github.com/open-cli-collective/slack-chat-api/internal/testutil"
@@ -120,4 +123,35 @@ func TestRunClear_Idempotent(t *testing.T) {
 	// Second clear is a no-op, still succeeds (§1.7 idempotent).
 	_, err = captureOutput(t, func() error { return runClear(&clearOptions{}) })
 	require.NoError(t, err)
+}
+
+// TestRunClearAll_RemovesBothNewAndOldConfigPaths pins the MON-5372 contract:
+// --all must scrub BOTH the new canonical config.yml AND the pre-MON-5372
+// hand-rolled path. Otherwise a stale old file would silently resurrect the
+// config via runtime old-only fallback. Linux: paths dedupe to one.
+func TestRunClearAll_RemovesBothNewAndOldConfigPaths(t *testing.T) {
+	testutil.Setup(t)
+
+	// Plant a config.yml at the NEW canonical path.
+	newPath, err := appconfig.Path()
+	require.NoError(t, err)
+	require.NoError(t, os.MkdirAll(filepath.Dir(newPath), 0o700))
+	require.NoError(t, os.WriteFile(newPath, []byte("credential_ref: slack-chat-api/test\n"), 0o600))
+
+	// Plant another config.yml at the OLD hand-rolled path (distinct on
+	// macOS/Windows; identical to new on Linux — which the dedupe handles).
+	oldPath, err := appconfig.OldConfigPath()
+	require.NoError(t, err)
+	require.NoError(t, os.MkdirAll(filepath.Dir(oldPath), 0o700))
+	require.NoError(t, os.WriteFile(oldPath, []byte("credential_ref: slack-chat-api/stale\n"), 0o600))
+
+	_, err = captureOutput(t, func() error { return runClear(&clearOptions{all: true}) })
+	require.NoError(t, err)
+
+	if _, e := os.Stat(newPath); !os.IsNotExist(e) {
+		t.Errorf("new path must be removed by --all: stat err=%v", e)
+	}
+	if _, e := os.Stat(oldPath); !os.IsNotExist(e) {
+		t.Errorf("old path must be removed by --all: stat err=%v", e)
+	}
 }

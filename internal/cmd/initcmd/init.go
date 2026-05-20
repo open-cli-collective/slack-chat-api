@@ -77,6 +77,20 @@ func runInit(opts *initOptions) error {
 	output.Println("Slack CLI Setup")
 	output.Println()
 
+	// Step -1 (must precede the §1.8 keyring migration): the MON-5372
+	// config-dir relocation gate. If the old hand-rolled dir and the new
+	// statedir-resolved dir both exist with divergent settings, abort
+	// BEFORE any token migration / config write — otherwise we'd soft-read
+	// one side, migrate, then SaveConfig, papering over the conflict. On
+	// only-old we copy old→new (atomic, idempotent).
+	if reloc, err := appconfig.DetectConfigRelocation(); err != nil {
+		return fmt.Errorf("detecting config relocation: %w", err)
+	} else if reloc.CopyNeeded {
+		if err := appconfig.ApplyConfigRelocation(reloc); err != nil {
+			return fmt.Errorf("relocating config from %s to %s: %w", reloc.OldPath, reloc.NewPath, err)
+		}
+	}
+
 	// Opening the store runs the one-time legacy migration (§1.8). With
 	// --overwrite a legacy/keyring conflict is resolved by forcing legacy.
 	open := keychain.Open
