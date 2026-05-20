@@ -39,7 +39,7 @@ type showStatus struct {
 }
 
 func runShow(_ *showOptions) error {
-	cfg, err := appconfig.Load()
+	cfg, err := appconfig.LoadForRuntime()
 	if err != nil {
 		return err
 	}

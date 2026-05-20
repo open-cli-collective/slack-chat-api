@@ -54,18 +54,29 @@ func runClear(opts *clearOptions) error {
 	}
 
 	if opts.all {
-		// §1.7: --all returns the active profile to a pre-init state —
-		// keyring bundle (above) + config file + caches + empty dirs.
-		// slck has NO cache directory today (no command writes one); if
-		// one is ever added it must also be removed here.
-		p := appconfig.Path()
-		switch err := os.Remove(p); {
-		case err == nil:
-			output.Printf("Removed %s\n", p)
-		case os.IsNotExist(err):
-			// idempotent
-		default:
-			return err
+		// §1.7: --all returns the active profile to a pre-init state. We
+		// must remove BOTH the new canonical config and the pre-MON-5372
+		// hand-rolled path — runtime old-only fallback would otherwise let
+		// a stale old config silently resurrect post-clear. Path-identity
+		// dedupe (Linux: old == new).
+		paths := []string{}
+		newPath, perr := appconfig.Path()
+		if perr != nil {
+			return perr
+		}
+		paths = append(paths, newPath)
+		if oldPath, oerr := appconfig.OldConfigPath(); oerr == nil && oldPath != newPath {
+			paths = append(paths, oldPath)
+		}
+		for _, p := range paths {
+			switch err := os.Remove(p); {
+			case err == nil:
+				output.Printf("Removed %s\n", p)
+			case os.IsNotExist(err):
+				// idempotent
+			default:
+				return err
+			}
 		}
 	}
 	return nil
