@@ -90,13 +90,25 @@ func Path() (string, error) {
 // message) when both the old hand-rolled and new statedir-resolved dirs
 // contain materially-different config.yml files; on conflict, the canonical
 // new-dir config is still returned alongside the error when canonical was
-// readable. If LoadConfig couldn't populate cfg (e.g. malformed canonical
-// YAML), returns (nil, ErrRelocationConflict) so LoadForRuntime hard-fails
-// instead of warning-and-defaulting (MON-5371 lesson). An absent file is not
-// an error: defaults are applied and a usable Config is returned.
+// readable. If Load couldn't populate cfg (e.g. malformed canonical YAML),
+// returns (nil, ErrRelocationConflict) so LoadForRuntime hard-fails instead
+// of warning-and-defaulting (MON-5371 lesson). An absent file is not an
+// error: defaults are applied and a usable Config is returned.
 func Load() (*Config, error) {
+	newDir, err := Dir()
+	if err != nil {
+		return nil, err
+	}
+	return loadFromNewDir(newDir)
+}
+
+// loadFromNewDir is the testable seam Load and the tests both call. Taking
+// an injected newDir is the only way to exercise the divergent/malformed
+// branches on Linux where os.UserConfigDir == $XDG_CONFIG_HOME (and so
+// would collapse old == new at the public Load entry point).
+func loadFromNewDir(newDir string) (*Config, error) {
 	relErr := error(nil)
-	reloc, derr := DetectConfigRelocation()
+	reloc, derr := detectRelocation(newDir)
 	if derr != nil && errors.Is(derr, ErrRelocationConflict) {
 		relErr = derr
 	} else if derr != nil {

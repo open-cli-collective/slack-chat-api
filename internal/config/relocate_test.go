@@ -265,58 +265,15 @@ func TestApplyConfigRelocation_IdempotentSkipsExistingNew(t *testing.T) {
 	}
 }
 
-// loadForRuntimeAt mirrors Load + LoadForRuntime against injected dirs so
-// the soft-degrade vs hard-fail branches are exercisable on Linux.
+// loadForRuntimeAt calls the production LoadForRuntime seam against the
+// injected (old, new) pair. Pinning XDG_CONFIG_HOME at oldDir's parent
+// makes oldHandRolledConfigDir resolve to oldDir on Linux, so the
+// divergent/malformed branches are exercised on the same OS CI runs.
 func loadForRuntimeAt(t *testing.T, oldDir, newDir string) (*Config, error) {
 	t.Helper()
 	t.Setenv("XDG_CONFIG_HOME", filepath.Dir(oldDir))
 	reloConflictOnce = sync.Once{}
-
-	r, derr := detectRelocation(newDir)
-	relErr := error(nil)
-	if derr != nil && errors.Is(derr, ErrRelocationConflict) {
-		relErr = derr
-	} else if derr != nil {
-		return nil, derr
-	}
-	cfg := &Config{}
-	read := false
-	if r.NewPath != "" {
-		newYML := filepath.Join(r.NewPath, configFileName)
-		if data, err := os.ReadFile(newYML); err == nil {
-			c, lerr := loadConfigFromFile(newYML)
-			if lerr != nil {
-				if relErr == nil {
-					return nil, lerr
-				}
-			} else {
-				cfg = &c
-				read = true
-			}
-			_ = data
-		}
-	}
-	if !read && r.Kind == relocOldOnly && r.OldPath != "" {
-		oldYML := filepath.Join(r.OldPath, configFileName)
-		c, lerr := loadConfigFromFile(oldYML)
-		if lerr != nil {
-			if relErr == nil {
-				return nil, lerr
-			}
-		} else {
-			cfg = &c
-			read = true
-		}
-	}
-	if !read && relErr != nil {
-		return nil, relErr
-	}
-	cfg.applyDefaults()
-	if relErr != nil {
-		warnReloConflictOnce(relErr)
-		return cfg, nil
-	}
-	return cfg, nil
+	return loadForRuntimeFromNewDir(newDir)
 }
 
 func TestLoadForRuntime_SoftConflict_ReturnsCanonical(t *testing.T) {

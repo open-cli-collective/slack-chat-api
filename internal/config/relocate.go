@@ -239,7 +239,17 @@ func fileExists(path string) bool {
 // CredentialRef back to DefaultCredentialRef and mask the corrupt file
 // (MON-5371 contract).
 func LoadForRuntime() (*Config, error) {
-	cfg, err := Load()
+	newDir, err := Dir()
+	if err != nil {
+		return nil, err
+	}
+	return loadForRuntimeFromNewDir(newDir)
+}
+
+// loadForRuntimeFromNewDir is the testable seam LoadForRuntime and the
+// tests both call.
+func loadForRuntimeFromNewDir(newDir string) (*Config, error) {
+	cfg, err := loadFromNewDir(newDir)
 	if err != nil && errors.Is(err, ErrRelocationConflict) && cfg != nil {
 		warnReloConflictOnce(err)
 		return cfg, nil

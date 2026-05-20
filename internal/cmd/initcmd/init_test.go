@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/open-cli-collective/cli-common/credstore"
 
 	"github.com/open-cli-collective/slack-chat-api/internal/client"
+	appconfig "github.com/open-cli-collective/slack-chat-api/internal/config"
 	"github.com/open-cli-collective/slack-chat-api/internal/keychain"
 	"github.com/open-cli-collective/slack-chat-api/internal/testutil"
 )
@@ -181,6 +183,86 @@ func TestRunInit_OverwriteResolvesMigrationConflict(t *testing.T) {
 	assert.Equal(t, "xoxb-NEW-legacy-value", v, "--overwrite must force the legacy value")
 	_, statErr := os.Stat(legacy)
 	assert.True(t, os.IsNotExist(statErr), "legacy file must be removed after forced migrate")
+}
+
+// TestRunInit_RelocationGate_OldOnlyCopied pins the MON-5372 init-level
+// contract: when only the old hand-rolled config.yml exists, runInit must
+// copy it to the new canonical dir BEFORE any token migration / save runs.
+// Tests the actual gate ordering through runInit (not just the unit-level
+// Detect+Apply pair), so a regression that removed or reordered the gate
+// would surface here.
+func TestRunInit_RelocationGate_OldOnlyCopied(t *testing.T) {
+	testutil.Setup(t)
+	// On Linux old == new path; the gate is a no-op and the test simply
+	// confirms init still works. On macOS/Windows these diverge and the
+	// gate actually performs the copy.
+	configHome := os.Getenv("XDG_CONFIG_HOME")
+	if configHome == "" {
+		// statedirtest sets it; defensive.
+		t.Skip("hermetic env did not set XDG_CONFIG_HOME")
+	}
+	oldDir := filepath.Join(configHome, "slack-chat-api")
+	require.NoError(t, os.MkdirAll(oldDir, 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(oldDir, "config.yml"),
+		[]byte("credential_ref: slack-chat-api/from-old\nworkspace: T_OLD_PRE_INIT\n"), 0o600))
+
+	// Run init with no tokens — wizard short-circuits at "no tokens provided"
+	// AFTER the relocation gate has run (and AFTER EnsureMigrated). The gate
+	// must have copied old→new by then if they differ.
+	err := runInit(&initOptions{stdin: strings.NewReader("\nn\n"), noVerify: true})
+	require.NoError(t, err)
+
+	// New canonical path must exist with the old content (or, on Linux,
+	// remain at the same path — same assertion either way).
+	newDir, err := appconfig.Dir()
+	require.NoError(t, err)
+	data, err := os.ReadFile(filepath.Join(newDir, "config.yml"))
+	require.NoError(t, err, "new canonical config.yml must exist after init")
+	assert.Contains(t, string(data), "slack-chat-api/from-old",
+		"new canonical must carry the old config content")
+}
+
+// TestRunInit_RelocationGate_DivergentAbortsBeforeMutation pins the MON-5372
+// fail-loud contract through runInit: divergent old/new config aborts init
+// BEFORE any token migration or config write papers over the conflict. Skips
+// on Linux where old == new path (the gate short-circuits to relocNone).
+func TestRunInit_RelocationGate_DivergentAbortsBeforeMutation(t *testing.T) {
+	testutil.Setup(t)
+	configHome := os.Getenv("XDG_CONFIG_HOME")
+	if configHome == "" {
+		t.Skip("hermetic env did not set XDG_CONFIG_HOME")
+	}
+	// On Linux the resolved new dir IS the XDG-rooted dir — old == new, no
+	// way to construct divergence at the public seam. The unit-level test
+	// already covers this branch on every OS via the injectable newDir.
+	newDir, err := appconfig.Dir()
+	require.NoError(t, err)
+	oldDir := filepath.Join(configHome, "slack-chat-api")
+	if newDir == oldDir {
+		t.Skip("Linux: old path equals new path; divergence covered at unit level")
+	}
+
+	require.NoError(t, os.MkdirAll(oldDir, 0o700))
+	require.NoError(t, os.MkdirAll(newDir, 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(oldDir, "config.yml"),
+		[]byte("credential_ref: slack-chat-api/old\n"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(newDir, "config.yml"),
+		[]byte("credential_ref: slack-chat-api/new\n"), 0o600))
+
+	// Snapshot pre-init bytes to assert mutate-nothing.
+	oldBefore, _ := os.ReadFile(filepath.Join(oldDir, "config.yml"))
+	newBefore, _ := os.ReadFile(filepath.Join(newDir, "config.yml"))
+
+	err = runInit(&initOptions{botEnv: "BOT_TOK", noVerify: true})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "detecting config relocation",
+		"init must abort at the relocation gate")
+
+	// Nothing mutated.
+	oldAfter, _ := os.ReadFile(filepath.Join(oldDir, "config.yml"))
+	newAfter, _ := os.ReadFile(filepath.Join(newDir, "config.yml"))
+	assert.Equal(t, string(oldBefore), string(oldAfter), "old config must not be mutated by aborted init")
+	assert.Equal(t, string(newBefore), string(newAfter), "new config must not be mutated by aborted init")
 }
 
 func TestRunInit_VerificationFailed(t *testing.T) {
