@@ -29,6 +29,7 @@ func NewCmd() *cobra.Command {
 	cmd.AddCommand(newReadCmd())
 	cmd.AddCommand(newReactCmd())
 	cmd.AddCommand(newUnreactCmd())
+	cmd.AddCommand(newPermalinkCmd())
 
 	return cmd
 }

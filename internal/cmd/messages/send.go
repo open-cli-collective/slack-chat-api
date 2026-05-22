@@ -26,6 +26,7 @@ type sendOptions struct {
 	noUnfurl    bool
 	files       []string
 	fileTitle   string
+	permalink   bool
 	stdin       io.Reader // For testing
 }
 
@@ -109,6 +110,7 @@ The channel can also be specified via --channel instead of as a positional argum
 	cmd.Flags().BoolVar(&opts.noUnfurl, "no-unfurl", false, "Disable link preview unfurling")
 	cmd.Flags().StringArrayVar(&opts.files, "file", nil, "File(s) to upload (can be specified multiple times)")
 	cmd.Flags().StringVar(&opts.fileTitle, "file-title", "", "Custom title for uploaded file(s)")
+	cmd.Flags().BoolVar(&opts.permalink, "permalink", false, "After sending, fetch and include the message permalink (one extra API call)")
 
 	return cmd
 }
@@ -240,11 +242,25 @@ func runSend(channel, text string, opts *sendOptions, c *client.Client) error {
 		return client.WrapError("send message", err)
 	}
 
+	// chat.postMessage doesn't return a permalink, so fetch it on request.
+	// Best-effort: the message is already sent, so a failed permalink lookup
+	// warns rather than failing the command.
+	if opts.permalink {
+		if link, perr := c.GetPermalink(channelID, msg.TS); perr == nil {
+			msg.Permalink = link
+		} else {
+			fmt.Fprintf(os.Stderr, "warning: message sent (ts %s) but permalink fetch failed: %v\n", msg.TS, perr)
+		}
+	}
+
 	if output.IsJSON() {
 		return output.PrintJSON(msg)
 	}
 
 	output.Printf("Message sent (ts: %s)\n", msg.TS)
+	if msg.Permalink != "" {
+		output.Printf("%s\n", msg.Permalink)
+	}
 	return nil
 }
 
