@@ -279,6 +279,7 @@ type Message struct {
 	Files       []File       `json:"files,omitempty"`
 	Blocks      []Block      `json:"blocks,omitempty"`
 	Attachments []Attachment `json:"attachments,omitempty"`
+	Permalink   string       `json:"permalink,omitempty"`
 }
 
 // Team represents workspace info
@@ -709,6 +710,30 @@ func (c *Client) ListEmoji() (map[string]string, error) {
 	}
 
 	return result.Emoji, nil
+}
+
+// GetPermalink returns a canonical permalink URL to a specific message
+// via chat.getPermalink. Slack resolves the correct link for top-level
+// messages, thread replies, and enterprise-grid workspaces — preferred
+// over hand-constructing an archive URL.
+func (c *Client) GetPermalink(channel, messageTS string) (string, error) {
+	params := url.Values{}
+	params.Set("channel", channel)
+	params.Set("message_ts", messageTS)
+
+	body, err := c.get("chat.getPermalink", params)
+	if err != nil {
+		return "", err
+	}
+
+	var result struct {
+		Permalink string `json:"permalink"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return "", err
+	}
+
+	return result.Permalink, nil
 }
 
 // GetTeamInfo returns workspace info

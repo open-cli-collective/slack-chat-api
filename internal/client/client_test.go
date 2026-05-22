@@ -1454,3 +1454,54 @@ func TestClient_DeleteCanvas_Success(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
+
+func TestClient_GetPermalink_Success(t *testing.T) {
+	const want = "https://signalft.slack.com/archives/C123456/p1234567890123456"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "GET" {
+			t.Errorf("expected GET, got %s", r.Method)
+		}
+		if !strings.Contains(r.URL.Path, "chat.getPermalink") {
+			t.Errorf("expected path to contain chat.getPermalink, got %s", r.URL.Path)
+		}
+		if got := r.URL.Query().Get("channel"); got != "C123456" {
+			t.Errorf("expected channel=C123456, got %s", got)
+		}
+		if got := r.URL.Query().Get("message_ts"); got != "1234567890.123456" {
+			t.Errorf("expected message_ts=1234567890.123456, got %s", got)
+		}
+		if auth := r.Header.Get("Authorization"); !strings.HasPrefix(auth, "Bearer ") {
+			t.Error("expected Authorization header with Bearer prefix")
+		}
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"ok":        true,
+			"channel":   "C123456",
+			"permalink": want,
+		})
+	}))
+	defer server.Close()
+
+	client := NewWithConfig(server.URL, "test-token", nil)
+	got, err := client.GetPermalink("C123456", "1234567890.123456")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != want {
+		t.Errorf("expected permalink %q, got %q", want, got)
+	}
+}
+
+func TestClient_GetPermalink_Error(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"ok":    false,
+			"error": "message_not_found",
+		})
+	}))
+	defer server.Close()
+
+	client := NewWithConfig(server.URL, "test-token", nil)
+	if _, err := client.GetPermalink("C123456", "1234567890.123456"); err == nil {
+		t.Fatal("expected an error for a not-OK response, got nil")
+	}
+}
