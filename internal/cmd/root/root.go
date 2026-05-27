@@ -89,8 +89,8 @@ config.yml so users on headless / non-default platforms can opt in.`,
 //
 // An invalid --backend errors here with the source prefix; an invalid
 // keyring.backend in config.yml only errors on the first credential
-// access (e.g. `slck me`) and `slck config show` surfaces the value
-// verbatim for discoverability.
+// access (including `slck config show`, which opens the store
+// internally) with credstore's own knob-named attribution.
 func WireBackendSelection(cmd *cobra.Command) error {
 	flag := cmd.Flag(credstore.BackendFlagName)
 	value := ""
