@@ -6,6 +6,8 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/open-cli-collective/cli-common/credstore"
+
 	"github.com/open-cli-collective/slack-chat-api/internal/client"
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/canvas"
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/channels"
@@ -19,6 +21,7 @@ import (
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/setcred"
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/users"
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/workspace"
+	"github.com/open-cli-collective/slack-chat-api/internal/keychain"
 	"github.com/open-cli-collective/slack-chat-api/internal/output"
 	"github.com/open-cli-collective/slack-chat-api/internal/version"
 )
@@ -26,6 +29,7 @@ import (
 var outputFormat string
 var asUser bool
 var asBot bool
+var backendFlag string
 
 var rootCmd = &cobra.Command{
 	Use:   "slck",
@@ -61,8 +65,40 @@ read at runtime (they are accepted only as ingress during setup).`,
 			client.SetAsUser(true)
 		}
 
-		return nil
+		return WireBackendSelection(cmd)
 	},
+}
+
+// WireBackendSelection validates the user-supplied --backend flag (eagerly,
+// at PersistentPreRunE time so `slck me --backend bogus` fails before
+// touching the keyring) and records it on the keychain package-level
+// override so openWith picks it up when it loads config. The cobra layer
+// does NOT load config — config-side validation deliberately happens later
+// at the openWith site, where the loaded keyring.backend value can be
+// attributed back to config.yml in the resulting error.
+//
+// An invalid --backend errors here with the source prefix; an invalid
+// keyring.backend in config.yml only errors on the first credential
+// access (e.g. `slck me`) and `slck config show` surfaces the value
+// verbatim for discoverability.
+func WireBackendSelection(cmd *cobra.Command) error {
+	flag := cmd.Flag(credstore.BackendFlagName)
+	value := ""
+	changed := false
+	if flag != nil {
+		value = flag.Value.String()
+		changed = flag.Changed
+	}
+
+	// Validate the flag value only; result discarded — actual binding
+	// happens in openWith via SetBackendFlagOverride. We pass an empty
+	// config-side so this validates the flag independently of config.
+	if err := credstore.BindBackendFlag(&credstore.Options{}, value, changed, ""); err != nil {
+		return fmt.Errorf("--%s: %w", credstore.BackendFlagName, err)
+	}
+
+	keychain.SetBackendFlagOverride(value, changed)
+	return nil
 }
 
 // Command returns the fully-configured root command (persistent --output
@@ -85,6 +121,7 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&output.NoColor, "no-color", false, "Disable colored output")
 	rootCmd.PersistentFlags().BoolVar(&asUser, "as-user", false, "Use user token")
 	rootCmd.PersistentFlags().BoolVar(&asBot, "as-bot", false, "Use bot token")
+	rootCmd.PersistentFlags().StringVar(&backendFlag, credstore.BackendFlagName, "", credstore.BackendFlagUsage())
 
 	// Set custom version template to include commit and build date
 	rootCmd.SetVersionTemplate("slck " + version.Info() + "\n")

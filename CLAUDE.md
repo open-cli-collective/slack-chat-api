@@ -119,7 +119,7 @@ The `internal/client` package wraps the Slack API:
 - **Token not found**: Run `slck init` or `slck set-credential --key bot_token --stdin`. Environment variables are NOT read at runtime (only as setup ingress, e.g. `init --bot-token-from-env`).
 - **Permission denied**: Check bot token scopes in Slack app settings
 - **Lint failures**: Run `make lint` locally before pushing
-- **golangci-lint version**: CI uses v2.0.2 with v2 config format
+- **golangci-lint version**: CI uses v2.12.2 with v2 config format (Go 1.26)
 
 ## Credentials
 
@@ -129,6 +129,22 @@ package is a credstore adapter (no `security` shell-out, no plaintext file).
 Non-secret config (`credential_ref`, `workspace`, `keyring.backend`) lives in
 `~/.config/slack-chat-api/config.yml`. Ingress is only `slck init` /
 `slck set-credential` (stdin or `--from-env`); never a flag/positional value.
+
+**Backend selection** uses three user-configurable knobs that fall back to
+auto-detect, in precedence order:
+
+1. `--backend <name>` persistent flag (wired in `internal/cmd/root/root.go`
+   `WireBackendSelection`, parsed eagerly at `PersistentPreRunE` so an invalid
+   value fails before opening the keyring)
+2. `SLACK_CHAT_API_KEYRING_BACKEND=<name>` env var (read by credstore directly)
+3. `keyring.backend: <name>` in `config.yml` (validated at `openWith` time)
+4. OS default
+
+Supported names: `keychain`, `wincred`, `secret-service`, `file`, `memory`.
+The `slck config show` command surfaces the resolved backend, its source
+(explicit / env / config / auto), and the `keyring.backend` value verbatim
+for diagnostics. Invalid `keyring.backend` surfaces on first credential
+access, not at config load — `slck config show` is the discovery surface.
 
 ## Dependencies
 

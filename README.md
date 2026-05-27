@@ -136,10 +136,22 @@ library:
 |----------|-------------------|
 | macOS | Keychain |
 | Windows | Credential Manager |
-| Linux | Secret Service (D-Bus); fails closed if a working keyring is locked. Encrypted-file backend only when there is no keyring at all, or by explicit opt-in (`keyring.backend: file` in `config.yml`). |
+| Linux | Secret Service (D-Bus); fails closed if a working keyring is locked. Encrypted-file backend only when there is no keyring at all, or by explicit opt-in via `--backend file`, `SLACK_CHAT_API_KEYRING_BACKEND=file`, or `keyring.backend: file` in `config.yml`. |
 
 Tokens are **never** written to a plaintext file. Non-secret config
-(`credential_ref`, `workspace`) lives in `~/.config/slack-chat-api/config.yml`.
+(`credential_ref`, `workspace`, `keyring.backend`) lives in `~/.config/slack-chat-api/config.yml`.
+
+The backend can be selected by three user-configurable knobs that fall back
+to auto-detect, in precedence order:
+
+1. `--backend <name>` persistent flag (highest)
+2. `SLACK_CHAT_API_KEYRING_BACKEND=<name>` environment variable
+3. `keyring.backend: <name>` in `config.yml`
+4. OS default (auto)
+
+Supported names: `keychain`, `wincred`, `secret-service`, `file`, `memory`.
+`slck config show` reports the selected backend, its source, and the
+`keyring.backend` value from `config.yml` when set.
 
 ### Credential Resolution
 
@@ -839,7 +851,7 @@ Commands have convenient aliases:
 | Variable | Description |
 |----------|-------------|
 | `SLCK_AS_USER` | Set to `true` or `1` to default to user token instead of bot token |
-| `SLACK_CHAT_API_KEYRING_BACKEND` | Force the keyring backend (e.g. `file`) — non-secret selector (§1.4) |
+| `SLACK_CHAT_API_KEYRING_BACKEND` | Select the keyring backend. Accepts `keychain`, `wincred`, `secret-service`, `file`, `memory`. Precedence: `--backend` flag > this env var > `keyring.backend` in `config.yml` > OS auto-detect (§1.4) |
 | `SLACK_CHAT_API_KEYRING_PASSPHRASE` | Passphrase for the encrypted-file backend (the one runtime secret-env exception, §1.4) |
 | `NO_COLOR` | Disable colored output when set |
 | `XDG_CONFIG_HOME` | Custom config directory (default: `~/.config`) |

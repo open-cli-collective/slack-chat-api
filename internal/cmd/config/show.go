@@ -32,6 +32,7 @@ type showStatus struct {
 	Ref              string `json:"credential_ref"`
 	Backend          string `json:"backend"`
 	BackendSource    string `json:"backend_source"`
+	KeyringBackend   string `json:"keyring_backend,omitempty"`
 	PassphraseSource string `json:"passphrase_source,omitempty"`
 	Workspace        string `json:"workspace,omitempty"`
 	BotToken         bool   `json:"bot_token_present"`
@@ -55,12 +56,13 @@ func runShow(_ *showOptions) error {
 
 	backend, src := st.Backend()
 	status := showStatus{
-		Ref:           st.Ref(),
-		Backend:       string(backend),
-		BackendSource: string(src),
-		Workspace:     cfg.Workspace,
-		BotToken:      st.HasBotToken(),
-		UserToken:     st.HasUserToken(),
+		Ref:            st.Ref(),
+		Backend:        string(backend),
+		BackendSource:  string(src),
+		KeyringBackend: cfg.Keyring.Backend,
+		Workspace:      cfg.Workspace,
+		BotToken:       st.HasBotToken(),
+		UserToken:      st.HasUserToken(),
 	}
 	if backend == credstore.BackendFile {
 		svc, _, _ := credstore.ParseRef(st.Ref())
@@ -73,6 +75,9 @@ func runShow(_ *showOptions) error {
 
 	output.Printf("Credential ref: %s\n", status.Ref)
 	output.Printf("Backend:        %s (%s)\n", status.Backend, status.BackendSource)
+	if status.KeyringBackend != "" {
+		output.Printf("keyring.backend: %s (config.yml)\n", status.KeyringBackend)
+	}
 	if status.PassphraseSource != "" {
 		output.Printf("Passphrase:     %s\n", status.PassphraseSource)
 	}

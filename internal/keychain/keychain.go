@@ -99,15 +99,13 @@ func openWith(cfg *config.Config, overwrite, runMigration bool) (*Store, error) 
 	}
 
 	opts := &credstore.Options{AllowedKeys: allowedKeys}
-	switch b := strings.TrimSpace(cfg.Keyring.Backend); b {
-	case "":
-		// Auto-select per §1.4 (credstore decides; fail-closed on Linux).
-	case "file":
-		opts.ConfigBackend = credstore.BackendFile
-	default:
-		// Fail closed: an unrecognized backend must not silently degrade
-		// to auto-selection and store credentials somewhere unintended.
-		return nil, fmt.Errorf("invalid keyring.backend %q in config (only \"file\" is supported)", b)
+	flagValue, flagSet := GetBackendFlagOverride()
+	if err := credstore.BindBackendFlag(opts, flagValue, flagSet, cfg.Keyring.Backend); err != nil {
+		source := "--" + credstore.BackendFlagName
+		if !flagSet {
+			source = "keyring.backend"
+		}
+		return nil, fmt.Errorf("%s: %w", source, err)
 	}
 	opts.FilePassphrase = passphraseFunc(service)
 
