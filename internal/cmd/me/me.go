@@ -1,6 +1,8 @@
 package me
 
 import (
+	"errors"
+
 	"github.com/spf13/cobra"
 
 	"github.com/open-cli-collective/slack-chat-api/internal/client"
@@ -99,9 +101,7 @@ func runMe(opts *meOptions, botClient *client.Client, userClient *client.Client)
 
 	// Check if any token worked
 	if result.Bot == nil && result.User == nil {
-		output.Println("No valid tokens configured.")
-		output.Println("Run 'slck init' to configure authentication.")
-		return nil
+		return errors.New("no bot or user token authenticated; run 'slck init' to configure authentication")
 	}
 
 	if output.IsJSON() {

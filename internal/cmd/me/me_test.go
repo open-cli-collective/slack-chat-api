@@ -100,10 +100,14 @@ func TestRunMe_NoTokens(t *testing.T) {
 
 	// Pass nil clients to trigger token lookup
 	err := runMe(opts, nil, nil)
-	require.NoError(t, err)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no bot or user token authenticated")
 }
 
 func TestRunMe_AuthFailed(t *testing.T) {
+	// Hermetic empty keyring so the nil userClient doesn't pick up real credentials.
+	testutil.Setup(t)
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{
@@ -116,9 +120,22 @@ func TestRunMe_AuthFailed(t *testing.T) {
 	botClient := client.NewWithConfig(server.URL, "bad-token", nil)
 	opts := &meOptions{}
 
-	// Auth fails, but function should handle gracefully
 	err := runMe(opts, botClient, nil)
-	require.NoError(t, err)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no bot or user token authenticated")
+}
+
+func TestNewCmd_NoTokens_ReturnsError(t *testing.T) {
+	testutil.Setup(t)
+
+	cmd := NewCmd()
+	cmd.SetArgs([]string{})
+	cmd.SilenceUsage = true
+	cmd.SilenceErrors = true
+
+	err := cmd.Execute()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no bot or user token authenticated")
 }
 
 func TestRunMe_BotWithoutBotID(t *testing.T) {
