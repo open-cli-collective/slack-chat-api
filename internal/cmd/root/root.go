@@ -29,6 +29,12 @@ import (
 var outputFormat string
 var asUser bool
 var asBot bool
+
+// backendFlag is the pflag storage anchor for --backend. It is
+// intentionally not read directly: WireBackendSelection consults the
+// flag via cmd.Flag(...) so it can also observe the Changed bit. Do
+// NOT replace those lookups with `if backendFlag != ""` — an explicit
+// empty --backend ("") is distinct from "no flag supplied".
 var backendFlag string
 
 var rootCmd = &cobra.Command{

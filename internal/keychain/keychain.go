@@ -105,11 +105,12 @@ func openWith(cfg *config.Config, overwrite, runMigration bool) (*Store, error) 
 	opts := &credstore.Options{AllowedKeys: allowedKeys}
 	flagValue, flagSet := GetBackendFlagOverride()
 	if err := credstore.BindBackendFlag(opts, flagValue, flagSet, cfg.Keyring.Backend); err != nil {
-		source := "--" + credstore.BackendFlagName
-		if !flagSet {
-			source = "keyring.backend"
-		}
-		return nil, fmt.Errorf("%s: %w", source, err)
+		// BindBackendFlag only validates the flag value; an invalid
+		// keyring.backend in config.yml or SLACK_CHAT_API_KEYRING_BACKEND
+		// surfaces inside credstore.Open below with credstore's own
+		// (knob-named) attribution. So an error here unambiguously means
+		// --backend was passed with a bogus value.
+		return nil, fmt.Errorf("--%s: %w", credstore.BackendFlagName, err)
 	}
 	opts.FilePassphrase = passphraseFunc(service)
 
