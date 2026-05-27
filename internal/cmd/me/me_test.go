@@ -151,6 +151,30 @@ func TestRunMe_AuthFailed(t *testing.T) {
 	assert.Contains(t, err.Error(), "no bot or user token authenticated")
 }
 
+func TestRunMe_BothClientsAuthFailed(t *testing.T) {
+	// Both clients are non-nil and both auth.test calls return invalid_auth.
+	// Distinct from the *_BotNil / *_AuthFailed variants — exercises the
+	// path through both AuthTest calls before the both-nil check.
+	testutil.Setup(t)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"ok":    false,
+			"error": "invalid_auth",
+		})
+	}))
+	defer server.Close()
+
+	botClient := client.NewWithConfig(server.URL, "bad-bot-token", nil)
+	userClient := client.NewWithConfig(server.URL, "bad-user-token", nil)
+	opts := &meOptions{}
+
+	err := runMe(opts, botClient, userClient)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no bot or user token authenticated")
+}
+
 func TestNewCmd_NoTokens_ReturnsError(t *testing.T) {
 	testutil.Setup(t)
 
