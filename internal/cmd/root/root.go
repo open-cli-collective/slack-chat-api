@@ -43,8 +43,12 @@ Configure credentials with:
   slck init
   slck set-credential --key bot_token --stdin   (e.g. via 'op read | ...')
 
-Credentials are stored in the OS keyring; environment variables are not
-read at runtime (they are accepted only as ingress during setup).`,
+Credentials are stored in the OS keyring; secret material (tokens) is
+never read from environment variables or config files at runtime — env
+vars are accepted only as ingress during setup. Non-secret backend
+routing (the keyring backend selector) is the exception: it is taken
+from --backend, SLACK_CHAT_API_KEYRING_BACKEND, or keyring.backend in
+config.yml so users on headless / non-default platforms can opt in.`,
 	Version: version.Version,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		// Parse and validate output format

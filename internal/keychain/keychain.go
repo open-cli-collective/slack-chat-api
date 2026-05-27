@@ -6,10 +6,14 @@
 // The name is retained only to avoid churning every importer during the
 // Phase B pilot (Open CLI Collective Secret-Handling Standard §2.4).
 //
-// All runtime credential resolution goes through here and reads the OS
-// keyring only — never an environment variable, never a config field
-// (§1.11 acceptance item 2). Environment variables carry secret material
-// into slck solely as *ingress* during `init` / `set-credential`.
+// All runtime credential resolution goes through here. Secret material
+// (tokens) is read from the OS keyring only — never an environment
+// variable, never a config field (§1.11 acceptance item 2). Environment
+// variables carry secret material into slck solely as *ingress* during
+// `init` / `set-credential`. The non-secret keyring backend *selector*
+// is the documented exception: --backend, SLACK_CHAT_API_KEYRING_BACKEND,
+// and keyring.backend in config.yml are routing inputs (which store to
+// open), not secret material.
 package keychain
 
 import (

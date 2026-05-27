@@ -141,10 +141,12 @@ auto-detect, in precedence order:
 4. OS default
 
 Supported names: `keychain`, `wincred`, `secret-service`, `file`, `memory`.
-The `slck config show` command surfaces the resolved backend, its source
-(explicit / env / config / auto), and the `keyring.backend` value verbatim
-for diagnostics. Invalid `keyring.backend` surfaces on first credential
-access, not at config load — `slck config show` is the discovery surface.
+When the configured backend opens cleanly, `slck config show` surfaces the
+resolved backend, its source (explicit / env / config / auto), and the
+`keyring.backend` value from config.yml verbatim. An invalid
+`keyring.backend` in config.yml errors at the first credential access
+(including `slck config show`, which opens the store internally) rather
+than at config load.
 
 ## Dependencies
 
