@@ -1,6 +1,8 @@
 package keychain
 
 import (
+	"errors"
+	"strings"
 	"testing"
 
 	"github.com/open-cli-collective/cli-common/credstore"
@@ -63,5 +65,59 @@ func TestOpenWith_FlagOverridesConfig(t *testing.T) {
 	}
 	if src != credstore.SourceExplicit {
 		t.Errorf("source = %q, want %q", src, credstore.SourceExplicit)
+	}
+}
+
+// TestOpenWith_InvalidConfigBackend_FailsClosed drives an invalid
+// keyring.backend value through openWith end-to-end. Because
+// credstore.BindBackendFlag deliberately does NOT validate the config
+// value (deferred validation per the ticket-3 architectural contract),
+// the failure surfaces at the credstore.Open call site. credstore's
+// own error text names the config knob ("config keyring.backend") so
+// the user has an actionable selector to fix without us double-prefixing.
+func TestOpenWith_InvalidConfigBackend_FailsClosed(t *testing.T) {
+	testutil.Setup(t)
+	t.Setenv("SLACK_CHAT_API_KEYRING_BACKEND", "")
+	SetBackendFlagOverride("", false)
+	t.Cleanup(func() { SetBackendFlagOverride("", false) })
+
+	cfg := &appconfig.Config{
+		CredentialRef: appconfig.DefaultCredentialRef,
+		Keyring:       appconfig.KeyringConfig{Backend: "bogus"},
+	}
+	_, err := openWith(cfg, false, false)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !errors.Is(err, credstore.ErrBackendNotImplemented) {
+		t.Errorf("errors.Is(_, ErrBackendNotImplemented) = false; err=%v", err)
+	}
+	if !strings.Contains(err.Error(), "keyring.backend") {
+		t.Errorf("error should name the config knob ('keyring.backend'); got %q", err.Error())
+	}
+	if !strings.Contains(err.Error(), "bogus") {
+		t.Errorf("error should name the bad value; got %q", err.Error())
+	}
+}
+
+// TestOpenWith_InvalidFlagBackend_AttributesToFlag drives a bogus
+// --backend value through openWith via the package override and asserts
+// the error is attributed to --backend, not keyring.backend.
+func TestOpenWith_InvalidFlagBackend_AttributesToFlag(t *testing.T) {
+	testutil.Setup(t)
+	t.Setenv("SLACK_CHAT_API_KEYRING_BACKEND", "")
+	SetBackendFlagOverride("bogus", true)
+	t.Cleanup(func() { SetBackendFlagOverride("", false) })
+
+	cfg := &appconfig.Config{CredentialRef: appconfig.DefaultCredentialRef}
+	_, err := openWith(cfg, false, false)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !errors.Is(err, credstore.ErrBackendNotImplemented) {
+		t.Errorf("errors.Is(_, ErrBackendNotImplemented) = false; err=%v", err)
+	}
+	if !strings.HasPrefix(err.Error(), "--"+credstore.BackendFlagName+":") {
+		t.Errorf("error should be attributed to --%s; got %q", credstore.BackendFlagName, err.Error())
 	}
 }
