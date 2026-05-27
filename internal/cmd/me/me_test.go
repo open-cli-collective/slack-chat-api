@@ -14,6 +14,8 @@ import (
 )
 
 func TestRunMe_BotTokenOnly(t *testing.T) {
+	testutil.Setup(t)
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/auth.test", r.URL.Path)
 		w.Header().Set("Content-Type", "application/json")
@@ -31,12 +33,14 @@ func TestRunMe_BotTokenOnly(t *testing.T) {
 	botClient := client.NewWithConfig(server.URL, "xoxb-test", nil)
 	opts := &meOptions{}
 
-	// Pass bot client, nil for user client
+	// Pass bot client, nil for user client (hermetic — no real user token can leak in)
 	err := runMe(opts, botClient, nil)
 	require.NoError(t, err)
 }
 
 func TestRunMe_UserTokenOnly(t *testing.T) {
+	testutil.Setup(t)
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/auth.test", r.URL.Path)
 		w.Header().Set("Content-Type", "application/json")
@@ -53,9 +57,31 @@ func TestRunMe_UserTokenOnly(t *testing.T) {
 	userClient := client.NewWithConfig(server.URL, "xoxp-test", nil)
 	opts := &meOptions{}
 
-	// Pass nil for bot client, user client provided
+	// Pass nil for bot client (hermetic — no real bot token can leak in), user client provided
 	err := runMe(opts, nil, userClient)
 	require.NoError(t, err)
+}
+
+func TestRunMe_UserAuthFailedBotNil(t *testing.T) {
+	// Symmetric to TestRunMe_AuthFailed: user token returns invalid_auth,
+	// bot client is nil with a hermetic empty keyring.
+	testutil.Setup(t)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"ok":    false,
+			"error": "invalid_auth",
+		})
+	}))
+	defer server.Close()
+
+	userClient := client.NewWithConfig(server.URL, "bad-user-token", nil)
+	opts := &meOptions{}
+
+	err := runMe(opts, nil, userClient)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no bot or user token authenticated")
 }
 
 func TestRunMe_BothTokens(t *testing.T) {
