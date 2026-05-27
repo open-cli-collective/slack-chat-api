@@ -6,10 +6,14 @@
 // The name is retained only to avoid churning every importer during the
 // Phase B pilot (Open CLI Collective Secret-Handling Standard §2.4).
 //
-// All runtime credential resolution goes through here and reads the OS
-// keyring only — never an environment variable, never a config field
-// (§1.11 acceptance item 2). Environment variables carry secret material
-// into slck solely as *ingress* during `init` / `set-credential`.
+// All runtime credential resolution goes through here. Secret material
+// (tokens) is read from the OS keyring only — never an environment
+// variable, never a config field (§1.11 acceptance item 2). Environment
+// variables carry secret material into slck solely as *ingress* during
+// `init` / `set-credential`. The non-secret keyring backend *selector*
+// is the documented exception: --backend, SLACK_CHAT_API_KEYRING_BACKEND,
+// and keyring.backend in config.yml are routing inputs (which store to
+// open), not secret material.
 package keychain
 
 import (
@@ -99,15 +103,14 @@ func openWith(cfg *config.Config, overwrite, runMigration bool) (*Store, error) 
 	}
 
 	opts := &credstore.Options{AllowedKeys: allowedKeys}
-	switch b := strings.TrimSpace(cfg.Keyring.Backend); b {
-	case "":
-		// Auto-select per §1.4 (credstore decides; fail-closed on Linux).
-	case "file":
-		opts.ConfigBackend = credstore.BackendFile
-	default:
-		// Fail closed: an unrecognized backend must not silently degrade
-		// to auto-selection and store credentials somewhere unintended.
-		return nil, fmt.Errorf("invalid keyring.backend %q in config (only \"file\" is supported)", b)
+	flagValue, flagSet := GetBackendFlagOverride()
+	if err := credstore.BindBackendFlag(opts, flagValue, flagSet, cfg.Keyring.Backend); err != nil {
+		// BindBackendFlag only validates the flag value; an invalid
+		// keyring.backend in config.yml or SLACK_CHAT_API_KEYRING_BACKEND
+		// surfaces inside credstore.Open below with credstore's own
+		// (knob-named) attribution. So an error here unambiguously means
+		// --backend was passed with a bogus value.
+		return nil, fmt.Errorf("--%s: %w", credstore.BackendFlagName, err)
 	}
 	opts.FilePassphrase = passphraseFunc(service)
 
