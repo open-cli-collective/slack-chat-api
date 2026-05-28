@@ -117,7 +117,7 @@ These tests don't modify anything. Safe to run anytime.
 | Step | Command | Expected |
 |------|---------|----------|
 | 1 | `slck workspace info` | Shows workspace ID, name, domain |
-| 2 | `slck workspace info -o json` | ~~~~Valid JSON output~~ (#173 removed) — errors: invalid output format ~~ (#173 removed) — errors: invalid output format |
+| 2 | `slck workspace info -o json` | ~~Valid JSON output~~ (#173 removed) — errors: invalid output format |
 | 3 | `slck workspace info -o table` | Formatted table output |
 
 ### 2.2 Users
@@ -126,7 +126,7 @@ These tests don't modify anything. Safe to run anytime.
 |------|---------|----------|
 | 1 | `slck users list` | Table with ID, USERNAME, REAL NAME |
 | 2 | `slck users list --limit 3` | Exactly 3 users |
-| 3 | `slck users list -o json` | ~~~~Valid JSON output~~ (#173 removed) — errors: invalid output format ~~ (#173 removed) — errors: invalid output format |
+| 3 | `slck users list -o json` | ~~Valid JSON output~~ (#173 removed) — errors: invalid output format |
 | 4 | `slck users get $TEST_USER_ID` | User details (ID, name, email, status) |
 | 5 | `slck users get $TEST_USER_ID -o json` | ~~Full user object with nested profile ~~ (#173 removed) — errors: invalid output format |
 | 6 | `slck users get UINVALID999` | Error: `user_not_found` |
@@ -139,7 +139,7 @@ These tests don't modify anything. Safe to run anytime.
 | 2 | `slck channels list --limit 5` | Exactly 5 channels |
 | 3 | `slck channels list --types public_channel` | Only public channels |
 | 4 | `slck channels list --exclude-archived=false` | Includes archived channels |
-| 5 | `slck channels list -o json` | ~~~~Valid JSON output~~ (#173 removed) — errors: invalid output format ~~ (#173 removed) — errors: invalid output format |
+| 5 | `slck channels list -o json` | ~~Valid JSON output~~ (#173 removed) — errors: invalid output format |
 | 6 | `slck channels get $TEST_CHANNEL_ID` | Channel details (ID, name, topic, purpose, members) |
 | 7 | `slck channels get $TEST_CHANNEL_ID -o json` | ~~Full channel object ~~ (#173 removed) — errors: invalid output format |
 | 8 | `slck channels get CINVALID999` | Error: `channel_not_found` |
@@ -150,7 +150,7 @@ These tests don't modify anything. Safe to run anytime.
 |------|---------|----------|
 | 1 | `slck messages history $TEST_CHANNEL_ID` | Table with timestamp, user, text |
 | 2 | `slck messages history $TEST_CHANNEL_ID --limit 5` | Exactly 5 messages |
-| 3 | `slck messages history $TEST_CHANNEL_ID -o json` | ~~~~Valid JSON output~~ (#173 removed) — errors: invalid output format ~~ (#173 removed) — errors: invalid output format |
+| 3 | `slck messages history $TEST_CHANNEL_ID -o json` | ~~Valid JSON output~~ (#173 removed) — errors: invalid output format |
 
 ### 2.5 Output Formats
 
@@ -269,7 +269,7 @@ First, create a message with a unique identifier that we can search for:
 | Step | Command | Expected |
 |------|---------|----------|
 | 1 | `slck search messages "$SEARCH_ID"` | Shows the test message with channel, user, timestamp |
-| 2 | `slck search messages "$SEARCH_ID" -o json` | ~~~~Valid JSON output~~ (#173 removed) — errors: invalid output format ~~ (#173 removed) — errors: invalid output format |
+| 2 | `slck search messages "$SEARCH_ID" -o json` | ~~Valid JSON output~~ (#173 removed) — errors: invalid output format |
 | 3 | `slck search messages "$SEARCH_ID" -o table` | Table format output |
 | 4 | `slck search messages "in:#$TEST_CHANNEL_NAME $SEARCH_ID"` | Same message (filtered by channel) |
 
@@ -294,7 +294,7 @@ First, create a message with a unique identifier that we can search for:
 | Step | Command | Expected |
 |------|---------|----------|
 | 1 | `slck search files "document"` | Lists matching files (if any exist) |
-| 2 | `slck search files "document" -o json` | ~~~~Valid JSON output~~ (#173 removed) — errors: invalid output format ~~ (#173 removed) — errors: invalid output format |
+| 2 | `slck search files "document" -o json` | ~~Valid JSON output~~ (#173 removed) — errors: invalid output format |
 
 ### 3B.6 Search All
 
@@ -326,7 +326,7 @@ First, create a message with a unique identifier that we can search for:
 | Step | Command | Expected |
 |------|---------|----------|
 | 1 | `slck users search "test"` | Lists users matching "test" (or "No users found") |
-| 2 | `slck users search "test" -o json` | ~~~~Valid JSON output~~ (#173 removed) — errors: invalid output format ~~ (#173 removed) — errors: invalid output format |
+| 2 | `slck users search "test" -o json` | ~~Valid JSON output~~ (#173 removed) — errors: invalid output format |
 | 3 | `slck users search "nonexistent12345xyz"` | "No users found" |
 | 4 | `slck users search "$TEST_USERNAME" --field name` | Matches by username only |
 | 5 | `slck users search "test" --field email` | Matches by email only |
@@ -557,7 +557,7 @@ These are read-only tests with no side effects.
 |------|---------|----------|
 | 1 | `slck emoji list` | Lists custom emoji names (or "No custom emoji found") |
 | 2 | `slck emoji list --include-aliases` | Includes alias entries (prefixed with `alias:` in JSON) |
-| 3 | `slck emoji list -o json` | ~~~~Valid JSON output~~ (#173 removed) — errors: invalid output format ~~ (#173 removed) — errors: invalid output format |
+| 3 | `slck emoji list -o json` | ~~Valid JSON output~~ (#173 removed) — errors: invalid output format |
 
 ### 8.2 Files Download
 

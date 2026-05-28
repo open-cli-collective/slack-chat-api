@@ -1990,7 +1990,7 @@ func TestRunThread_SectionBlockRendersInBody(t *testing.T) {
 
 // TestRunHistory_SectionBlockRendersInTextColumn is the messages-side
 // regression for issue #143: a non-rich_text section block must surface
-// its text in the rendered output, not just in --output json.
+// its text in the rendered text-column output.
 func TestRunHistory_SectionBlockRendersInTextColumn(t *testing.T) {
 	statusLine := "Served Rian in #general · claude-sonnet-4-6"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
