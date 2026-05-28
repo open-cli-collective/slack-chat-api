@@ -1507,8 +1507,9 @@ func TestClient_GetPermalink_Error(t *testing.T) {
 }
 
 func TestMessage_SendResponseFields(t *testing.T) {
-	// A freshly-sent message carries the response-level channel + ok so
-	// `messages send -o json` is the documented {ok, channel, ts, …} shape.
+	// A freshly-sent message carries the response-level channel + ok so the
+	// in-memory shape matches Slack's documented {ok, channel, ts, …}
+	// envelope. The text printer reads these fields when rendering send output.
 	sent, err := json.Marshal(Message{TS: "123.456", Channel: "C1", OK: true})
 	if err != nil {
 		t.Fatalf("marshal: %v", err)

@@ -61,3 +61,22 @@ func TestRunShow_OmitsKeyringBackendWhenUnset(t *testing.T) {
 		t.Errorf("json show emitted keyring_backend when unset: %s", jsonOut)
 	}
 }
+
+// TestRunShow_JSONFlagOverridesGlobalOutput pins the documented
+// composition rule: when --json is set, the local carve-out takes
+// precedence over -o text/table. The envelope is the only output;
+// no human-readable lines leak alongside.
+func TestRunShow_JSONFlagOverridesGlobalOutput(t *testing.T) {
+	testutil.Setup(t)
+	out, err := captureOutput(t, func() error { return runShow(&showOptions{json: true}) })
+	require.NoError(t, err)
+	// The envelope should be valid JSON.
+	var st showStatus
+	if err := json.Unmarshal([]byte(out), &st); err != nil {
+		t.Fatalf("--json output is not valid JSON: %v\n%s", err, out)
+	}
+	// No human-readable "Credential ref:" / "Backend:" lines should appear.
+	if strings.Contains(out, "Credential ref:") || strings.Contains(out, "Backend:") {
+		t.Fatalf("--json leaked human-readable lines: %s", out)
+	}
+}

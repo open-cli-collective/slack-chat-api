@@ -22,8 +22,7 @@ Wraps Slack's chat.getPermalink, which returns the correct link for
 top-level messages, thread replies, and enterprise-grid workspaces —
 preferred over constructing an archive URL by hand.
 
-  slck messages permalink C1234567890 1234567890.123456
-  slck messages permalink C1234567890 1234567890.123456 -o json`,
+  slck messages permalink C1234567890 1234567890.123456`,
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runPermalink(args[0], args[1], opts, nil)

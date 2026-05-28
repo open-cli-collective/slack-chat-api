@@ -280,9 +280,10 @@ type Message struct {
 	Blocks      []Block      `json:"blocks,omitempty"`
 	Attachments []Attachment `json:"attachments,omitempty"`
 	Permalink   string       `json:"permalink,omitempty"`
-	// Response-level fields, set on a freshly-sent message so `messages
-	// send -o json` is the documented {ok, channel, ts, …} shape and
-	// downstream tooling can read the channel back (e.g. to delete it).
+	// Response-level fields, set on a freshly-sent message so the
+	// in-memory shape matches Slack's documented {ok, channel, ts, …}
+	// envelope and downstream tooling can read the channel back (e.g.
+	// to delete it).
 	Channel string `json:"channel,omitempty"`
 	OK      bool   `json:"ok,omitempty"`
 }

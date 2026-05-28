@@ -117,7 +117,7 @@ These tests don't modify anything. Safe to run anytime.
 | Step | Command | Expected |
 |------|---------|----------|
 | 1 | `slck workspace info` | Shows workspace ID, name, domain |
-| 2 | `slck workspace info -o json` | Valid JSON with `id`, `name`, `domain` |
+| 2 | `slck workspace info -o json` | ~~~~Valid JSON output~~ (#173 removed) — errors: invalid output format ~~ (#173 removed) — errors: invalid output format |
 | 3 | `slck workspace info -o table` | Formatted table output |
 
 ### 2.2 Users
@@ -126,9 +126,9 @@ These tests don't modify anything. Safe to run anytime.
 |------|---------|----------|
 | 1 | `slck users list` | Table with ID, USERNAME, REAL NAME |
 | 2 | `slck users list --limit 3` | Exactly 3 users |
-| 3 | `slck users list -o json` | Valid JSON array |
+| 3 | `slck users list -o json` | ~~~~Valid JSON output~~ (#173 removed) — errors: invalid output format ~~ (#173 removed) — errors: invalid output format |
 | 4 | `slck users get $TEST_USER_ID` | User details (ID, name, email, status) |
-| 5 | `slck users get $TEST_USER_ID -o json` | Full user object with nested profile |
+| 5 | `slck users get $TEST_USER_ID -o json` | ~~Full user object with nested profile ~~ (#173 removed) — errors: invalid output format |
 | 6 | `slck users get UINVALID999` | Error: `user_not_found` |
 
 ### 2.3 Channels
@@ -139,9 +139,9 @@ These tests don't modify anything. Safe to run anytime.
 | 2 | `slck channels list --limit 5` | Exactly 5 channels |
 | 3 | `slck channels list --types public_channel` | Only public channels |
 | 4 | `slck channels list --exclude-archived=false` | Includes archived channels |
-| 5 | `slck channels list -o json` | Valid JSON array |
+| 5 | `slck channels list -o json` | ~~~~Valid JSON output~~ (#173 removed) — errors: invalid output format ~~ (#173 removed) — errors: invalid output format |
 | 6 | `slck channels get $TEST_CHANNEL_ID` | Channel details (ID, name, topic, purpose, members) |
-| 7 | `slck channels get $TEST_CHANNEL_ID -o json` | Full channel object |
+| 7 | `slck channels get $TEST_CHANNEL_ID -o json` | ~~Full channel object ~~ (#173 removed) — errors: invalid output format |
 | 8 | `slck channels get CINVALID999` | Error: `channel_not_found` |
 
 ### 2.4 Message History
@@ -150,14 +150,14 @@ These tests don't modify anything. Safe to run anytime.
 |------|---------|----------|
 | 1 | `slck messages history $TEST_CHANNEL_ID` | Table with timestamp, user, text |
 | 2 | `slck messages history $TEST_CHANNEL_ID --limit 5` | Exactly 5 messages |
-| 3 | `slck messages history $TEST_CHANNEL_ID -o json` | Valid JSON array of messages |
+| 3 | `slck messages history $TEST_CHANNEL_ID -o json` | ~~~~Valid JSON output~~ (#173 removed) — errors: invalid output format ~~ (#173 removed) — errors: invalid output format |
 
 ### 2.5 Output Formats
 
 | Step | Command | Expected |
 |------|---------|----------|
 | 1 | `slck channels list -o text` | Same as default (human-readable) |
-| 2 | `slck channels list -o json \| jq '.[0].id'` | Works with jq |
+| 2 | `slck channels list -o json \| jq '.[0].id'` | ~~Works with jq ~~ (#173 removed) — errors: invalid output format |
 | 3 | `slck channels list --no-color` | No ANSI escape codes in output |
 
 ---
@@ -174,7 +174,7 @@ These tests create messages, then clean them up at the end.
 |------|---------|----------|---------|
 | 1 | `slck messages send $TEST_CHANNEL_ID "Integration test message"` | "Message sent (ts: X)" | **Save TS₁** |
 | 2 | `slck messages history $TEST_CHANNEL_ID --limit 1` | Shows your message |
-| 3 | `slck messages send $TEST_CHANNEL_ID "JSON test" -o json` | JSON with `ts` field | (verify only) |
+| 3 | `slck messages send $TEST_CHANNEL_ID "JSON test" -o json` | ~~JSON with `ts` field ~~ (#173 removed) — errors: invalid output format | (verify only) |
 | 4 | `slck messages send $TEST_CHANNEL_ID "Plain text" --simple` | Message without Block Kit formatting |
 | 5 | `slck messages send --channel $TEST_CHANNEL_ID "Channel flag test"` | "Message sent" (--channel flag alternative) |
 
@@ -204,7 +204,7 @@ Using **TS₁** from step 3.1:
 |------|---------|----------|---------|
 | 1 | `slck messages send $TEST_CHANNEL_ID "Thread reply" --thread <TS₁>` | "Message sent" as thread reply | **Save TS₂** |
 | 2 | `slck messages thread $TEST_CHANNEL_ID <TS₁>` | Shows parent + reply, full text (not truncated) |
-| 3 | `slck messages thread $TEST_CHANNEL_ID <TS₁> -o json` | JSON array of thread messages |
+| 3 | `slck messages thread $TEST_CHANNEL_ID <TS₁> -o json` | ~~JSON array of thread messages ~~ (#173 removed) — errors: invalid output format |
 | 4 | `slck messages thread $TEST_CHANNEL_ID <TS₁> --since <TS₁>` | Only replies after TS₁ (may exclude parent) |
 
 ### 3.5 Update Message
@@ -216,7 +216,7 @@ Using **TS₁** from step 3.1:
 | 1 | `slck messages update $TEST_CHANNEL_ID <TS₁> "Updated message text"` | "Message updated" |
 | 2 | `slck messages history $TEST_CHANNEL_ID --limit 1` | Shows updated text with `[edited]` suffix |
 | 3 | `slck messages thread $TEST_CHANNEL_ID <TS₁>` | Updated message shows `[edited]` suffix |
-| 4 | `slck messages thread $TEST_CHANNEL_ID <TS₁> -o json` | Updated message has `"edited"` object with `user` and `ts` |
+| 4 | `slck messages thread $TEST_CHANNEL_ID <TS₁> -o json` | ~~Updated message has `"edited"` object with `user` and `ts` ~~ (#173 removed) — errors: invalid output format |
 
 ### 3.6 Cleanup: Delete Messages
 
@@ -269,7 +269,7 @@ First, create a message with a unique identifier that we can search for:
 | Step | Command | Expected |
 |------|---------|----------|
 | 1 | `slck search messages "$SEARCH_ID"` | Shows the test message with channel, user, timestamp |
-| 2 | `slck search messages "$SEARCH_ID" -o json` | Valid JSON with `query`, `messages.matches[]`, `messages.paging` |
+| 2 | `slck search messages "$SEARCH_ID" -o json` | ~~~~Valid JSON output~~ (#173 removed) — errors: invalid output format ~~ (#173 removed) — errors: invalid output format |
 | 3 | `slck search messages "$SEARCH_ID" -o table` | Table format output |
 | 4 | `slck search messages "in:#$TEST_CHANNEL_NAME $SEARCH_ID"` | Same message (filtered by channel) |
 
@@ -294,14 +294,14 @@ First, create a message with a unique identifier that we can search for:
 | Step | Command | Expected |
 |------|---------|----------|
 | 1 | `slck search files "document"` | Lists matching files (if any exist) |
-| 2 | `slck search files "document" -o json` | Valid JSON with `files.matches[]` |
+| 2 | `slck search files "document" -o json` | ~~~~Valid JSON output~~ (#173 removed) — errors: invalid output format ~~ (#173 removed) — errors: invalid output format |
 
 ### 3B.6 Search All
 
 | Step | Command | Expected |
 |------|---------|----------|
 | 1 | `slck search all "$SEARCH_ID"` | Shows message result under "Messages" section |
-| 2 | `slck search all "$SEARCH_ID" -o json` | JSON with both `messages` and `files` objects |
+| 2 | `slck search all "$SEARCH_ID" -o json` | ~~JSON with both `messages` and `files` objects ~~ (#173 removed) — errors: invalid output format |
 | 3 | `slck search all "test" --count 10` | Shows both messages and files (if any) |
 
 ### 3B.7 Search Error Cases
@@ -326,7 +326,7 @@ First, create a message with a unique identifier that we can search for:
 | Step | Command | Expected |
 |------|---------|----------|
 | 1 | `slck users search "test"` | Lists users matching "test" (or "No users found") |
-| 2 | `slck users search "test" -o json` | Valid JSON array |
+| 2 | `slck users search "test" -o json` | ~~~~Valid JSON output~~ (#173 removed) — errors: invalid output format ~~ (#173 removed) — errors: invalid output format |
 | 3 | `slck users search "nonexistent12345xyz"` | "No users found" |
 | 4 | `slck users search "$TEST_USERNAME" --field name` | Matches by username only |
 | 5 | `slck users search "test" --field email` | Matches by email only |
@@ -363,7 +363,7 @@ First, create a message with a unique identifier that we can search for:
 |------|---------|----------|
 | 1 | `slck search messages "$SEARCH_ID" --in "$TEST_CHANNEL_NAME" --scope public` | Combined scope + channel filter |
 | 2 | `slck search messages "test" --from "@$TEST_USERNAME" --after "2024-01-01"` | Combined from + date filter |
-| 3 | `slck search messages "test" -o json --in "$TEST_CHANNEL_NAME"` | JSON output with filters |
+| 3 | `slck search messages "test" -o json --in "$TEST_CHANNEL_NAME"` | ~~JSON output with filters ~~ (#173 removed) — errors: invalid output format |
 | 4 | `slck search all "test" --scope public --in "$TEST_CHANNEL_NAME"` | Combined filters on search all |
 
 ### 3B.13 Query Builder Error Cases
@@ -392,7 +392,7 @@ These tests modify channel metadata but restore original values afterward.
 
 | Step | Command | Capture |
 |------|---------|---------|
-| 1 | `slck channels get $TEST_CHANNEL_ID -o json` | **Save original TOPIC and PURPOSE** |
+| 1 | `slck channels get $TEST_CHANNEL_ID -o json` | ~~**Save original TOPIC and PURPOSE** ~~ (#173 removed) — errors: invalid output format |
 
 ### 4.2 Modify Topic & Purpose
 
@@ -557,7 +557,7 @@ These are read-only tests with no side effects.
 |------|---------|----------|
 | 1 | `slck emoji list` | Lists custom emoji names (or "No custom emoji found") |
 | 2 | `slck emoji list --include-aliases` | Includes alias entries (prefixed with `alias:` in JSON) |
-| 3 | `slck emoji list -o json` | Valid JSON map of emoji name → URL |
+| 3 | `slck emoji list -o json` | ~~~~Valid JSON output~~ (#173 removed) — errors: invalid output format ~~ (#173 removed) — errors: invalid output format |
 
 ### 8.2 Files Download
 
@@ -567,7 +567,7 @@ These are read-only tests with no side effects.
 |------|---------|----------|
 | 1 | `slck files download <FILE_ID>` | "Downloaded <name> (<size> bytes) to <path>" |
 | 2 | `slck files download <FILE_ID> --output /tmp/test-download` | File saved to specified path |
-| 3 | `slck files download <FILE_ID> -o json` | JSON with file_id, name, size, path fields |
+| 3 | `slck files download <FILE_ID> -o json` | ~~JSON with file_id, name, size, path fields ~~ (#173 removed) — errors: invalid output format |
 
 ---
 
@@ -580,7 +580,7 @@ No additional scopes required (uses `auth.test` which works with any valid token
 | Step | Command | Expected |
 |------|---------|----------|
 | 1 | `slck me` | Shows Bot name/ID, Workspace name |
-| 2 | `slck me -o json` | JSON with bot, workspace fields |
+| 2 | `slck me -o json` | ~~JSON with bot, workspace fields ~~ (#173 removed) — errors: invalid output format |
 
 ---
 
@@ -595,7 +595,7 @@ These tests create, edit, and delete canvases. Cleanup is included.
 | Step | Command | Expected | Capture |
 |------|---------|----------|---------|
 | 1 | `slck canvas create --title "Test Canvas" --text "# Hello\n\nIntegration test"` | "Created canvas: F..." | **Save CANVAS_ID₁** |
-| 2 | `slck canvas create --title "Test Canvas" --text "# Hello" -o json` | JSON with `canvas_id` and `title` | (verify only) |
+| 2 | `slck canvas create --title "Test Canvas" --text "# Hello" -o json` | ~~JSON with `canvas_id` and `title` ~~ (#173 removed) — errors: invalid output format | (verify only) |
 
 ### 10.2 Create Canvas from File
 
@@ -616,7 +616,7 @@ Using **CANVAS_ID₁** from step 10.1:
 | Step | Command | Expected |
 |------|---------|----------|
 | 1 | `slck canvas edit <CANVAS_ID₁> --text "# Updated\n\nNew content"` | "Updated canvas: F..." |
-| 2 | `slck canvas edit <CANVAS_ID₁> --text "# Updated again" -o json` | JSON with `canvas_id` and `status: "updated"` |
+| 2 | `slck canvas edit <CANVAS_ID₁> --text "# Updated again" -o json` | ~~JSON with `canvas_id` and `status: "updated"` ~~ (#173 removed) — errors: invalid output format |
 
 ### 10.5 Error Cases
 

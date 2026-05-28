@@ -2,6 +2,7 @@ package root
 
 import (
 	"errors"
+	"io"
 	"strings"
 	"testing"
 
@@ -216,5 +217,55 @@ func TestRootSingleton_RejectsJSONOutput(t *testing.T) {
 		if !strings.Contains(err.Error(), "must be one of: text, table") {
 			t.Fatalf("-o %q error missing closed-set hint: %v", fmt, err)
 		}
+	}
+}
+
+// TestRootSingleton_RejectsJSON_EndToEnd is the end-to-end complement to
+// TestRootSingleton_RejectsJSONOutput — instead of mutating the global
+// outputFormat and calling PersistentPreRunE directly, this drives the
+// rootCmd through cobra Execute() with `channels list -o json` so the real
+// parse+prerun pipeline is exercised. Reproduces the user-visible failure
+// path that the PR claims as an invariant.
+func TestRootSingleton_RejectsJSON_EndToEnd(t *testing.T) {
+	resetState(t)
+	root := Command()
+
+	// Capture singleton state to restore after the test.
+	priorOutputFormat := outputFormat
+	priorAsUser := asUser
+	priorAsBot := asBot
+	priorArgs := root.Flags().Args()
+	var priorOut, priorErr io.Writer
+	if w := root.OutOrStdout(); w != nil {
+		priorOut = w
+	}
+	if w := root.ErrOrStderr(); w != nil {
+		priorErr = w
+	}
+	t.Cleanup(func() {
+		outputFormat = priorOutputFormat
+		asUser = priorAsUser
+		asBot = priorAsBot
+		root.SetArgs(priorArgs)
+		if priorOut != nil {
+			root.SetOut(priorOut)
+		}
+		if priorErr != nil {
+			root.SetErr(priorErr)
+		}
+	})
+
+	root.SetOut(io.Discard)
+	root.SetErr(io.Discard)
+	root.SetArgs([]string{"channels", "list", "-o", "json"})
+	root.SilenceErrors = true
+	root.SilenceUsage = true
+
+	err := root.Execute()
+	if err == nil {
+		t.Fatal("`channels list -o json` should be rejected, got nil error")
+	}
+	if !strings.Contains(err.Error(), "must be one of: text, table") {
+		t.Fatalf("expected closed-set hint, got: %v", err)
 	}
 }

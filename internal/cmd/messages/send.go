@@ -242,8 +242,8 @@ func runSend(channel, text string, opts *sendOptions, c *client.Client) error {
 		return client.WrapError("send message", err)
 	}
 	// SendMessage returns Slack's `message` object, which omits the
-	// response-level channel + ok. Set them so `-o json` is the documented
-	// {ok, channel, ts, …} shape and callers can read the channel back.
+	// response-level channel + ok. Set them so the in-memory shape matches
+	// the documented Slack response and callers can read the channel back.
 	msg.Channel = channelID
 	msg.OK = true
 

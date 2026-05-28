@@ -17,9 +17,10 @@ import (
 )
 
 // One-time legacy migration (§1.8 / §2.4). Reads any legacy credential
-// location that still exists, writes the new credstore bundle, surfaces the
-// signal (stderr for humans, _migration for JSON), then deletes the legacy
-// originals. Idempotent: once the originals are gone there is nothing to do
+// location that still exists, writes the new credstore bundle, emits a
+// stderr signal (the §1.8 JSON-splice sidecar was removed in #173 — see
+// the Phase 3 comment), then deletes the legacy originals. Idempotent:
+// once the originals are gone there is nothing to do
 // and no signal fires. Conflicts (legacy vs legacy, or legacy vs an existing
 // keyring value) fail loudly per §1.8 — all conflicts are detected before
 // any write or delete, and on conflict every legacy and keyring entry is
@@ -101,7 +102,7 @@ func migrateLegacyOverwrite(s *Store, cfg *config.Config, overwrite bool) error 
 // to write, the §1.8 signal, and the legacy originals to delete on success.
 type migrationPlan struct {
 	writes     map[string]string           // newKey -> value to SetBundle
-	changes    []credstore.MigrationChange // _migration block entries
+	changes    []credstore.MigrationChange // legacy entries moved this run (stderr-only since #173)
 	humanField map[string]string           // newKey -> legacyField (stderr)
 	cleanups   []func() error              // legacy deleters (post-write)
 	keys       []string                    // sorted newKeys (deterministic)
