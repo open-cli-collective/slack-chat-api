@@ -58,7 +58,7 @@ Commands live in `internal/cmd/<resource>/` directories. Each command should:
 
 1. Define an options struct for flags
 2. Use injectable client for testability
-3. Support `--output` flag via `output.IsJSON()`
+3. Render via `output.Table()` / `output.KeyValue()` / `output.Printf()` — text and table only. Per #173 (cli-common `docs/output-and-rendering.md` §2), do NOT add `--json` flags or `output.IsJSON()` branches to resource or mutation-success commands; JSON is reserved for control-plane carve-outs (see "Control-plane carve-outs" below).
 
 Example:
 
@@ -94,21 +94,16 @@ func runMy(opts *myOptions, c *client.Client) error {
 
 ### Output Formatting
 
-Always support both text and JSON output:
+Resource and mutation-success commands emit text or table only. Per #173, JSON is reserved for local control-plane carve-outs (today only `slck config show --json`). Examples:
 
 ```go
-if output.IsJSON() {
-    return output.PrintJSON(result)
-}
+// Detail view
 output.Printf("Result: %s\n", result.Name)
 ```
 
 For list commands, use `output.Table()`:
 
 ```go
-if output.IsJSON() {
-    return output.PrintJSON(items)
-}
 headers := []string{"ID", "Name"}
 rows := make([][]string, len(items))
 for i, item := range items {
@@ -116,6 +111,10 @@ for i, item := range items {
 }
 output.Table(headers, rows)
 ```
+
+### Control-plane carve-outs
+
+A new command qualifies as a control-plane carve-out (and may declare a local `--json` boolean flag) only if it (a) lives outside the resource-command packages and (b) emits a write confirmation envelope (`set-credential`-style) or diagnostic introspection of CLI state (`config show`-style) — not a Slack API resource. Carve-outs call `output.PrintJSON(envelope)` directly when `--json` is set; the global `-o text/table` is ignored under the local `--json`.
 
 ### Testing
 

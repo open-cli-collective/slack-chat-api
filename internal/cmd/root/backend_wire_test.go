@@ -189,3 +189,32 @@ func TestRootSingleton_PersistentPreRunE_WiresBackend(t *testing.T) {
 		t.Errorf("singleton PreRunE failed to wire backend: override = (%q, %v); want (\"memory\", true)", v, set)
 	}
 }
+
+// TestRootSingleton_RejectsJSONOutput pins the #173 closed-set policy at
+// the root layer: -o json on any resource subcommand fails fast in the
+// PersistentPreRunE via output.ParseFormat, before any subcommand Run.
+// Cleanup discipline matches TestRootSingleton_PersistentPreRunE_WiresBackend
+// (the rootCmd is a package-level singleton).
+func TestRootSingleton_RejectsJSONOutput(t *testing.T) {
+	resetState(t)
+	root := Command()
+	priorOutputFormat := outputFormat
+	priorAsUser := asUser
+	priorAsBot := asBot
+	t.Cleanup(func() {
+		outputFormat = priorOutputFormat
+		asUser = priorAsUser
+		asBot = priorAsBot
+	})
+
+	for _, fmt := range []string{"json", "yaml", "csv"} {
+		outputFormat = fmt
+		err := root.PersistentPreRunE(root, nil)
+		if err == nil {
+			t.Fatalf("-o %q should be rejected, got nil error", fmt)
+		}
+		if !strings.Contains(err.Error(), "must be one of: text, table") {
+			t.Fatalf("-o %q error missing closed-set hint: %v", fmt, err)
+		}
+	}
+}

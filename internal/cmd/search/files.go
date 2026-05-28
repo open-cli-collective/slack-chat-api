@@ -107,10 +107,6 @@ func runSearchFiles(query string, opts *filesOptions, c *client.Client) error {
 		return err
 	}
 
-	if output.IsJSON() {
-		return output.PrintJSON(result)
-	}
-
 	// Text/table output
 	if result.Files == nil || len(result.Files.Matches) == 0 {
 		output.Printf("No files found for \"%s\"\n", query)

@@ -258,10 +258,6 @@ func runSend(channel, text string, opts *sendOptions, c *client.Client) error {
 		}
 	}
 
-	if output.IsJSON() {
-		return output.PrintJSON(msg)
-	}
-
 	output.Printf("Message sent (ts: %s)\n", msg.TS)
 	if msg.Permalink != "" {
 		output.Printf("%s\n", msg.Permalink)

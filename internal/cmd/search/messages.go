@@ -115,10 +115,6 @@ func runSearchMessages(query string, opts *messagesOptions, c *client.Client) er
 		return err
 	}
 
-	if output.IsJSON() {
-		return output.PrintJSON(result)
-	}
-
 	// Text/table output
 	if result.Messages == nil || len(result.Messages.Matches) == 0 {
 		output.Printf("No messages found for \"%s\"\n", query)

@@ -94,32 +94,6 @@ func TestRunGet_InvalidRef(t *testing.T) {
 	assert.Contains(t, err.Error(), "could not resolve file ID")
 }
 
-func TestRunGet_JSONOutputRaw(t *testing.T) {
-	c, server := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{
-			"ok": true,
-			"file": map[string]interface{}{
-				"id": "F0ABC123", "name": "report.pdf", "title": "Q1", "filetype": "pdf", "size": 100,
-			},
-		})
-	})
-	defer server.Close()
-
-	origFmt := output.OutputFormat
-	output.OutputFormat = output.FormatJSON
-	defer func() { output.OutputFormat = origFmt }()
-
-	out := captureOutput(t, func() { require.NoError(t, runGet("F0ABC123", c)) })
-
-	var parsed map[string]interface{}
-	require.NoError(t, json.Unmarshal([]byte(out), &parsed))
-	// Raw upstream-shaped File. No synthetic ref/hint/download keys.
-	assert.Equal(t, "F0ABC123", parsed["id"])
-	assert.NotContains(t, parsed, "ref")
-	assert.NotContains(t, parsed, "download")
-	assert.NotContains(t, parsed, "hint")
-}
-
 func TestRunGet_NegativeSizeRendersZero(t *testing.T) {
 	c, server := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{

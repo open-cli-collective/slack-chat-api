@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	appconfig "github.com/open-cli-collective/slack-chat-api/internal/config"
-	"github.com/open-cli-collective/slack-chat-api/internal/output"
 	"github.com/open-cli-collective/slack-chat-api/internal/testutil"
 )
 
@@ -30,12 +29,9 @@ func TestRunShow_ReportsKeyringBackendSelector(t *testing.T) {
 		t.Errorf("text show missing selector line:\n%s", out)
 	}
 
-	// JSON output
-	priorFormat := output.OutputFormat
-	output.OutputFormat = output.FormatJSON
-	t.Cleanup(func() { output.OutputFormat = priorFormat })
-
-	jsonOut, err := captureOutput(t, func() error { return runShow(&showOptions{}) })
+	// JSON output via the local --json carve-out flag (post-#173 — the
+	// global -o json is gone; --json is the only JSON surface).
+	jsonOut, err := captureOutput(t, func() error { return runShow(&showOptions{json: true}) })
 	require.NoError(t, err)
 	var st showStatus
 	if err := json.Unmarshal([]byte(jsonOut), &st); err != nil {
@@ -59,11 +55,7 @@ func TestRunShow_OmitsKeyringBackendWhenUnset(t *testing.T) {
 		t.Errorf("text show emitted selector line when unset:\n%s", out)
 	}
 
-	priorFormat := output.OutputFormat
-	output.OutputFormat = output.FormatJSON
-	t.Cleanup(func() { output.OutputFormat = priorFormat })
-
-	jsonOut, err := captureOutput(t, func() error { return runShow(&showOptions{}) })
+	jsonOut, err := captureOutput(t, func() error { return runShow(&showOptions{json: true}) })
 	require.NoError(t, err)
 	if strings.Contains(jsonOut, `"keyring_backend"`) {
 		t.Errorf("json show emitted keyring_backend when unset: %s", jsonOut)

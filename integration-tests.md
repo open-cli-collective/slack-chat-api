@@ -2,6 +2,8 @@
 
 Manual integration tests for verifying slck against a live Slack workspace. Tests are organized from safe (read-only) to destructive, so you can stop at any section.
 
+> **#173 update:** Scenarios that exercise `-o json` / `--output json` on resource commands are obsolete — the resource JSON surface has been removed. They now error at the root with `invalid output format "json": must be one of: text, table`. Skip those rows. The surviving JSON surface is `slck config show --json` (control-plane envelope per cli-common §2 carve-out).
+
 > **Credential model (§1.11/§1.12):** slck stores credentials in the OS
 > keyring only. Ingress is `slck init` or `slck set-credential` (stdin /
 > `--from-env`) — never a positional/flag value. `slck config set-token` is

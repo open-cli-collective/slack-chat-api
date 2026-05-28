@@ -165,7 +165,7 @@ or `op read ... | slck set-credential --key bot_token --stdin`.
 > version (old macOS Keychain items under service `slck`/`slack-chat-api`, or
 > the legacy `~/.config/slack-chat-api/credentials` file) are moved into the
 > keyring automatically, once, then the originals are removed. A one-line
-> notice is printed to stderr (and a `_migration` block to JSON output).
+> notice is printed to stderr.
 
 ## Authentication
 
@@ -808,13 +808,11 @@ All commands support multiple output formats via the `--output` (or `-o`) flag:
 # Default text output
 slck channels list
 
-# JSON output (for scripting)
-slck channels list --output json
-slck users get U1234567890 -o json
-
 # Table output (aligned columns)
 slck channels list --output table
 ```
+
+**Breaking change (#173):** resource `-o json` has been removed. JSON is reserved for control-plane envelopes per cli-common `docs/output-and-rendering.md` §2. The surviving JSON surface is `slck config show --json` (diagnostic; emits the credential/backend status as a JSON envelope).
 
 ### Shell Completion
 

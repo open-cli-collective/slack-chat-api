@@ -95,14 +95,15 @@ func TestNoLeak_ConfigShowText(t *testing.T) {
 	assertNoLeak(t, "config show", out)
 }
 
+// TestNoLeak_ConfigShowJSON exercises the §2 carve-out: `slck config show
+// --json` is the only JSON surface in slck after #173. Drives the real
+// command with the local --json flag.
 func TestNoLeak_ConfigShowJSON(t *testing.T) {
 	testutil.Setup(t)
 	seed(t)
-	output.JSON = true
-	t.Cleanup(func() { output.JSON = false })
 	c := cfgcmd.NewCmd()
-	c.SetArgs([]string{"show"})
-	assertNoLeak(t, "config show -o json", captureAll(t, "", func() { _ = c.Execute() }))
+	c.SetArgs([]string{"show", "--json"})
+	assertNoLeak(t, "config show --json", captureAll(t, "", func() { _ = c.Execute() }))
 }
 
 func TestNoLeak_DeleteTokenAndClear(t *testing.T) {
@@ -156,28 +157,21 @@ func TestNoLeak_ConfigTest(t *testing.T) {
 // travels only in the Authorization header — assert it never reaches any
 // output channel (incl. error/verbose output).
 func TestNoLeak_APICommandClasses(t *testing.T) {
+	// #173 removed slck's resource-side JSON output; the only JSON surface
+	// is config show --json (covered by TestNoLeak_ConfigShowJSON). No
+	// json toggle here.
 	cases := []struct {
 		name string
 		cmd  func() *cobra.Command
 		args []string
-		json bool
 	}{
-		{"channels list", channels.NewCmd, []string{"list"}, false},
-		// JSON mode is toggled via output.JSON (the real IsJSON() path),
-		// NOT a `-o json` arg: -o is a ROOT persistent flag, so passing it
-		// to a bare subcommand errors during parsing and would make this a
-		// vacuous no-leak pass.
-		{"channels list (json)", channels.NewCmd, []string{"list"}, true},
-		{"messages history", messages.NewCmd, []string{"history", "C123"}, false},
+		{"channels list", channels.NewCmd, []string{"list"}},
+		{"messages history", messages.NewCmd, []string{"history", "C123"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			testutil.Setup(t)
 			seed(t)
-			if tc.json {
-				output.JSON = true
-				t.Cleanup(func() { output.JSON = false })
-			}
 			c := tc.cmd()
 			c.SetArgs(tc.args)
 			var execErr error

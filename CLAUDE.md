@@ -65,19 +65,20 @@ func runList(opts *listOptions, c *client.Client) error {
 
 ### Output Formatting
 
-Commands support `--output text|json|table` via the `internal/output` package:
+Resource and mutation-success commands emit text or table only. Per cli-common `docs/output-and-rendering.md` §2 (enforced by `output.ParseFormat`'s closed-set `{text, table}`), JSON is reserved for local control-plane carve-outs — today only `slck config show --json`. Do NOT add per-command `--json` flags or `output.IsJSON()` branches to new resource commands.
 
 ```go
-if output.IsJSON() {
-    return output.PrintJSON(data)
-}
+// Default + table path:
 output.Table(headers, rows)  // For list commands
 output.KeyValue("ID", item.ID)  // For detail views
+
+// Control-plane carve-out (config show pattern):
+// local --json flag → call output.PrintJSON(envelope) directly.
 ```
 
 ### Global Flags
 
-- `--output, -o` - Output format: text (default), json, or table
+- `--output, -o` - Output format: text (default) or table
 - `--no-color` - Disable colored output
 
 ## Testing

@@ -80,9 +80,6 @@ func runCreate(opts *createOptions, c *client.Client) error {
 		if err != nil {
 			return client.WrapError("create channel canvas", err)
 		}
-		if output.IsJSON() {
-			return output.PrintJSON(map[string]string{"canvas_id": canvasID, "channel": channelID})
-		}
 		output.Printf("Created channel canvas: %s\n", canvasID)
 		return nil
 	}
@@ -92,9 +89,6 @@ func runCreate(opts *createOptions, c *client.Client) error {
 		return client.WrapError("create canvas", err)
 	}
 
-	if output.IsJSON() {
-		return output.PrintJSON(map[string]string{"canvas_id": canvasID, "title": opts.title})
-	}
 	output.Printf("Created canvas: %s\n", canvasID)
 	return nil
 }

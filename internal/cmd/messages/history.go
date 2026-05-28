@@ -52,10 +52,6 @@ func runHistory(channel string, opts *historyOptions, c *client.Client) error {
 		return err
 	}
 
-	if output.IsJSON() {
-		return output.PrintJSON(messages)
-	}
-
 	if len(messages) == 0 {
 		output.Println("No messages found")
 		return nil

@@ -41,10 +41,6 @@ func runList(opts *listOptions, c *client.Client) error {
 		return err
 	}
 
-	if output.IsJSON() {
-		return output.PrintJSON(users)
-	}
-
 	if len(users) == 0 {
 		output.Println("No users found")
 		return nil

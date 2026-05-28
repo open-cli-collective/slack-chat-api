@@ -55,15 +55,6 @@ func runPermalink(channel, timestamp string, _ *permalinkOptions, c *client.Clie
 		return client.WrapError("get permalink", err)
 	}
 
-	if output.IsJSON() {
-		return output.PrintJSON(map[string]interface{}{
-			"ok":        true,
-			"channel":   channelID,
-			"ts":        timestamp,
-			"permalink": permalink,
-		})
-	}
-
 	output.Printf("%s\n", permalink)
 	return nil
 }

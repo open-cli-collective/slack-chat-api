@@ -42,10 +42,6 @@ func runCreate(name string, opts *createOptions, c *client.Client) error {
 		return err
 	}
 
-	if output.IsJSON() {
-		return output.PrintJSON(channel)
-	}
-
 	output.Printf("Created channel: %s (%s)\n", channel.Name, channel.ID)
 	return nil
 }

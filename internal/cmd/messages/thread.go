@@ -56,10 +56,6 @@ func runThread(channel, threadTS string, opts *threadOptions, c *client.Client) 
 		return err
 	}
 
-	if output.IsJSON() {
-		return output.PrintJSON(messages)
-	}
-
 	if len(messages) == 0 {
 		output.Println("No replies found")
 		return nil

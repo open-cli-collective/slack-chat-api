@@ -108,6 +108,51 @@ func TestSearchTable(t *testing.T) {
 	}
 }
 
+// TestParseFormat_ClosedSet pins the #173 closed-set policy: only "text"
+// and "table" are accepted; "json" is rejected uniformly with any other
+// non-{text,table} value. JSON is reserved for local control-plane carve-outs
+// that call PrintJSON directly (e.g. `slck config show --json`).
+func TestParseFormat_ClosedSet(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		in      string
+		wantErr bool
+		want    Format
+	}{
+		{"text", false, FormatText},
+		{"", false, FormatText},
+		{"TEXT", false, FormatText},
+		{"table", false, FormatTable},
+		{"Table", false, FormatTable},
+		{"json", true, FormatText},
+		{"JSON", true, FormatText},
+		{"yaml", true, FormatText},
+		{"csv", true, FormatText},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.in, func(t *testing.T) {
+			t.Parallel()
+			got, err := ParseFormat(tc.in)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatalf("ParseFormat(%q) wanted error, got nil", tc.in)
+				}
+				if !strings.Contains(err.Error(), "must be one of: text, table") {
+					t.Fatalf("error message missing closed-set hint: %v", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("ParseFormat(%q) unexpected error: %v", tc.in, err)
+			}
+			if got != tc.want {
+				t.Fatalf("ParseFormat(%q) = %v, want %v", tc.in, got, tc.want)
+			}
+		})
+	}
+}
+
 func TestSearchTableTruncatesRunesNotBytes(t *testing.T) {
 	var buf bytes.Buffer
 	origWriter := Writer

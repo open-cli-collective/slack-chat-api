@@ -14,7 +14,6 @@ import (
 	"github.com/open-cli-collective/cli-common/credstore"
 
 	"github.com/open-cli-collective/slack-chat-api/internal/config"
-	"github.com/open-cli-collective/slack-chat-api/internal/output"
 )
 
 // One-time legacy migration (§1.8 / §2.4). Reads any legacy credential
@@ -72,17 +71,13 @@ func migrateLegacyOverwrite(s *Store, cfg *config.Config, overwrite bool) error 
 	}
 
 	// Phase 3: surface the signal (only for keys actually moved this run).
-	// Record the _migration block ONLY on a JSON run — recording it on a
-	// text run would leave a stale block that a later JSON command in the
-	// same (or test) process could splice into an unrelated response.
+	// Per #173, the §1.8 JSON-splice sidecar is gone; migration notices
+	// always go to stderr. If a future PR adds `slck set-credential --json`,
+	// it can reintroduce the sidecar targeted at that envelope.
 	if len(plan.changes) > 0 {
-		if output.IsJSON() {
-			output.RecordMigration(credstore.NewMigrationBlock(plan.changes...))
-		} else {
-			for _, k := range plan.keys {
-				if lf, ok := plan.humanField[k]; ok {
-					credstore.EmitMigrationStderr(lf, s.ref)
-				}
+		for _, k := range plan.keys {
+			if lf, ok := plan.humanField[k]; ok {
+				credstore.EmitMigrationStderr(lf, s.ref)
 			}
 		}
 	}

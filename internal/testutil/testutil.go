@@ -16,7 +16,6 @@ import (
 	"github.com/open-cli-collective/cli-common/statedirtest"
 
 	appconfig "github.com/open-cli-collective/slack-chat-api/internal/config"
-	"github.com/open-cli-collective/slack-chat-api/internal/output"
 )
 
 // Setup isolates the full §3.1 7-var env set under t.TempDir() (via
@@ -40,10 +39,6 @@ func Setup(t *testing.T) string {
 	// is hermetic. This is independent of the destination backend: the
 	// migration's discovery matrix (§2.4) otherwise always runs on macOS.
 	t.Setenv("SLCK_TEST_DISABLE_LEGACY_KEYCHAIN_SCAN", "1")
-	// Belt-and-suspenders: a prior test's recorded §1.8 block must never
-	// bleed into this one's JSON output.
-	output.ResetMigration()
-	t.Cleanup(output.ResetMigration)
 	return tmp
 }
 

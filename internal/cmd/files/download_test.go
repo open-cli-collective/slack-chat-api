@@ -6,14 +6,12 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/open-cli-collective/slack-chat-api/internal/client"
-	"github.com/open-cli-collective/slack-chat-api/internal/output"
 )
 
 func TestResolveFileID(t *testing.T) {
@@ -155,42 +153,6 @@ func TestRunDownload_InvalidFileID(t *testing.T) {
 	err := runDownload("not-a-file", opts, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "could not resolve file ID")
-}
-
-func TestRunDownload_JSONOutput(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{
-			"ok": true,
-			"file": map[string]interface{}{
-				"id":                   "F123",
-				"name":                 "doc.txt",
-				"size":                 42,
-				"url_private_download": "https://files.slack.com/download",
-			},
-		})
-	}))
-	defer server.Close()
-
-	c := client.NewWithConfig(server.URL, "test-token", nil)
-	opts := &downloadOptions{outputPath: "/tmp/doc.txt"}
-
-	output.OutputFormat = output.FormatJSON
-	defer func() { output.OutputFormat = output.FormatText }()
-
-	var buf strings.Builder
-	output.Writer = &buf
-	defer func() { output.Writer = os.Stdout }()
-
-	err := runDownload("F123", opts, c)
-	require.NoError(t, err)
-
-	var result map[string]interface{}
-	err = json.Unmarshal([]byte(buf.String()), &result)
-	require.NoError(t, err)
-
-	assert.Equal(t, "F123", result["file_id"])
-	assert.Equal(t, "doc.txt", result["name"])
-	assert.Equal(t, "/tmp/doc.txt", result["path"])
 }
 
 func TestRunDownload_FallsBackToURLPrivate(t *testing.T) {
