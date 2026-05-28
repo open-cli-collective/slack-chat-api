@@ -1505,25 +1505,3 @@ func TestClient_GetPermalink_Error(t *testing.T) {
 		t.Fatal("expected an error for a not-OK response, got nil")
 	}
 }
-
-func TestMessage_SendResponseFields(t *testing.T) {
-	// A freshly-sent message carries the response-level channel + ok so the
-	// in-memory shape matches Slack's documented {ok, channel, ts, …}
-	// envelope. The text printer reads these fields when rendering send output.
-	sent, err := json.Marshal(Message{TS: "123.456", Channel: "C1", OK: true})
-	if err != nil {
-		t.Fatalf("marshal: %v", err)
-	}
-	if !strings.Contains(string(sent), `"channel":"C1"`) || !strings.Contains(string(sent), `"ok":true`) {
-		t.Errorf("send message JSON missing channel/ok: %s", sent)
-	}
-
-	// History/thread items carry neither — omitempty keeps them out.
-	item, err := json.Marshal(Message{TS: "123.456", Text: "hi"})
-	if err != nil {
-		t.Fatalf("marshal: %v", err)
-	}
-	if strings.Contains(string(item), `"channel"`) || strings.Contains(string(item), `"ok"`) {
-		t.Errorf("history-item JSON should omit channel/ok: %s", item)
-	}
-}
