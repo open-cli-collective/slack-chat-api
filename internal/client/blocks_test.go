@@ -538,7 +538,8 @@ func TestRenderBlocks_PreformattedStripsInlineStyles(t *testing.T) {
 func TestBlock_JSONFidelityForNonRichTextBlocks(t *testing.T) {
 	// A section block carries "text" in a field the typed Block struct
 	// doesn't model. Round-tripping through unmarshal → marshal must
-	// preserve it verbatim so --output json consumers see the content.
+	// preserve it verbatim so the next API round-trip (and any future
+	// control-plane envelope) sees the content.
 	raw := []byte(`{"type":"section","block_id":"B1","text":{"type":"mrkdwn","text":"hello *world*"}}`)
 	var b Block
 	require.NoError(t, json.Unmarshal(raw, &b))

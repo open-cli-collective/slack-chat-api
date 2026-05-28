@@ -47,10 +47,6 @@ func runList(opts *listOptions, c *client.Client) error {
 		return err
 	}
 
-	if output.IsJSON() {
-		return output.PrintJSON(channels)
-	}
-
 	if len(channels) == 0 {
 		output.Println("No channels found")
 		return nil

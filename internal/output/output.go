@@ -1,7 +1,6 @@
 package output
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -14,12 +13,13 @@ type Format string
 
 const (
 	FormatText  Format = "text"
-	FormatJSON  Format = "json"
 	FormatTable Format = "table"
 )
 
 var (
-	// OutputFormat is the current output format (set by root command)
+	// OutputFormat is the current output format (set by root command).
+	// Closed-set {text, table} after #173; JSON is reserved for local
+	// control-plane carve-outs (today only `config show --json`).
 	OutputFormat Format = FormatText
 
 	// NoColor disables colored output
@@ -29,32 +29,10 @@ var (
 	Writer io.Writer = os.Stdout
 )
 
-// JSON is deprecated: use IsJSON() instead.
-// Kept for backward compatibility during transition.
-var JSON bool
-
-// IsJSON returns true if output format is JSON
-func IsJSON() bool {
-	return OutputFormat == FormatJSON || JSON
-}
-
-// PrintJSON outputs data as formatted JSON. If a §1.8 migration block was
-// recorded this run, it is spliced in (consume-once) per the policy in
-// migration.go and never appears again.
+// PrintJSON encodes data as indented JSON to Writer. It is a pure encoder
+// — no global state, no migration splicing. Called by local control-plane
+// `--json` carve-outs (e.g. `slck config show --json`).
 func PrintJSON(data interface{}) error {
-	if mig := takeMigration(); mig != nil {
-		body, err := json.Marshal(data)
-		if err != nil {
-			return err
-		}
-		var buf bytes.Buffer
-		if err := json.Indent(&buf, spliceMigration(body, mig), "", "  "); err != nil {
-			return err
-		}
-		buf.WriteByte('\n')
-		_, err = Writer.Write(buf.Bytes())
-		return err
-	}
 	enc := json.NewEncoder(Writer)
 	enc.SetIndent("", "  ")
 	return enc.Encode(data)
@@ -216,21 +194,23 @@ func KeyValue(key string, value interface{}) {
 	_, _ = fmt.Fprintf(Writer, "%-12s  %v\n", key+":", value)
 }
 
-// ValidFormats returns the list of valid output formats for flag validation
+// ValidFormats returns the list of valid output formats for flag validation.
+// Closed-set {text, table} per #173; JSON is reserved for local control-plane
+// carve-outs (today only `config show --json`).
 func ValidFormats() []string {
-	return []string{string(FormatText), string(FormatJSON), string(FormatTable)}
+	return []string{string(FormatText), string(FormatTable)}
 }
 
-// ParseFormat parses a string into a Format, returning an error if invalid
+// ParseFormat parses a string into a Format, returning an error if invalid.
+// Closed-set policy: rejects `json` uniformly with `yaml` and any other
+// non-{text,table} value.
 func ParseFormat(s string) (Format, error) {
 	switch strings.ToLower(s) {
 	case "text", "":
 		return FormatText, nil
-	case "json":
-		return FormatJSON, nil
 	case "table":
 		return FormatTable, nil
 	default:
-		return FormatText, fmt.Errorf("invalid output format %q: must be one of: text, json, table", s)
+		return FormatText, fmt.Errorf("invalid output format %q: must be one of: text, table", s)
 	}
 }

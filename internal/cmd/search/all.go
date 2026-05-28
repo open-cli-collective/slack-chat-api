@@ -107,10 +107,6 @@ func runSearchAll(query string, opts *allOptions, c *client.Client) error {
 		return err
 	}
 
-	if output.IsJSON() {
-		return output.PrintJSON(result)
-	}
-
 	hasMessages := result.Messages != nil && len(result.Messages.Matches) > 0
 	hasFiles := result.Files != nil && len(result.Files.Matches) > 0
 

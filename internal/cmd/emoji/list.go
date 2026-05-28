@@ -62,10 +62,6 @@ func runList(opts *listOptions, c *client.Client) error {
 	}
 	sort.Strings(names)
 
-	if output.IsJSON() {
-		return output.PrintJSON(emojis)
-	}
-
 	if len(names) == 0 {
 		output.Println("No custom emoji found")
 		return nil

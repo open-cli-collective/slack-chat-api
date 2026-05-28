@@ -104,10 +104,6 @@ func runMe(opts *meOptions, botClient *client.Client, userClient *client.Client)
 		return errors.New("no bot or user token authenticated; run 'slck init' to configure authentication")
 	}
 
-	if output.IsJSON() {
-		return output.PrintJSON(result)
-	}
-
 	// Text output
 	if result.Bot != nil {
 		if result.Bot.ID != "" {

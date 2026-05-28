@@ -30,12 +30,9 @@ func TestRunShow_ReportsKeyringBackendSelector(t *testing.T) {
 		t.Errorf("text show missing selector line:\n%s", out)
 	}
 
-	// JSON output
-	priorFormat := output.OutputFormat
-	output.OutputFormat = output.FormatJSON
-	t.Cleanup(func() { output.OutputFormat = priorFormat })
-
-	jsonOut, err := captureOutput(t, func() error { return runShow(&showOptions{}) })
+	// JSON output via the local --json carve-out flag (post-#173 — the
+	// global -o json is gone; --json is the only JSON surface).
+	jsonOut, err := captureOutput(t, func() error { return runShow(&showOptions{json: true}) })
 	require.NoError(t, err)
 	var st showStatus
 	if err := json.Unmarshal([]byte(jsonOut), &st); err != nil {
@@ -59,13 +56,31 @@ func TestRunShow_OmitsKeyringBackendWhenUnset(t *testing.T) {
 		t.Errorf("text show emitted selector line when unset:\n%s", out)
 	}
 
-	priorFormat := output.OutputFormat
-	output.OutputFormat = output.FormatJSON
-	t.Cleanup(func() { output.OutputFormat = priorFormat })
-
-	jsonOut, err := captureOutput(t, func() error { return runShow(&showOptions{}) })
+	jsonOut, err := captureOutput(t, func() error { return runShow(&showOptions{json: true}) })
 	require.NoError(t, err)
 	if strings.Contains(jsonOut, `"keyring_backend"`) {
 		t.Errorf("json show emitted keyring_backend when unset: %s", jsonOut)
+	}
+}
+
+// TestRunShow_JSONFlagOverridesGlobalOutput pins the documented
+// composition rule: when --json is set, the local carve-out takes
+// precedence over -o text/table. Sets output.OutputFormat to FormatTable
+// (the state root's PersistentPreRunE would leave for `slck config show
+// --json -o table`) and asserts runShow still emits a JSON envelope.
+func TestRunShow_JSONFlagOverridesGlobalOutput(t *testing.T) {
+	testutil.Setup(t)
+	priorFormat := output.OutputFormat
+	output.OutputFormat = output.FormatTable
+	t.Cleanup(func() { output.OutputFormat = priorFormat })
+
+	out, err := captureOutput(t, func() error { return runShow(&showOptions{json: true}) })
+	require.NoError(t, err)
+	var st showStatus
+	if err := json.Unmarshal([]byte(out), &st); err != nil {
+		t.Fatalf("--json output is not valid JSON despite -o table: %v\n%s", err, out)
+	}
+	if strings.Contains(out, "Credential ref:") || strings.Contains(out, "Backend:") {
+		t.Fatalf("--json leaked human-readable lines: %s", out)
 	}
 }

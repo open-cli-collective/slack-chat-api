@@ -10,20 +10,28 @@ import (
 	"github.com/open-cli-collective/slack-chat-api/internal/output"
 )
 
-type showOptions struct{}
+type showOptions struct {
+	json bool
+}
 
 func newShowCmd() *cobra.Command {
 	opts := &showOptions{}
 
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "show",
 		Short: "Show current configuration status",
 		Long: `Show credential configuration: backend, ref, and which keys are
-present. Secret values are never displayed (§1.11).`,
+present. Secret values are never displayed (§1.11).
+
+With --json, emit a control-plane envelope (§2 carve-out). The global
+--output flag is silently ignored when --json is set; the envelope is
+the only output.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runShow(opts)
 		},
 	}
+	cmd.Flags().BoolVar(&opts.json, "json", false, "Emit a JSON control-plane envelope (§2 carve-out)")
+	return cmd
 }
 
 // showStatus is the non-secret view (§1.11 item 3): presence, backend, ref,
@@ -39,7 +47,7 @@ type showStatus struct {
 	UserToken        bool   `json:"user_token_present"`
 }
 
-func runShow(_ *showOptions) error {
+func runShow(opts *showOptions) error {
 	cfg, err := appconfig.LoadForRuntime()
 	if err != nil {
 		return err
@@ -69,7 +77,7 @@ func runShow(_ *showOptions) error {
 		status.PassphraseSource = keychain.PassphraseSource(svc)
 	}
 
-	if output.IsJSON() {
+	if opts.json {
 		return output.PrintJSON(status)
 	}
 

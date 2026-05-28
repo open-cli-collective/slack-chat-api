@@ -33,9 +33,6 @@ func runDelete(canvasID string, c *client.Client) error {
 		return client.WrapError("delete canvas", err)
 	}
 
-	if output.IsJSON() {
-		return output.PrintJSON(map[string]string{"canvas_id": canvasID, "status": "deleted"})
-	}
 	output.Printf("Deleted canvas: %s\n", canvasID)
 	return nil
 }

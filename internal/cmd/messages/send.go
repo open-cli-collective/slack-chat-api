@@ -241,11 +241,6 @@ func runSend(channel, text string, opts *sendOptions, c *client.Client) error {
 	if err != nil {
 		return client.WrapError("send message", err)
 	}
-	// SendMessage returns Slack's `message` object, which omits the
-	// response-level channel + ok. Set them so `-o json` is the documented
-	// {ok, channel, ts, …} shape and callers can read the channel back.
-	msg.Channel = channelID
-	msg.OK = true
 
 	// chat.postMessage doesn't return a permalink, so fetch it on request.
 	// Best-effort: the message is already sent, so a failed permalink lookup
@@ -256,10 +251,6 @@ func runSend(channel, text string, opts *sendOptions, c *client.Client) error {
 		} else {
 			fmt.Fprintf(os.Stderr, "warning: message sent (ts %s) but permalink fetch failed: %v\n", msg.TS, perr)
 		}
-	}
-
-	if output.IsJSON() {
-		return output.PrintJSON(msg)
 	}
 
 	output.Printf("Message sent (ts: %s)\n", msg.TS)

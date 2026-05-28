@@ -9,7 +9,6 @@ import (
 	"github.com/open-cli-collective/cli-common/credstore"
 
 	appconfig "github.com/open-cli-collective/slack-chat-api/internal/config"
-	"github.com/open-cli-collective/slack-chat-api/internal/output"
 	"github.com/open-cli-collective/slack-chat-api/internal/testutil"
 )
 
@@ -241,7 +240,6 @@ func TestMigrateIdempotent(t *testing.T) {
 		t.Fatalf("first Open: %v", err)
 	}
 	_ = s1.Close()
-	output.ResetMigration()
 
 	s2, err := Open()
 	if err != nil {
@@ -319,7 +317,6 @@ func TestMigrateEqualValueCleansUpSilently(t *testing.T) {
 	}
 	_ = pre.Close()
 	legacy := writeLegacyFile(t, map[string]string{"api_token": botTok})
-	output.ResetMigration()
 
 	st, err := Open()
 	if err != nil {

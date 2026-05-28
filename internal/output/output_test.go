@@ -108,6 +108,86 @@ func TestSearchTable(t *testing.T) {
 	}
 }
 
+// TestParseFormat_ClosedSet pins the #173 closed-set policy: only "text"
+// and "table" are accepted; "json" is rejected uniformly with any other
+// non-{text,table} value. JSON is reserved for local control-plane carve-outs
+// that call PrintJSON directly (e.g. `slck config show --json`).
+func TestParseFormat_ClosedSet(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		in      string
+		wantErr bool
+		want    Format
+	}{
+		{"text", false, FormatText},
+		{"", false, FormatText},
+		{"TEXT", false, FormatText},
+		{"table", false, FormatTable},
+		{"Table", false, FormatTable},
+		{"json", true, FormatText},
+		{"JSON", true, FormatText},
+		{"yaml", true, FormatText},
+		{"csv", true, FormatText},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.in, func(t *testing.T) {
+			t.Parallel()
+			got, err := ParseFormat(tc.in)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatalf("ParseFormat(%q) wanted error, got nil", tc.in)
+				}
+				if !strings.Contains(err.Error(), "must be one of: text, table") {
+					t.Fatalf("error message missing closed-set hint: %v", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("ParseFormat(%q) unexpected error: %v", tc.in, err)
+			}
+			if got != tc.want {
+				t.Fatalf("ParseFormat(%q) = %v, want %v", tc.in, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestPrintJSON_PureEncoder pins the post-#173 invariant: PrintJSON is a
+// pure JSON encoder — no global state, no migration splicing, no _migration
+// block. Two consecutive calls must produce byte-identical output for the
+// same input. (Pre-#173 the helper consumed a one-shot migration sidecar.)
+func TestPrintJSON_PureEncoder(t *testing.T) {
+	type env struct {
+		Ref     string `json:"ref"`
+		Backend string `json:"backend"`
+	}
+	data := env{Ref: "slack-chat-api/default", Backend: "keychain"}
+
+	var buf1, buf2 bytes.Buffer
+	origWriter := Writer
+	t.Cleanup(func() { Writer = origWriter })
+
+	Writer = &buf1
+	if err := PrintJSON(data); err != nil {
+		t.Fatalf("PrintJSON #1: %v", err)
+	}
+	Writer = &buf2
+	if err := PrintJSON(data); err != nil {
+		t.Fatalf("PrintJSON #2: %v", err)
+	}
+
+	if buf1.String() != buf2.String() {
+		t.Fatalf("PrintJSON is not pure: call #1 != call #2\n#1: %s\n#2: %s", buf1.String(), buf2.String())
+	}
+	if !strings.Contains(buf1.String(), `"ref": "slack-chat-api/default"`) {
+		t.Fatalf("PrintJSON output missing expected field: %s", buf1.String())
+	}
+	if strings.Contains(buf1.String(), "_migration") {
+		t.Fatalf("PrintJSON leaked a _migration block (sidecar should be gone): %s", buf1.String())
+	}
+}
+
 func TestSearchTableTruncatesRunesNotBytes(t *testing.T) {
 	var buf bytes.Buffer
 	origWriter := Writer

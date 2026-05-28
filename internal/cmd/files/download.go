@@ -78,15 +78,6 @@ func runDownload(input string, opts *downloadOptions, c *client.Client) error {
 		destPath = info.Name
 	}
 
-	if output.IsJSON() {
-		return output.PrintJSON(map[string]interface{}{
-			"file_id": info.ID,
-			"name":    info.Name,
-			"size":    info.Size,
-			"path":    destPath,
-		})
-	}
-
 	f, err := os.Create(destPath)
 	if err != nil {
 		return fmt.Errorf("creating output file: %w", err)

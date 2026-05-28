@@ -42,10 +42,6 @@ func runGet(channel string, opts *getOptions, c *client.Client) error {
 		return err
 	}
 
-	if output.IsJSON() {
-		return output.PrintJSON(ch)
-	}
-
 	output.KeyValue("ID", ch.ID)
 	output.KeyValue("Name", ch.Name)
 	output.KeyValue("Private", ch.IsPrivate)

@@ -38,10 +38,6 @@ func runGet(userID string, opts *getOptions, c *client.Client) error {
 		return err
 	}
 
-	if output.IsJSON() {
-		return output.PrintJSON(user)
-	}
-
 	output.KeyValue("ID", user.ID)
 	output.KeyValue("Username", user.Name)
 	output.KeyValue("Real Name", user.RealName)

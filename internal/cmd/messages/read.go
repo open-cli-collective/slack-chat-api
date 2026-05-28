@@ -67,10 +67,6 @@ func runRead(input string, opts *readOptions, c *client.Client) error {
 		return err
 	}
 
-	if output.IsJSON() {
-		return output.PrintJSON(messages)
-	}
-
 	if len(messages) == 0 {
 		output.Println("No messages found for ref")
 		return nil

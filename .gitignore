@@ -16,3 +16,6 @@ dist/
 # Test coverage
 coverage.out
 slck
+
+# Local twapp artifacts
+.twapp-*.json

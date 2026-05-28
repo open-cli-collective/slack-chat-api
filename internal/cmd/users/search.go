@@ -97,10 +97,6 @@ func runSearch(query string, opts *searchOptions, c *client.Client) error {
 		}
 	}
 
-	if output.IsJSON() {
-		return output.PrintJSON(matches)
-	}
-
 	if len(matches) == 0 {
 		output.Printf("No users found matching \"%s\"\n", query)
 		return nil

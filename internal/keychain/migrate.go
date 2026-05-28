@@ -14,13 +14,13 @@ import (
 	"github.com/open-cli-collective/cli-common/credstore"
 
 	"github.com/open-cli-collective/slack-chat-api/internal/config"
-	"github.com/open-cli-collective/slack-chat-api/internal/output"
 )
 
 // One-time legacy migration (§1.8 / §2.4). Reads any legacy credential
-// location that still exists, writes the new credstore bundle, surfaces the
-// signal (stderr for humans, _migration for JSON), then deletes the legacy
-// originals. Idempotent: once the originals are gone there is nothing to do
+// location that still exists, writes the new credstore bundle, emits a
+// stderr signal (the §1.8 JSON-splice sidecar was removed in #173 — see
+// the Phase 3 comment), then deletes the legacy originals. Idempotent:
+// once the originals are gone there is nothing to do
 // and no signal fires. Conflicts (legacy vs legacy, or legacy vs an existing
 // keyring value) fail loudly per §1.8 — all conflicts are detected before
 // any write or delete, and on conflict every legacy and keyring entry is
@@ -72,17 +72,13 @@ func migrateLegacyOverwrite(s *Store, cfg *config.Config, overwrite bool) error 
 	}
 
 	// Phase 3: surface the signal (only for keys actually moved this run).
-	// Record the _migration block ONLY on a JSON run — recording it on a
-	// text run would leave a stale block that a later JSON command in the
-	// same (or test) process could splice into an unrelated response.
+	// Per #173, the §1.8 JSON-splice sidecar is gone; migration notices
+	// always go to stderr. If a future PR adds `slck set-credential --json`,
+	// it can reintroduce the sidecar targeted at that envelope.
 	if len(plan.changes) > 0 {
-		if output.IsJSON() {
-			output.RecordMigration(credstore.NewMigrationBlock(plan.changes...))
-		} else {
-			for _, k := range plan.keys {
-				if lf, ok := plan.humanField[k]; ok {
-					credstore.EmitMigrationStderr(lf, s.ref)
-				}
+		for _, k := range plan.keys {
+			if lf, ok := plan.humanField[k]; ok {
+				credstore.EmitMigrationStderr(lf, s.ref)
 			}
 		}
 	}
@@ -106,7 +102,7 @@ func migrateLegacyOverwrite(s *Store, cfg *config.Config, overwrite bool) error 
 // to write, the §1.8 signal, and the legacy originals to delete on success.
 type migrationPlan struct {
 	writes     map[string]string           // newKey -> value to SetBundle
-	changes    []credstore.MigrationChange // _migration block entries
+	changes    []credstore.MigrationChange // legacy entries moved this run (stderr-only since #173)
 	humanField map[string]string           // newKey -> legacyField (stderr)
 	cleanups   []func() error              // legacy deleters (post-write)
 	keys       []string                    // sorted newKeys (deterministic)

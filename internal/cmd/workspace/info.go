@@ -37,10 +37,6 @@ func runInfo(opts *infoOptions, c *client.Client) error {
 		return err
 	}
 
-	if output.IsJSON() {
-		return output.PrintJSON(team)
-	}
-
 	output.KeyValue("ID", team.ID)
 	output.KeyValue("Name", team.Name)
 	output.KeyValue("Domain", fmt.Sprintf("%s.slack.com", team.Domain))

@@ -537,188 +537,6 @@ func TestRunThread_Success(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestRunThread_JSONIncludesReactions(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/conversations.replies":
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{
-				"ok": true,
-				"messages": []map[string]interface{}{
-					{
-						"ts":   "1234567890.123456",
-						"user": "U001",
-						"text": "Original",
-						"reactions": []map[string]interface{}{
-							{"name": "thumbsup", "count": 2, "users": []string{"U001", "U002"}},
-						},
-					},
-					{
-						"ts":   "1234567890.123457",
-						"user": "U002",
-						"text": "Reply without reactions",
-					},
-				},
-			})
-		case "/users.info":
-			mockUserInfoHandler(w, r)
-		}
-	}))
-	defer server.Close()
-
-	c := client.NewWithConfig(server.URL, "test-token", nil)
-	opts := &threadOptions{limit: 100}
-
-	// Capture JSON output
-	output.OutputFormat = output.FormatJSON
-	defer func() { output.OutputFormat = output.FormatText }()
-
-	var buf strings.Builder
-	output.Writer = &buf
-	defer func() { output.Writer = os.Stdout }()
-
-	err := runThread("C123", "1234567890.123456", opts, c)
-	require.NoError(t, err)
-
-	// Parse the JSON output
-	var messages []client.Message
-	err = json.Unmarshal([]byte(buf.String()), &messages)
-	require.NoError(t, err)
-
-	require.Len(t, messages, 2)
-
-	// First message should have reactions
-	require.Len(t, messages[0].Reactions, 1)
-	assert.Equal(t, "thumbsup", messages[0].Reactions[0].Name)
-	assert.Equal(t, 2, messages[0].Reactions[0].Count)
-	assert.Equal(t, []string{"U001", "U002"}, messages[0].Reactions[0].Users)
-
-	// Second message should have no reactions
-	assert.Empty(t, messages[1].Reactions)
-}
-
-func TestRunThread_JSONIncludesFiles(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/conversations.replies":
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{
-				"ok": true,
-				"messages": []map[string]interface{}{
-					{
-						"ts":   "1234567890.123456",
-						"user": "U001",
-						"text": "See the screenshot below",
-						"files": []map[string]interface{}{
-							{
-								"id":                   "F0123ABC",
-								"name":                 "screenshot.png",
-								"title":                "Screenshot",
-								"mimetype":             "image/png",
-								"filetype":             "png",
-								"size":                 54321,
-								"url_private":          "https://files.slack.com/files-pri/T123-F0123ABC/screenshot.png",
-								"url_private_download": "https://files.slack.com/files-pri/T123-F0123ABC/download/screenshot.png",
-								"permalink":            "https://example.slack.com/files/U001/F0123ABC/screenshot.png",
-							},
-						},
-					},
-					{
-						"ts":   "1234567890.123457",
-						"user": "U002",
-						"text": "Plain reply without files",
-					},
-				},
-			})
-		case "/users.info":
-			mockUserInfoHandler(w, r)
-		}
-	}))
-	defer server.Close()
-
-	c := client.NewWithConfig(server.URL, "test-token", nil)
-	opts := &threadOptions{limit: 100}
-
-	// Capture JSON output
-	output.OutputFormat = output.FormatJSON
-	defer func() { output.OutputFormat = output.FormatText }()
-
-	var buf strings.Builder
-	output.Writer = &buf
-	defer func() { output.Writer = os.Stdout }()
-
-	err := runThread("C123", "1234567890.123456", opts, c)
-	require.NoError(t, err)
-
-	// Parse the JSON output
-	var messages []client.Message
-	err = json.Unmarshal([]byte(buf.String()), &messages)
-	require.NoError(t, err)
-
-	require.Len(t, messages, 2)
-
-	// First message should have files
-	require.Len(t, messages[0].Files, 1)
-	assert.Equal(t, "F0123ABC", messages[0].Files[0].ID)
-	assert.Equal(t, "screenshot.png", messages[0].Files[0].Name)
-	assert.Equal(t, "image/png", messages[0].Files[0].Mimetype)
-	assert.Equal(t, "png", messages[0].Files[0].Filetype)
-	assert.Equal(t, int64(54321), messages[0].Files[0].Size)
-	assert.Equal(t, "https://files.slack.com/files-pri/T123-F0123ABC/screenshot.png", messages[0].Files[0].URLPrivate)
-	assert.Equal(t, "https://example.slack.com/files/U001/F0123ABC/screenshot.png", messages[0].Files[0].Permalink)
-
-	// Second message should have no files
-	assert.Empty(t, messages[1].Files)
-}
-
-func TestRunHistory_JSONIncludesReactions(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/conversations.history":
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{
-				"ok": true,
-				"messages": []map[string]interface{}{
-					{
-						"ts":   "1234567890.123456",
-						"user": "U001",
-						"text": "Hello",
-						"reactions": []map[string]interface{}{
-							{"name": "wave", "count": 1, "users": []string{"U002"}},
-							{"name": "heart", "count": 3, "users": []string{"U001", "U002", "U003"}},
-						},
-					},
-				},
-			})
-		case "/users.info":
-			mockUserInfoHandler(w, r)
-		}
-	}))
-	defer server.Close()
-
-	c := client.NewWithConfig(server.URL, "test-token", nil)
-	opts := &historyOptions{limit: 20}
-
-	// Capture JSON output
-	output.OutputFormat = output.FormatJSON
-	defer func() { output.OutputFormat = output.FormatText }()
-
-	var buf strings.Builder
-	output.Writer = &buf
-	defer func() { output.Writer = os.Stdout }()
-
-	err := runHistory("C123", opts, c)
-	require.NoError(t, err)
-
-	// Parse the JSON output
-	var messages []client.Message
-	err = json.Unmarshal([]byte(buf.String()), &messages)
-	require.NoError(t, err)
-
-	require.Len(t, messages, 1)
-	require.Len(t, messages[0].Reactions, 2)
-	assert.Equal(t, "wave", messages[0].Reactions[0].Name)
-	assert.Equal(t, "heart", messages[0].Reactions[1].Name)
-	assert.Equal(t, 3, messages[0].Reactions[1].Count)
-}
-
 func TestRunReact_Success(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/reactions.add", r.URL.Path)
@@ -2172,7 +1990,7 @@ func TestRunThread_SectionBlockRendersInBody(t *testing.T) {
 
 // TestRunHistory_SectionBlockRendersInTextColumn is the messages-side
 // regression for issue #143: a non-rich_text section block must surface
-// its text in the rendered output, not just in --output json.
+// its text in the rendered text-column output.
 func TestRunHistory_SectionBlockRendersInTextColumn(t *testing.T) {
 	statusLine := "Served Rian in #general · claude-sonnet-4-6"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -2470,58 +2288,6 @@ func TestRunHistory_MultiSectionBlocksStayOnOneLine(t *testing.T) {
 	assert.Len(t, lines, 1, "expected single output line, got %d: %q", len(lines), out)
 }
 
-func TestRunThread_JSONIncludesBlocks(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/conversations.replies":
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{
-				"ok": true,
-				"messages": []map[string]interface{}{
-					{
-						"ts":   "1234567890.123456",
-						"user": "U001",
-						"text": "",
-						"blocks": []map[string]interface{}{
-							{
-								"type": "rich_text",
-								"elements": []map[string]interface{}{
-									{
-										"type": "rich_text_section",
-										"elements": []map[string]interface{}{
-											{"type": "text", "text": "hello"},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			})
-		case "/users.info":
-			mockUserInfoHandler(w, r)
-		}
-	}))
-	defer server.Close()
-
-	c := client.NewWithConfig(server.URL, "test-token", nil)
-	opts := &threadOptions{limit: 100}
-
-	output.OutputFormat = output.FormatJSON
-	defer func() { output.OutputFormat = output.FormatText }()
-	var buf strings.Builder
-	output.Writer = &buf
-	defer func() { output.Writer = os.Stdout }()
-
-	err := runThread("C123", "1234567890.123456", opts, c)
-	require.NoError(t, err)
-
-	var messages []client.Message
-	require.NoError(t, json.Unmarshal([]byte(buf.String()), &messages))
-	require.Len(t, messages, 1)
-	require.Len(t, messages[0].Blocks, 1)
-	assert.Equal(t, "rich_text", messages[0].Blocks[0].Type)
-}
-
 func TestRunHistory_TextIncludesFileHints(t *testing.T) {
 	// Message text intentionally long to ensure file hint still renders in full
 	longText := "This is a very long message body that definitely exceeds eighty characters and will be truncated in history's compact view."
@@ -2653,29 +2419,6 @@ func TestRunRead_OtherErrorNoHint(t *testing.T) {
 	err := runRead("C02DF3BEUGN/1777469221.721439", &readOptions{limit: 100}, c)
 	require.Error(t, err)
 	assert.NotContains(t, err.Error(), "--as-user")
-}
-
-func TestRunRead_JSONOutput(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{
-			"ok":       true,
-			"messages": []map[string]interface{}{{"type": "message", "user": "U1", "text": "hi", "ts": "1777469221.721439"}},
-		})
-	}))
-	defer server.Close()
-
-	c := client.NewWithConfig(server.URL, "test-token", nil)
-	var buf strings.Builder
-	orig := output.Writer
-	output.Writer = &buf
-	defer func() { output.Writer = orig }()
-	origFmt := output.OutputFormat
-	output.OutputFormat = output.FormatJSON
-	defer func() { output.OutputFormat = origFmt }()
-
-	err := runRead("C02DF3BEUGN/1777469221.721439", &readOptions{limit: 100}, c)
-	require.NoError(t, err)
-	assert.Contains(t, buf.String(), `"text": "hi"`)
 }
 
 func TestRunRead_EmptyMessages(t *testing.T) {

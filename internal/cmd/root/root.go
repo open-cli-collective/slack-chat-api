@@ -127,7 +127,7 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVarP(&outputFormat, "output", "o", "text", "Output format: text, json, or table")
+	rootCmd.PersistentFlags().StringVarP(&outputFormat, "output", "o", "text", "Output format: text or table")
 	rootCmd.PersistentFlags().BoolVar(&output.NoColor, "no-color", false, "Disable colored output")
 	rootCmd.PersistentFlags().BoolVar(&asUser, "as-user", false, "Use user token")
 	rootCmd.PersistentFlags().BoolVar(&asBot, "as-bot", false, "Use bot token")

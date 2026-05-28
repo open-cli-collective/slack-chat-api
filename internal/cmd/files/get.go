@@ -47,10 +47,6 @@ func runGet(input string, c *client.Client) error {
 		return err
 	}
 
-	if output.IsJSON() {
-		return output.PrintJSON(info)
-	}
-
 	output.Printf("ID: %s\n", info.ID)
 	output.Printf("Name: %s\n", info.Name)
 	if info.Title != "" {

@@ -19,8 +19,8 @@ type Block struct {
 
 	// raw holds the verbatim JSON bytes captured during unmarshal so that
 	// non-rich_text blocks (section.text, image.image_url, header.text,
-	// etc.) round-trip through --output json without losing fields the
-	// typed struct doesn't model.
+	// etc.) round-trip through the Slack API (and any control-plane JSON
+	// envelope) without losing fields the typed struct doesn't model.
 	raw json.RawMessage
 }
 
@@ -120,8 +120,8 @@ func (e *RichTextElement) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// MarshalJSON round-trips the polymorphic style field so --output json
-// preserves whichever variant was on the wire.
+// MarshalJSON round-trips the polymorphic style field so the marshal
+// path preserves whichever variant was on the wire.
 func (e RichTextElement) MarshalJSON() ([]byte, error) {
 	type alias RichTextElement
 	aux := struct {

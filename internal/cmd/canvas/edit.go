@@ -59,9 +59,6 @@ func runEdit(canvasID string, opts *editOptions, c *client.Client) error {
 		return client.WrapError("edit canvas", err)
 	}
 
-	if output.IsJSON() {
-		return output.PrintJSON(map[string]string{"canvas_id": canvasID, "status": "updated"})
-	}
 	output.Printf("Updated canvas: %s\n", canvasID)
 	return nil
 }
