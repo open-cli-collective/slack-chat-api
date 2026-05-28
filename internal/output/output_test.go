@@ -153,6 +153,41 @@ func TestParseFormat_ClosedSet(t *testing.T) {
 	}
 }
 
+// TestPrintJSON_PureEncoder pins the post-#173 invariant: PrintJSON is a
+// pure JSON encoder — no global state, no migration splicing, no _migration
+// block. Two consecutive calls must produce byte-identical output for the
+// same input. (Pre-#173 the helper consumed a one-shot migration sidecar.)
+func TestPrintJSON_PureEncoder(t *testing.T) {
+	type env struct {
+		Ref     string `json:"ref"`
+		Backend string `json:"backend"`
+	}
+	data := env{Ref: "slack-chat-api/default", Backend: "keychain"}
+
+	var buf1, buf2 bytes.Buffer
+	origWriter := Writer
+	t.Cleanup(func() { Writer = origWriter })
+
+	Writer = &buf1
+	if err := PrintJSON(data); err != nil {
+		t.Fatalf("PrintJSON #1: %v", err)
+	}
+	Writer = &buf2
+	if err := PrintJSON(data); err != nil {
+		t.Fatalf("PrintJSON #2: %v", err)
+	}
+
+	if buf1.String() != buf2.String() {
+		t.Fatalf("PrintJSON is not pure: call #1 != call #2\n#1: %s\n#2: %s", buf1.String(), buf2.String())
+	}
+	if !strings.Contains(buf1.String(), `"ref": "slack-chat-api/default"`) {
+		t.Fatalf("PrintJSON output missing expected field: %s", buf1.String())
+	}
+	if strings.Contains(buf1.String(), "_migration") {
+		t.Fatalf("PrintJSON leaked a _migration block (sidecar should be gone): %s", buf1.String())
+	}
+}
+
 func TestSearchTableTruncatesRunesNotBytes(t *testing.T) {
 	var buf bytes.Buffer
 	origWriter := Writer

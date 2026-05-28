@@ -241,11 +241,6 @@ func runSend(channel, text string, opts *sendOptions, c *client.Client) error {
 	if err != nil {
 		return client.WrapError("send message", err)
 	}
-	// SendMessage returns Slack's `message` object, which omits the
-	// response-level channel + ok. Set them so the in-memory shape matches
-	// the documented Slack response and callers can read the channel back.
-	msg.Channel = channelID
-	msg.OK = true
 
 	// chat.postMessage doesn't return a permalink, so fetch it on request.
 	// Best-effort: the message is already sent, so a failed permalink lookup
