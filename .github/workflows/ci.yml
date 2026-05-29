@@ -22,6 +22,24 @@ jobs:
       - name: Build
         run: go build -v ./...
 
+      - name: Static release build guard
+        run: |
+          set -euo pipefail
+          for target in linux/amd64 linux/arm64 windows/amd64 windows/arm64; do
+            goos="${target%/*}"
+            goarch="${target#*/}"
+            CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch" \
+              go build -o "$RUNNER_TEMP/slck-$goos-$goarch" ./cmd/slck
+          done
+
+          for goarch in amd64 arm64; do
+            deps=$(CGO_ENABLED=0 GOOS=linux GOARCH="$goarch" go list -deps ./cmd/slck)
+            if printf '%s\n' "$deps" | grep -E '^(github.com/byteness/keyring|github.com/1password/onepassword-sdk-go)$'; then
+              echo "static Linux $goarch build graph must not include byteness/keyring or onepassword-sdk-go"
+              exit 1
+            fi
+          done
+
       - name: Test
         run: go test -v -race -coverprofile=coverage.out ./...
 

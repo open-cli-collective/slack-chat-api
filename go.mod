@@ -3,7 +3,7 @@ module github.com/open-cli-collective/slack-chat-api
 go 1.26
 
 require (
-	github.com/open-cli-collective/cli-common v0.2.1
+	github.com/open-cli-collective/cli-common v0.2.2
 	github.com/spf13/cobra v1.8.0
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/term v0.43.0

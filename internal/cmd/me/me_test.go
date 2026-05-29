@@ -190,6 +190,8 @@ func TestNewCmd_NoTokens_ReturnsError(t *testing.T) {
 
 func TestRunMe_BotWithoutBotID(t *testing.T) {
 	// Some tokens may not have a bot_id
+	testutil.Setup(t)
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{
