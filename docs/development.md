@@ -13,7 +13,8 @@ workspace information.
 
 ```bash
 make build      # build binary to ./bin/slck
-make test       # run tests with race detection and coverage
+make test       # run tests with race detection
+make test-cover # run tests with coverage output
 make lint       # run golangci-lint
 make clean      # remove build artifacts
 make install    # install to $GOPATH/bin
@@ -23,7 +24,7 @@ make install    # install to $GOPATH/bin
 
 ```text
 slack-chat-api/
-├── main.go
+├── cmd/slck/main.go
 ├── internal/
 │   ├── cmd/        # Cobra command implementations
 │   ├── client/     # Slack API client wrapper
