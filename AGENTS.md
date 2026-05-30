@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-Claude entrypoint for the slack-chat-api repository.
+Codex entrypoint for the slack-chat-api repository.
 
 ## Start Here
 
