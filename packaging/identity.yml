@@ -25,7 +25,12 @@ keychain_probe:
     content: |
       credential_ref: slack-chat-api/default
       workspace: smoke
-  command: ["--output", "json", "config", "show"]
+  # `config show --json` (the §2 control-plane carve-out), NOT `--output json`:
+  # the global -o/--output flag is a closed set {text, table} and rejects "json".
+  # The pre-migration gate script used `--output json`, which became stale after
+  # the output-rendering §2 rollout restricted --output and added the local
+  # --json flag; carrying it forward verbatim would fail the release gate.
+  command: ["config", "show", "--json"]
   output: json
   assertions:
     .backend: keychain
