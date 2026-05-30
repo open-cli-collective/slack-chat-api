@@ -67,6 +67,10 @@ func runList(opts *listOptions, c *client.Client) error {
 
 Resource and mutation-success commands emit text or table only. Per cli-common `docs/output-and-rendering.md` §2 (enforced by `output.ParseFormat`'s closed-set `{text, table}`), JSON is reserved for local control-plane carve-outs — today only `slck config show --json`. Do NOT add per-command `--json` flags or `output.IsJSON()` branches to new resource commands.
 
+The project-level JSON-vs-text contract lives in `ARCHITECTURE.md`:
+JSON preserves upstream API semantics; text and table output may interpret
+Slack data for terminal readability.
+
 ```go
 // Default + table path:
 output.Table(headers, rows)  // For list commands

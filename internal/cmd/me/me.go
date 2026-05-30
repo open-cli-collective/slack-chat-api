@@ -36,7 +36,6 @@ type WorkspaceInfo struct {
 	ID   string `json:"id"`
 }
 
-// NewCmd creates the me command
 func NewCmd() *cobra.Command {
 	opts := &meOptions{}
 
@@ -57,7 +56,6 @@ func runMe(opts *meOptions, botClient *client.Client, userClient *client.Client)
 	result := &MeResult{}
 	var workspace *WorkspaceInfo
 
-	// Test bot token
 	if botClient == nil {
 		botClient, _ = client.New()
 	}
@@ -77,7 +75,6 @@ func runMe(opts *meOptions, botClient *client.Client, userClient *client.Client)
 		}
 	}
 
-	// Test user token
 	if userClient == nil {
 		userClient, _ = client.NewUserClient()
 	}
@@ -99,12 +96,10 @@ func runMe(opts *meOptions, botClient *client.Client, userClient *client.Client)
 
 	result.Workspace = workspace
 
-	// Check if any token worked
 	if result.Bot == nil && result.User == nil {
 		return errors.New("no bot or user token authenticated; run 'slck init' to configure authentication")
 	}
 
-	// Text output
 	if result.Bot != nil {
 		if result.Bot.ID != "" {
 			output.Printf("Bot: %s (%s)\n", result.Bot.Name, result.Bot.ID)
