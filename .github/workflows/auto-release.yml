@@ -1,47 +1,33 @@
 name: Auto Release
 
+# On push to main, decide whether to cut a release and mint the tag. Identity
+# (tag prefix + version file) comes from packaging/identity.yml. The actual logic
+# lives in the shared reusable workflow; this caller just wires triggers/secrets.
+# The release gate (Go-code paths + feat/fix commit) and the version.txt +
+# GITHUB_RUN_NUMBER tag scheme are handled by the reusable workflow.
 on:
   push:
-    branches:
-      - main
-    # Gate 1: Only trigger when Go code actually changes
-    paths:
-      - '**.go'
-      - 'go.mod'
-      - 'go.sum'
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: "Compute the tag but do not push it"
+        type: boolean
+        default: true
 
+# The tag push uses the dedicated TAP_GITHUB_TOKEN via a credential helper, not
+# GITHUB_TOKEN — so the pushed tag retriggers release.yml.
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  create-release:
-    runs-on: ubuntu-latest
-    # Gate 2: Only release for feat: and fix: commits (actual functionality changes)
-    if: >-
-      startsWith(github.event.head_commit.message, 'feat:') ||
-      startsWith(github.event.head_commit.message, 'feat(') ||
-      startsWith(github.event.head_commit.message, 'fix:') ||
-      startsWith(github.event.head_commit.message, 'fix(')
-    steps:
-      # TAP_GITHUB_TOKEN (a PAT) is required here instead of the default GITHUB_TOKEN
-      # because tag pushes made with GITHUB_TOKEN do not trigger other workflows.
-      # Without this, the Release workflow would not run when we push the tag.
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.TAP_GITHUB_TOKEN }}
-
-      - name: Read version
-        id: version
-        run: |
-          BASE_VERSION=$(cat version.txt | tr -d '\n')
-          VERSION="v${BASE_VERSION}.${GITHUB_RUN_NUMBER}"
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Creating release: $VERSION"
-
-      - name: Create and push tag
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag ${{ steps.version.outputs.version }}
-          git push origin ${{ steps.version.outputs.version }}
+  auto-release:
+    uses: open-cli-collective/.github/.github/workflows/auto-release.yml@v1
+    with:
+      # push is live (false); workflow_dispatch honors the checkbox. Compare
+      # against both true and 'true' because a workflow_dispatch boolean input
+      # may surface as a real boolean or the string "true" depending on context
+      # — this is robust to either and always yields a real boolean.
+      dry-run: ${{ github.event_name == 'workflow_dispatch' && (inputs.dry-run == true || inputs.dry-run == 'true') }}
+    secrets:
+      tag-token: ${{ secrets.TAP_GITHUB_TOKEN }}

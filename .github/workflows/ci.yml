@@ -4,24 +4,68 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
-  build-and-test:
+  build-platform:                          # OS matrix — NOT a required check
+    name: build (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: open-cli-collective/.github/actions/go-build@v1
+        with:
+          go-version-file: go.mod
+
+  build:                                   # required aggregate — stable bare name
+    needs: [build-platform]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+      # Fail only on a real failure/cancellation; a skipped leg must NOT fail
+      # the gate (which `== 'success'` would do).
+      - if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+        run: echo "::error::a build-platform leg failed or was cancelled" && exit 1
+
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: open-cli-collective/.github/actions/go-test@v1
+        with:
+          go-version-file: go.mod
 
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: open-cli-collective/.github/actions/go-lint@v1
+        with:
+          go-version-file: go.mod
+
+  # slck-specific regression sentinel (preserved verbatim from #178, which
+  # restored static linux builds after the cli-common→byteness/keyring CGO
+  # break). The shared go-build@v1 matrix legs build with default CGO and so
+  # would NOT catch a static-linux regression; this job cross-compiles the
+  # release targets with CGO disabled and asserts the static build graph never
+  # pulls in the 1Password/keyring stack. Kept as a required check (see branch
+  # protection) to preserve the blocking semantics it had inside build-and-test.
+  static-release-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.26'
-
-      - name: Download dependencies
-        run: go mod download
-
-      - name: Build
-        run: go build -v ./...
-
+          go-version-file: go.mod
       - name: Static release build guard
         run: |
           set -euo pipefail
@@ -40,19 +84,16 @@ jobs:
             fi
           done
 
-      - name: Test
-        run: go test -v -race -coverprofile=coverage.out ./...
-
-  lint:
+  identity-check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: open-cli-collective/.github/actions/identity-check@v1   # distribution.md §8.2
 
-      - uses: actions/setup-go@v5
+  pr-title:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: open-cli-collective/.github/actions/pr-title@v1
         with:
-          go-version: '1.26'
-
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v7
-        with:
-          version: v2.12.2
+          title: ${{ github.event.pull_request.title }}

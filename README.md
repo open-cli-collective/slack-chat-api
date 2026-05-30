@@ -54,14 +54,6 @@ winget install OpenCLICollective.slack-chat-cli
 
 ### Linux
 
-**Snap**
-
-```bash
-sudo snap install ocli-slack
-```
-
-> Note: After installation, the command is available as `slck`.
-
 **APT (Debian/Ubuntu)**
 
 ```bash
