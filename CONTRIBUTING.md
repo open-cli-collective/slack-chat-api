@@ -96,6 +96,11 @@ func runMy(opts *myOptions, c *client.Client) error {
 
 Resource and mutation-success commands emit text or table only. Per #173, JSON is reserved for local control-plane carve-outs (today only `slck config show --json`). Examples:
 
+The durable JSON-vs-text contract is documented in
+[ARCHITECTURE.md](ARCHITECTURE.md#output-contract). In short: JSON preserves
+upstream API semantics; text and table output may render, flatten, dedupe, and
+truncate for terminal use.
+
 ```go
 // Detail view
 output.Printf("Result: %s\n", result.Name)
