@@ -17,7 +17,7 @@ make test       # run tests with race detection
 make test-cover # run tests with coverage output
 make lint       # run golangci-lint
 make clean      # remove build artifacts
-make install    # install to $GOPATH/bin
+make install    # install to /usr/local/bin
 ```
 
 ## Repo Structure
