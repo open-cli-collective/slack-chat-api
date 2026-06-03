@@ -42,6 +42,13 @@ builds:
       - -X github.com/open-cli-collective/slack-chat-api/internal/version.Version={{.Version}}
       - -X github.com/open-cli-collective/slack-chat-api/internal/version.Commit={{.Commit}}
       - -X github.com/open-cli-collective/slack-chat-api/internal/version.Date={{.Date}}
+    # macOS code-signing — stable DR so Keychain "Always Allow" survives brew upgrade
+    # (cli-common distribution.md §2A). Logic + identity live in open-cli-collective/.github
+    # (macos-codesign-setup), which exports CODESIGN_DARWIN_SCRIPT (absolute). Unset in
+    # local builds → signing skipped.
+    hooks:
+      post:
+        - cmd: bash -c 'f="${CODESIGN_DARWIN_SCRIPT:-}"; [ -n "$f" ] && [ -x "$f" ] && exec "$f" "$0" "$1"; echo "skip codesign (no CODESIGN_DARWIN_SCRIPT)"' "{{ .Path }}" "{{ .Os }}"
   - id: slck-unix-win
     main: ./cmd/slck
     binary: slck
