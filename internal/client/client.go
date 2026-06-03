@@ -491,6 +491,32 @@ func (c *Client) GetUserInfo(userID string) (*User, error) {
 	return &result.User, nil
 }
 
+// OpenDM opens (or returns the existing) direct-message conversation with a user
+// and returns its IM channel ID (D...). It wraps conversations.open, which is
+// idempotent: calling it for a user you already have a DM with returns the same
+// channel rather than creating a new one. Requires the im:write scope.
+func (c *Client) OpenDM(userID string) (string, error) {
+	body, err := c.post("conversations.open", map[string]interface{}{
+		"users": userID,
+	})
+	if err != nil {
+		return "", err
+	}
+
+	var result struct {
+		Channel struct {
+			ID string `json:"id"`
+		} `json:"channel"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return "", err
+	}
+	if result.Channel.ID == "" {
+		return "", fmt.Errorf("conversations.open returned no channel id for user %s", userID)
+	}
+	return result.Channel.ID, nil
+}
+
 // SendMessage sends a message to a channel.
 // Text can be empty if blocks are provided (Slack API allows this).
 // The unfurl parameter controls whether link previews are shown (unfurl_links and unfurl_media).

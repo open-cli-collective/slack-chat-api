@@ -120,3 +120,122 @@ func TestResolveChannel_Empty(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "cannot be empty")
 }
+
+func TestIsUserID(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected bool
+	}{
+		{"U07D13N5AMV", true}, // regular user
+		{"U123456", true},
+		{"W012ABC34", true},    // Enterprise Grid user
+		{"USERNAME", false},    // pure letters - treated as a name
+		{"u07d13n5amv", false}, // lowercase
+		{"C123456", false},     // channel ID, not a user ID
+		{"B123456", false},     // bot ID
+		{"U", false},           // too short
+		{"", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			assert.Equal(t, tt.expected, IsUserID(tt.input))
+		})
+	}
+}
+
+// TestResolveChannel_UserID covers issue #152: a bare user ID must open a DM
+// (conversations.open) rather than being lowercased and rejected as a channel.
+func TestResolveChannel_UserID(t *testing.T) {
+	var gotUsers string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/conversations.open", r.URL.Path)
+		var body struct {
+			Users string `json:"users"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		gotUsers = body.Users
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"ok":      true,
+			"channel": map[string]interface{}{"id": "D0123456789"},
+		})
+	}))
+	defer server.Close()
+
+	c := NewWithConfig(server.URL, "test-token", nil)
+
+	result, err := c.ResolveChannel("U07D13N5AMV")
+	require.NoError(t, err)
+	assert.Equal(t, "D0123456789", result)
+	assert.Equal(t, "U07D13N5AMV", gotUsers, "user ID should be passed to conversations.open unchanged")
+}
+
+func TestResolveChannel_Handle(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/users.list":
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"ok": true,
+				"members": []map[string]interface{}{
+					{"id": "U111", "name": "alice"},
+					{"id": "U222", "name": "bob"},
+				},
+			})
+		case "/conversations.open":
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"ok":      true,
+				"channel": map[string]interface{}{"id": "D0000000001"},
+			})
+		default:
+			t.Errorf("unexpected path %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	c := NewWithConfig(server.URL, "test-token", nil)
+
+	result, err := c.ResolveChannel("@alice")
+	require.NoError(t, err)
+	assert.Equal(t, "D0000000001", result)
+}
+
+func TestResolveChannel_HandleNotFound(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/users.list", r.URL.Path)
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"ok":      true,
+			"members": []map[string]interface{}{{"id": "U111", "name": "alice"}},
+		})
+	}))
+	defer server.Close()
+
+	c := NewWithConfig(server.URL, "test-token", nil)
+
+	_, err := c.ResolveChannel("@nobody")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not found")
+	assert.Contains(t, err.Error(), "slck users search")
+}
+
+func TestResolveChannel_HandleAmbiguous(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"ok": true,
+			"members": []map[string]interface{}{
+				{"id": "U111", "profile": map[string]interface{}{"display_name": "Sam"}},
+				{"id": "U222", "profile": map[string]interface{}{"display_name": "Sam"}},
+			},
+		})
+	}))
+	defer server.Close()
+
+	c := NewWithConfig(server.URL, "test-token", nil)
+
+	_, err := c.ResolveChannel("@Sam")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "ambiguous")
+}
