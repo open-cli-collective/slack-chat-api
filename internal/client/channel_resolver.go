@@ -78,7 +78,7 @@ func IsChannelID(s string) bool {
 		if c >= '0' && c <= '9' {
 			hasDigit = true
 		} else if c < 'A' || c > 'Z' {
-			return false // not uppercase letter or digit
+			return false // not an uppercase letter
 		}
 	}
 	return hasDigit
@@ -104,7 +104,7 @@ func IsUserID(s string) bool {
 		if c >= '0' && c <= '9' {
 			hasDigit = true
 		} else if c < 'A' || c > 'Z' {
-			return false // not uppercase letter or digit
+			return false // not an uppercase letter
 		}
 	}
 	return hasDigit
