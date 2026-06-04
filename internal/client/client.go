@@ -471,6 +471,44 @@ func (c *Client) ListUsers(limit int) ([]User, error) {
 	return allUsers, nil
 }
 
+// ListAllUsers returns all users, handling Slack cursor pagination.
+func (c *Client) ListAllUsers() ([]User, error) {
+	var allUsers []User
+	cursor := ""
+
+	for {
+		params := url.Values{}
+		params.Set("limit", "200")
+		if cursor != "" {
+			params.Set("cursor", cursor)
+		}
+
+		body, err := c.get("users.list", params)
+		if err != nil {
+			return nil, err
+		}
+
+		var result struct {
+			Members          []User `json:"members"`
+			ResponseMetadata struct {
+				NextCursor string `json:"next_cursor"`
+			} `json:"response_metadata"`
+		}
+		if err := json.Unmarshal(body, &result); err != nil {
+			return nil, err
+		}
+
+		allUsers = append(allUsers, result.Members...)
+
+		if result.ResponseMetadata.NextCursor == "" {
+			break
+		}
+		cursor = result.ResponseMetadata.NextCursor
+	}
+
+	return allUsers, nil
+}
+
 // GetUserInfo returns user details
 func (c *Client) GetUserInfo(userID string) (*User, error) {
 	params := url.Values{}

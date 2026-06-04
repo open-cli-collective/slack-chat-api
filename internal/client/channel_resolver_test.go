@@ -261,6 +261,58 @@ func TestResolveMessageDestination_Handle(t *testing.T) {
 	assert.Equal(t, "U111", gotOpenUsers)
 }
 
+func TestResolveMessageDestination_HandleFoundAfterFirstPage(t *testing.T) {
+	userListCalls := 0
+	var gotOpenUsers string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/users.list":
+			userListCalls++
+			if userListCalls == 1 {
+				assert.Empty(t, r.URL.Query().Get("cursor"))
+				_ = json.NewEncoder(w).Encode(map[string]interface{}{
+					"ok": true,
+					"members": []map[string]interface{}{
+						{"id": "U111", "name": "bob"},
+					},
+					"response_metadata": map[string]string{"next_cursor": "cursor456"},
+				})
+				return
+			}
+			assert.Equal(t, "cursor456", r.URL.Query().Get("cursor"))
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"ok": true,
+				"members": []map[string]interface{}{
+					{"id": "U222", "name": "alice"},
+				},
+				"response_metadata": map[string]string{"next_cursor": ""},
+			})
+		case "/conversations.open":
+			var body struct {
+				Users string `json:"users"`
+			}
+			_ = json.NewDecoder(r.Body).Decode(&body)
+			gotOpenUsers = body.Users
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"ok":      true,
+				"channel": map[string]interface{}{"id": "D0000000002"},
+			})
+		default:
+			t.Errorf("unexpected path %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	c := NewWithConfig(server.URL, "test-token", nil)
+
+	result, err := c.ResolveMessageDestination("@alice")
+	require.NoError(t, err)
+	assert.Equal(t, "D0000000002", result)
+	assert.Equal(t, 2, userListCalls)
+	assert.Equal(t, "U222", gotOpenUsers)
+}
+
 func TestResolveMessageDestination_HandleNotFound(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/users.list", r.URL.Path)
@@ -280,15 +332,29 @@ func TestResolveMessageDestination_HandleNotFound(t *testing.T) {
 	assert.Contains(t, err.Error(), "slck users search")
 }
 
-func TestResolveMessageDestination_HandleAmbiguous(t *testing.T) {
+func TestResolveMessageDestination_HandleAmbiguousAcrossPages(t *testing.T) {
+	userListCalls := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		assert.Equal(t, "/users.list", r.URL.Path)
+		userListCalls++
+		if userListCalls == 1 {
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"ok": true,
+				"members": []map[string]interface{}{
+					{"id": "U111", "profile": map[string]interface{}{"display_name": "Sam"}},
+				},
+				"response_metadata": map[string]string{"next_cursor": "cursor456"},
+			})
+			return
+		}
+		assert.Equal(t, "cursor456", r.URL.Query().Get("cursor"))
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"ok": true,
 			"members": []map[string]interface{}{
-				{"id": "U111", "profile": map[string]interface{}{"display_name": "Sam"}},
 				{"id": "U222", "profile": map[string]interface{}{"display_name": "Sam"}},
 			},
+			"response_metadata": map[string]string{"next_cursor": ""},
 		})
 	}))
 	defer server.Close()
@@ -298,4 +364,5 @@ func TestResolveMessageDestination_HandleAmbiguous(t *testing.T) {
 	_, err := c.ResolveMessageDestination("@Sam")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "ambiguous")
+	assert.Equal(t, 2, userListCalls)
 }

@@ -127,7 +127,7 @@ func (c *Client) resolveUserHandle(handle string) (string, error) {
 		return "", fmt.Errorf("user handle cannot be empty")
 	}
 
-	users, err := c.ListUsers(1000)
+	users, err := c.ListAllUsers()
 	if err != nil {
 		return "", fmt.Errorf("failed to list users: %w", err)
 	}
