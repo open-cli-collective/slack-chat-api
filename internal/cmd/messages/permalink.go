@@ -44,7 +44,7 @@ func runPermalink(channel, timestamp string, _ *permalinkOptions, c *client.Clie
 		}
 	}
 
-	channelID, err := c.ResolveChannel(channel)
+	channelID, err := c.ResolveMessageDestination(channel)
 	if err != nil {
 		return err
 	}

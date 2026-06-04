@@ -136,6 +136,39 @@ func TestRunCreate_Channel_Success(t *testing.T) {
 	}
 }
 
+func TestRunCreate_ChannelUserIDDoesNotOpenDM(t *testing.T) {
+	openedDM := false
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/conversations.open":
+			openedDM = true
+			t.Errorf("canvas create --channel should not open DMs")
+		case "/conversations.list":
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"ok":       true,
+				"channels": []map[string]interface{}{},
+			})
+		default:
+			t.Errorf("unexpected path %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	c := client.NewWithConfig(server.URL, "test-token", nil)
+	opts := &createOptions{channel: "U07D13N5AMV", text: "# Channel Doc"}
+	err := runCreate(opts, c)
+	if err == nil {
+		t.Fatal("expected user ID channel lookup to fail")
+	}
+	if openedDM {
+		t.Fatal("unexpected conversations.open call")
+	}
+	if !strings.Contains(err.Error(), "channel 'u07d13n5amv' not found") {
+		t.Fatalf("expected channel not found error, got %v", err)
+	}
+}
+
 func TestRunEdit_NoContent(t *testing.T) {
 	opts := &editOptions{}
 	err := runEdit("F12345", opts, nil)

@@ -316,6 +316,176 @@ func TestRunSend_Success(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestRunSend_UserIDOpensDM(t *testing.T) {
+	var gotOpenUsers string
+	var gotPostChannel string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/conversations.open":
+			var body struct {
+				Users string `json:"users"`
+			}
+			_ = json.NewDecoder(r.Body).Decode(&body)
+			gotOpenUsers = body.Users
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"ok":      true,
+				"channel": map[string]interface{}{"id": "D0123456789"},
+			})
+		case "/chat.postMessage":
+			var body map[string]interface{}
+			_ = json.NewDecoder(r.Body).Decode(&body)
+			gotPostChannel, _ = body["channel"].(string)
+			assert.Equal(t, "Hello World", body["text"])
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"ok":      true,
+				"ts":      "1234567890.123456",
+				"channel": "D0123456789",
+			})
+		default:
+			t.Errorf("unexpected path %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	c := client.NewWithConfig(server.URL, "test-token", nil)
+	opts := &sendOptions{simple: true}
+
+	err := runSend("U07D13N5AMV", "Hello World", opts, c)
+	require.NoError(t, err)
+	assert.Equal(t, "U07D13N5AMV", gotOpenUsers)
+	assert.Equal(t, "D0123456789", gotPostChannel)
+}
+
+func TestMessageCommands_UserIDDestinationsOpenDM(t *testing.T) {
+	const (
+		userID = "U07D13N5AMV"
+		dmID   = "D0123456789"
+		ts     = "1234567890.123456"
+	)
+
+	postChannel := func(t *testing.T, r *http.Request) string {
+		t.Helper()
+		var body map[string]interface{}
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		channel, _ := body["channel"].(string)
+		return channel
+	}
+
+	tests := []struct {
+		name     string
+		apiPath  string
+		run      func(*client.Client) error
+		channel  func(*testing.T, *http.Request) string
+		response map[string]interface{}
+	}{
+		{
+			name:    "history",
+			apiPath: "/conversations.history",
+			run: func(c *client.Client) error {
+				return runHistory(userID, &historyOptions{limit: 1}, c)
+			},
+			channel: func(t *testing.T, r *http.Request) string {
+				return r.URL.Query().Get("channel")
+			},
+			response: map[string]interface{}{"ok": true, "messages": []map[string]interface{}{}},
+		},
+		{
+			name:    "thread",
+			apiPath: "/conversations.replies",
+			run: func(c *client.Client) error {
+				return runThread(userID, ts, &threadOptions{limit: 1}, c)
+			},
+			channel: func(t *testing.T, r *http.Request) string {
+				return r.URL.Query().Get("channel")
+			},
+			response: map[string]interface{}{"ok": true, "messages": []map[string]interface{}{}},
+		},
+		{
+			name:    "permalink",
+			apiPath: "/chat.getPermalink",
+			run: func(c *client.Client) error {
+				return runPermalink(userID, ts, &permalinkOptions{}, c)
+			},
+			channel: func(t *testing.T, r *http.Request) string {
+				return r.URL.Query().Get("channel")
+			},
+			response: map[string]interface{}{"ok": true, "permalink": "https://example.slack.com/archives/D0123456789/p1234567890123456"},
+		},
+		{
+			name:    "react",
+			apiPath: "/reactions.add",
+			run: func(c *client.Client) error {
+				return runReact(userID, ts, "thumbsup", &reactOptions{}, c)
+			},
+			channel:  postChannel,
+			response: map[string]interface{}{"ok": true},
+		},
+		{
+			name:    "unreact",
+			apiPath: "/reactions.remove",
+			run: func(c *client.Client) error {
+				return runUnreact(userID, ts, "thumbsup", &unreactOptions{}, c)
+			},
+			channel:  postChannel,
+			response: map[string]interface{}{"ok": true},
+		},
+		{
+			name:    "update",
+			apiPath: "/chat.update",
+			run: func(c *client.Client) error {
+				return runUpdate(userID, ts, "Updated", &updateOptions{simple: true}, c)
+			},
+			channel:  postChannel,
+			response: map[string]interface{}{"ok": true},
+		},
+		{
+			name:    "delete",
+			apiPath: "/chat.delete",
+			run: func(c *client.Client) error {
+				return runDelete(userID, ts, &deleteOptions{force: true}, c)
+			},
+			channel:  postChannel,
+			response: map[string]interface{}{"ok": true},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var gotOpenUsers string
+			apiCalled := false
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				switch r.URL.Path {
+				case "/conversations.open":
+					var body struct {
+						Users string `json:"users"`
+					}
+					_ = json.NewDecoder(r.Body).Decode(&body)
+					gotOpenUsers = body.Users
+					_ = json.NewEncoder(w).Encode(map[string]interface{}{
+						"ok":      true,
+						"channel": map[string]interface{}{"id": dmID},
+					})
+				case tt.apiPath:
+					apiCalled = true
+					assert.Equal(t, dmID, tt.channel(t, r))
+					_ = json.NewEncoder(w).Encode(tt.response)
+				default:
+					t.Errorf("unexpected path %s", r.URL.Path)
+				}
+			}))
+			defer server.Close()
+
+			c := client.NewWithConfig(server.URL, "test-token", nil)
+
+			require.NoError(t, tt.run(c))
+			assert.Equal(t, userID, gotOpenUsers)
+			assert.True(t, apiCalled)
+		})
+	}
+}
+
 func TestRunSend_WithThread(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var body map[string]interface{}

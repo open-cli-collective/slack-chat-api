@@ -221,7 +221,7 @@ func runSend(channel, text string, opts *sendOptions, c *client.Client) error {
 	}
 
 	// Resolve channel name to ID if needed
-	channelID, err := c.ResolveChannel(channel)
+	channelID, err := c.ResolveMessageDestination(channel)
 	if err != nil {
 		return err
 	}

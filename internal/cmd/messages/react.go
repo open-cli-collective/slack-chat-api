@@ -43,7 +43,7 @@ func runReact(channel, timestamp, emoji string, opts *reactOptions, c *client.Cl
 	}
 
 	// Resolve channel name to ID if needed
-	channelID, err := c.ResolveChannel(channel)
+	channelID, err := c.ResolveMessageDestination(channel)
 	if err != nil {
 		return err
 	}

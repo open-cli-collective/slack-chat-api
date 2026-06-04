@@ -56,7 +56,7 @@ func runUpdate(channel, timestamp, text string, opts *updateOptions, c *client.C
 	}
 
 	// Resolve channel name to ID if needed
-	channelID, err := c.ResolveChannel(channel)
+	channelID, err := c.ResolveMessageDestination(channel)
 	if err != nil {
 		return err
 	}

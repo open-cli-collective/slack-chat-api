@@ -144,9 +144,37 @@ func TestIsUserID(t *testing.T) {
 	}
 }
 
-// TestResolveChannel_UserID covers issue #152: a bare user ID must open a DM
-// (conversations.open) rather than being lowercased and rejected as a channel.
-func TestResolveChannel_UserID(t *testing.T) {
+func TestResolveChannel_UserIDDoesNotOpenDM(t *testing.T) {
+	var openedDM bool
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/conversations.open":
+			openedDM = true
+			t.Errorf("ResolveChannel should not open DMs")
+		case "/conversations.list":
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"ok":       true,
+				"channels": []map[string]interface{}{},
+			})
+		default:
+			t.Errorf("unexpected path %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	c := NewWithConfig(server.URL, "test-token", nil)
+
+	_, err := c.ResolveChannel("U07D13N5AMV")
+	require.Error(t, err)
+	assert.False(t, openedDM)
+	assert.Contains(t, err.Error(), "channel 'u07d13n5amv' not found")
+}
+
+// TestResolveMessageDestination_UserID covers issue #152: a bare user ID must
+// open a DM (conversations.open) rather than being lowercased and rejected as a
+// channel.
+func TestResolveMessageDestination_UserID(t *testing.T) {
 	var gotUsers string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/conversations.open", r.URL.Path)
@@ -165,13 +193,39 @@ func TestResolveChannel_UserID(t *testing.T) {
 
 	c := NewWithConfig(server.URL, "test-token", nil)
 
-	result, err := c.ResolveChannel("U07D13N5AMV")
+	result, err := c.ResolveMessageDestination("U07D13N5AMV")
 	require.NoError(t, err)
 	assert.Equal(t, "D0123456789", result)
 	assert.Equal(t, "U07D13N5AMV", gotUsers, "user ID should be passed to conversations.open unchanged")
 }
 
-func TestResolveChannel_Handle(t *testing.T) {
+func TestResolveMessageDestination_EnterpriseGridUserID(t *testing.T) {
+	var gotUsers string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/conversations.open", r.URL.Path)
+		var body struct {
+			Users string `json:"users"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		gotUsers = body.Users
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"ok":      true,
+			"channel": map[string]interface{}{"id": "D0123456789"},
+		})
+	}))
+	defer server.Close()
+
+	c := NewWithConfig(server.URL, "test-token", nil)
+
+	result, err := c.ResolveMessageDestination("W012ABC34")
+	require.NoError(t, err)
+	assert.Equal(t, "D0123456789", result)
+	assert.Equal(t, "W012ABC34", gotUsers, "Enterprise Grid user ID should be passed through unchanged")
+}
+
+func TestResolveMessageDestination_Handle(t *testing.T) {
+	var gotOpenUsers string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
@@ -184,6 +238,11 @@ func TestResolveChannel_Handle(t *testing.T) {
 				},
 			})
 		case "/conversations.open":
+			var body struct {
+				Users string `json:"users"`
+			}
+			_ = json.NewDecoder(r.Body).Decode(&body)
+			gotOpenUsers = body.Users
 			_ = json.NewEncoder(w).Encode(map[string]interface{}{
 				"ok":      true,
 				"channel": map[string]interface{}{"id": "D0000000001"},
@@ -196,12 +255,13 @@ func TestResolveChannel_Handle(t *testing.T) {
 
 	c := NewWithConfig(server.URL, "test-token", nil)
 
-	result, err := c.ResolveChannel("@alice")
+	result, err := c.ResolveMessageDestination("@alice")
 	require.NoError(t, err)
 	assert.Equal(t, "D0000000001", result)
+	assert.Equal(t, "U111", gotOpenUsers)
 }
 
-func TestResolveChannel_HandleNotFound(t *testing.T) {
+func TestResolveMessageDestination_HandleNotFound(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/users.list", r.URL.Path)
 		w.Header().Set("Content-Type", "application/json")
@@ -214,13 +274,13 @@ func TestResolveChannel_HandleNotFound(t *testing.T) {
 
 	c := NewWithConfig(server.URL, "test-token", nil)
 
-	_, err := c.ResolveChannel("@nobody")
+	_, err := c.ResolveMessageDestination("@nobody")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not found")
 	assert.Contains(t, err.Error(), "slck users search")
 }
 
-func TestResolveChannel_HandleAmbiguous(t *testing.T) {
+func TestResolveMessageDestination_HandleAmbiguous(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{
@@ -235,7 +295,7 @@ func TestResolveChannel_HandleAmbiguous(t *testing.T) {
 
 	c := NewWithConfig(server.URL, "test-token", nil)
 
-	_, err := c.ResolveChannel("@Sam")
+	_, err := c.ResolveMessageDestination("@Sam")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "ambiguous")
 }

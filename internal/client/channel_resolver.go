@@ -9,28 +9,9 @@ import (
 // act on. It accepts:
 //   - channel IDs (C/G/D...)        returned as-is
 //   - channel names ("general", "#general")  looked up via the Slack API
-//   - user IDs (U.../W...)          a DM is opened and the IM channel ID returned
-//   - user handles ("@alice")       resolved to a user ID, then a DM is opened
-//
-// Opening a DM uses conversations.open and requires the im:write scope.
 func (c *Client) ResolveChannel(channel string) (string, error) {
 	if channel == "" {
 		return "", fmt.Errorf("channel cannot be empty")
-	}
-
-	// "@handle" -> resolve the username to a user ID, then open a DM.
-	if handle := strings.TrimPrefix(channel, "@"); handle != channel {
-		userID, err := c.resolveUserHandle(handle)
-		if err != nil {
-			return "", err
-		}
-		return c.OpenDM(userID)
-	}
-
-	// A bare user ID (U.../W...) -> open a DM and return its IM channel ID.
-	// chat.postMessage rejects raw user IDs, so the DM must be opened first.
-	if IsUserID(channel) {
-		return c.OpenDM(channel)
 	}
 
 	// Strip leading # if present (common user mistake)
@@ -47,6 +28,32 @@ func (c *Client) ResolveChannel(channel string) (string, error) {
 
 	// Otherwise, look it up by name
 	return c.lookupChannelByName(channel)
+}
+
+// ResolveMessageDestination takes a message destination and returns a Slack
+// conversation ID suitable for message APIs. User IDs and handles are resolved
+// by opening a DM; channel-like inputs are delegated to ResolveChannel.
+func (c *Client) ResolveMessageDestination(destination string) (string, error) {
+	if destination == "" {
+		return "", fmt.Errorf("channel cannot be empty")
+	}
+
+	// "@handle" -> resolve the username to a user ID, then open a DM.
+	if handle := strings.TrimPrefix(destination, "@"); handle != destination {
+		userID, err := c.resolveUserHandle(handle)
+		if err != nil {
+			return "", err
+		}
+		return c.OpenDM(userID)
+	}
+
+	// A bare user ID (U.../W...) -> open a DM and return its IM channel ID.
+	// chat.postMessage rejects raw user IDs, so the DM must be opened first.
+	if IsUserID(destination) {
+		return c.OpenDM(destination)
+	}
+
+	return c.ResolveChannel(destination)
 }
 
 // IsChannelID returns true if the string looks like a Slack channel ID.
