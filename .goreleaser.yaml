@@ -48,7 +48,7 @@ builds:
     # local builds → signing skipped.
     hooks:
       post:
-        - cmd: bash -c 'f="${CODESIGN_DARWIN_SCRIPT:-}"; [ -n "$f" ] && [ -x "$f" ] && exec "$f" "$0" "$1"; echo "skip codesign (no CODESIGN_DARWIN_SCRIPT)"' "{{ .Path }}" "{{ .Os }}"
+        - cmd: bash -c 'f="${CODESIGN_DARWIN_SCRIPT:-}"; if [ -z "$f" ]; then echo "skip codesign (CODESIGN_DARWIN_SCRIPT unset, local build)"; exit 0; fi; [ -x "$f" ] || { echo "CODESIGN_DARWIN_SCRIPT not executable ($f)" >&2; exit 1; }; exec "$f" "$0" "$1"' "{{ .Path }}" "{{ .Os }}"
   - id: slck-unix-win
     main: ./cmd/slck
     binary: slck
