@@ -131,6 +131,34 @@ func TestRunGet_NotFound(t *testing.T) {
 	assert.Contains(t, err.Error(), "channel_not_found")
 }
 
+func TestRunGet_UserIDDoesNotOpenDM(t *testing.T) {
+	var openedDM bool
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/conversations.open":
+			openedDM = true
+			t.Errorf("channels get should not open DMs")
+		case "/conversations.list":
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"ok":       true,
+				"channels": []map[string]interface{}{},
+			})
+		default:
+			t.Errorf("unexpected path %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	c := client.NewWithConfig(server.URL, "test-token", nil)
+	opts := &getOptions{}
+
+	err := runGet("U07D13N5AMV", opts, c)
+	require.Error(t, err)
+	assert.False(t, openedDM)
+	assert.Contains(t, err.Error(), "channel 'u07d13n5amv' not found")
+}
+
 func TestRunCreate_Success(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/conversations.create", r.URL.Path)

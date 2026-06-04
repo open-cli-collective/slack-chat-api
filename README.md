@@ -547,6 +547,10 @@ slck messages send C1234567890 "Hello, *world*!"
 # Send using --channel flag (alternative to positional arg)
 slck messages send --channel general "Hello team"
 
+# Send a direct message to a user (by user ID or @handle; requires im:write scope)
+slck messages send U1234567890 "Hey, got a minute?"
+slck messages send @alice "Hey, got a minute?"
+
 # Send from stdin (use "-" as text argument)
 echo "Hello from stdin" | slck messages send C1234567890 -
 cat message.txt | slck messages send C1234567890 -

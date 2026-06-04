@@ -35,8 +35,12 @@ func newSendCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "send <channel> [text]",
-		Short: "Send a message to a channel",
-		Long: `Send a message to a channel.
+		Short: "Send a message to a channel or user",
+		Long: `Send a message to a channel or user.
+
+The destination can be a channel ID (C…), a channel name ("general"), a user ID
+(U…) or a user handle ("@alice"). Passing a user opens a direct message, which
+requires the im:write scope.
 
 By default, messages are sent using Slack Block Kit formatting for a more
 refined appearance. Use --simple to send plain text messages instead.
@@ -101,7 +105,7 @@ The channel can also be specified via --channel instead of as a positional argum
 		},
 	}
 
-	cmd.Flags().StringVar(&opts.channel, "channel", "", "Channel name or ID (alternative to positional argument)")
+	cmd.Flags().StringVar(&opts.channel, "channel", "", "Channel/user name or ID (alternative to positional argument)")
 	cmd.Flags().StringVar(&opts.threadTS, "thread", "", "Thread timestamp for reply")
 	cmd.Flags().StringVar(&opts.blocksJSON, "blocks", "", "Inline Block Kit JSON array (for simple blocks)")
 	cmd.Flags().StringVar(&opts.blocksFile, "blocks-file", "", "Read blocks from JSON file (recommended for complex payloads)")
@@ -217,7 +221,7 @@ func runSend(channel, text string, opts *sendOptions, c *client.Client) error {
 	}
 
 	// Resolve channel name to ID if needed
-	channelID, err := c.ResolveChannel(channel)
+	channelID, err := c.ResolveMessageDestination(channel)
 	if err != nil {
 		return err
 	}

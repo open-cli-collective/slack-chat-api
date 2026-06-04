@@ -120,3 +120,249 @@ func TestResolveChannel_Empty(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "cannot be empty")
 }
+
+func TestIsUserID(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected bool
+	}{
+		{"U07D13N5AMV", true}, // regular user
+		{"U123456", true},
+		{"W012ABC34", true},    // Enterprise Grid user
+		{"USERNAME", false},    // pure letters - treated as a name
+		{"u07d13n5amv", false}, // lowercase
+		{"C123456", false},     // channel ID, not a user ID
+		{"B123456", false},     // bot ID
+		{"U", false},           // too short
+		{"", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			assert.Equal(t, tt.expected, IsUserID(tt.input))
+		})
+	}
+}
+
+func TestResolveChannel_UserIDDoesNotOpenDM(t *testing.T) {
+	var openedDM bool
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/conversations.open":
+			openedDM = true
+			t.Errorf("ResolveChannel should not open DMs")
+		case "/conversations.list":
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"ok":       true,
+				"channels": []map[string]interface{}{},
+			})
+		default:
+			t.Errorf("unexpected path %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	c := NewWithConfig(server.URL, "test-token", nil)
+
+	_, err := c.ResolveChannel("U07D13N5AMV")
+	require.Error(t, err)
+	assert.False(t, openedDM)
+	assert.Contains(t, err.Error(), "channel 'u07d13n5amv' not found")
+}
+
+// TestResolveMessageDestination_UserID covers issue #152: a bare user ID must
+// open a DM (conversations.open) rather than being lowercased and rejected as a
+// channel.
+func TestResolveMessageDestination_UserID(t *testing.T) {
+	var gotUsers string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/conversations.open", r.URL.Path)
+		var body struct {
+			Users string `json:"users"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		gotUsers = body.Users
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"ok":      true,
+			"channel": map[string]interface{}{"id": "D0123456789"},
+		})
+	}))
+	defer server.Close()
+
+	c := NewWithConfig(server.URL, "test-token", nil)
+
+	result, err := c.ResolveMessageDestination("U07D13N5AMV")
+	require.NoError(t, err)
+	assert.Equal(t, "D0123456789", result)
+	assert.Equal(t, "U07D13N5AMV", gotUsers, "user ID should be passed to conversations.open unchanged")
+}
+
+func TestResolveMessageDestination_EnterpriseGridUserID(t *testing.T) {
+	var gotUsers string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/conversations.open", r.URL.Path)
+		var body struct {
+			Users string `json:"users"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		gotUsers = body.Users
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"ok":      true,
+			"channel": map[string]interface{}{"id": "D0123456789"},
+		})
+	}))
+	defer server.Close()
+
+	c := NewWithConfig(server.URL, "test-token", nil)
+
+	result, err := c.ResolveMessageDestination("W012ABC34")
+	require.NoError(t, err)
+	assert.Equal(t, "D0123456789", result)
+	assert.Equal(t, "W012ABC34", gotUsers, "Enterprise Grid user ID should be passed through unchanged")
+}
+
+func TestResolveMessageDestination_Handle(t *testing.T) {
+	var gotOpenUsers string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/users.list":
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"ok": true,
+				"members": []map[string]interface{}{
+					{"id": "U111", "name": "alice"},
+					{"id": "U222", "name": "bob"},
+				},
+			})
+		case "/conversations.open":
+			var body struct {
+				Users string `json:"users"`
+			}
+			_ = json.NewDecoder(r.Body).Decode(&body)
+			gotOpenUsers = body.Users
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"ok":      true,
+				"channel": map[string]interface{}{"id": "D0000000001"},
+			})
+		default:
+			t.Errorf("unexpected path %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	c := NewWithConfig(server.URL, "test-token", nil)
+
+	result, err := c.ResolveMessageDestination("@alice")
+	require.NoError(t, err)
+	assert.Equal(t, "D0000000001", result)
+	assert.Equal(t, "U111", gotOpenUsers)
+}
+
+func TestResolveMessageDestination_HandleFoundAfterFirstPage(t *testing.T) {
+	userListCalls := 0
+	var gotOpenUsers string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/users.list":
+			userListCalls++
+			if userListCalls == 1 {
+				assert.Empty(t, r.URL.Query().Get("cursor"))
+				_ = json.NewEncoder(w).Encode(map[string]interface{}{
+					"ok": true,
+					"members": []map[string]interface{}{
+						{"id": "U111", "name": "bob"},
+					},
+					"response_metadata": map[string]string{"next_cursor": "cursor456"},
+				})
+				return
+			}
+			assert.Equal(t, "cursor456", r.URL.Query().Get("cursor"))
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"ok": true,
+				"members": []map[string]interface{}{
+					{"id": "U222", "name": "alice"},
+				},
+				"response_metadata": map[string]string{"next_cursor": ""},
+			})
+		case "/conversations.open":
+			var body struct {
+				Users string `json:"users"`
+			}
+			_ = json.NewDecoder(r.Body).Decode(&body)
+			gotOpenUsers = body.Users
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"ok":      true,
+				"channel": map[string]interface{}{"id": "D0000000002"},
+			})
+		default:
+			t.Errorf("unexpected path %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	c := NewWithConfig(server.URL, "test-token", nil)
+
+	result, err := c.ResolveMessageDestination("@alice")
+	require.NoError(t, err)
+	assert.Equal(t, "D0000000002", result)
+	assert.Equal(t, 2, userListCalls)
+	assert.Equal(t, "U222", gotOpenUsers)
+}
+
+func TestResolveMessageDestination_HandleNotFound(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/users.list", r.URL.Path)
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"ok":      true,
+			"members": []map[string]interface{}{{"id": "U111", "name": "alice"}},
+		})
+	}))
+	defer server.Close()
+
+	c := NewWithConfig(server.URL, "test-token", nil)
+
+	_, err := c.ResolveMessageDestination("@nobody")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not found")
+	assert.Contains(t, err.Error(), "slck users search")
+}
+
+func TestResolveMessageDestination_HandleAmbiguousAcrossPages(t *testing.T) {
+	userListCalls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		assert.Equal(t, "/users.list", r.URL.Path)
+		userListCalls++
+		if userListCalls == 1 {
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"ok": true,
+				"members": []map[string]interface{}{
+					{"id": "U111", "profile": map[string]interface{}{"display_name": "Sam"}},
+				},
+				"response_metadata": map[string]string{"next_cursor": "cursor456"},
+			})
+			return
+		}
+		assert.Equal(t, "cursor456", r.URL.Query().Get("cursor"))
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"ok": true,
+			"members": []map[string]interface{}{
+				{"id": "U222", "profile": map[string]interface{}{"display_name": "Sam"}},
+			},
+			"response_metadata": map[string]string{"next_cursor": ""},
+		})
+	}))
+	defer server.Close()
+
+	c := NewWithConfig(server.URL, "test-token", nil)
+
+	_, err := c.ResolveMessageDestination("@Sam")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "ambiguous")
+	assert.Equal(t, 2, userListCalls)
+}

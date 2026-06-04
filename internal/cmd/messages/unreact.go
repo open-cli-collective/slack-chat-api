@@ -43,7 +43,7 @@ func runUnreact(channel, timestamp, emoji string, opts *unreactOptions, c *clien
 	}
 
 	// Resolve channel name to ID if needed
-	channelID, err := c.ResolveChannel(channel)
+	channelID, err := c.ResolveMessageDestination(channel)
 	if err != nil {
 		return err
 	}

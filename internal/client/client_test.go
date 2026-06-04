@@ -1100,6 +1100,55 @@ func TestClient_ListUsers_PaginationWithLimit(t *testing.T) {
 	}
 }
 
+func TestClient_ListAllUsers_Pagination(t *testing.T) {
+	callCount := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		callCount++
+		var resp map[string]interface{}
+
+		if callCount == 1 {
+			if r.URL.Query().Get("cursor") != "" {
+				t.Errorf("expected no cursor on first request, got %s", r.URL.Query().Get("cursor"))
+			}
+			resp = map[string]interface{}{
+				"ok": true,
+				"members": []map[string]interface{}{
+					{"id": "U1", "name": "user1"},
+					{"id": "U2", "name": "user2"},
+				},
+				"response_metadata": map[string]string{"next_cursor": "cursor456"},
+			}
+		} else {
+			if r.URL.Query().Get("cursor") != "cursor456" {
+				t.Errorf("expected cursor=cursor456, got %s", r.URL.Query().Get("cursor"))
+			}
+			resp = map[string]interface{}{
+				"ok": true,
+				"members": []map[string]interface{}{
+					{"id": "U3", "name": "user3"},
+				},
+				"response_metadata": map[string]string{"next_cursor": ""},
+			}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	client := NewWithConfig(server.URL, "test-token", nil)
+	users, err := client.ListAllUsers()
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if callCount != 2 {
+		t.Errorf("expected 2 API calls, got %d", callCount)
+	}
+	if len(users) != 3 {
+		t.Errorf("expected 3 users, got %d", len(users))
+	}
+}
+
 // --- Search Tests ---
 
 func TestClient_SearchMessages_Success(t *testing.T) {
