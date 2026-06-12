@@ -17,6 +17,9 @@ builds:
   - id: slck-darwin
     main: ./cmd/slck
     binary: slck
+    # Standard keyring opt-out tags (cli-common working-with-secrets.md §1.10).
+    flags:
+      - -tags=keyring_no1password,keyring_nopassage
     env:
       - CGO_ENABLED=1
     goos:
@@ -52,6 +55,8 @@ builds:
   - id: slck-unix-win
     main: ./cmd/slck
     binary: slck
+    flags:
+      - -tags=keyring_no1password,keyring_nopassage
     env:
       - CGO_ENABLED=0
     goos:
