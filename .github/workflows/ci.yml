@@ -12,6 +12,10 @@ concurrency:
 permissions:
   contents: read
 
+# Standard keyring opt-out tags (cli-common working-with-secrets.md §1.10).
+env:
+  GOFLAGS: -tags=keyring_no1password,keyring_nopassage
+
 jobs:
   build-platform:                          # OS matrix — NOT a required check
     name: build (${{ matrix.os }})

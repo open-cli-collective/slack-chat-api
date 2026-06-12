@@ -9,6 +9,10 @@ LDFLAGS := -ldflags "-s -w \
 
 DIST_DIR = dist
 
+# Standard keyring opt-out tags (cli-common working-with-secrets.md §1.10):
+# exclude the 1Password and passage backends credstore never exposes.
+export GOFLAGS := -tags=keyring_no1password,keyring_nopassage
+
 .PHONY: all build test test-cover test-short lint fmt deps verify clean release checksums install uninstall
 
 all: build
