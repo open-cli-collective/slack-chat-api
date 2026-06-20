@@ -3,7 +3,8 @@ module github.com/open-cli-collective/slack-chat-api
 go 1.26
 
 require (
-	github.com/open-cli-collective/cli-common v0.3.2
+	github.com/byteness/keyring v1.11.0
+	github.com/open-cli-collective/cli-common v0.4.1-0.20260620115552-351effa2004b
 	github.com/spf13/cobra v1.8.0
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/term v0.44.0
@@ -15,7 +16,6 @@ require (
 	github.com/1password/onepassword-sdk-go v0.4.1-beta.1 // indirect
 	github.com/byteness/go-keychain v0.0.0-20191008050251-8e49817e8af4 // indirect
 	github.com/byteness/go-libsecret v0.0.0-20260108215642-107379d3dee0 // indirect
-	github.com/byteness/keyring v1.11.0 // indirect
 	github.com/byteness/percent v0.2.2 // indirect
 	github.com/danieljoos/wincred v1.2.3 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
