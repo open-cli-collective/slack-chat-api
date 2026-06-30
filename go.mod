@@ -4,7 +4,7 @@ go 1.26
 
 require (
 	github.com/byteness/keyring v1.11.0
-	github.com/open-cli-collective/cli-common v0.4.1-0.20260620115552-351effa2004b
+	github.com/open-cli-collective/cli-common v0.4.1
 	github.com/spf13/cobra v1.8.0
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/term v0.44.0
