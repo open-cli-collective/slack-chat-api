@@ -1759,6 +1759,17 @@ func TestRunHistory_BotAuthorAndBody(t *testing.T) {
 	assert.Contains(t, out, "deploy-bot: deployment complete")
 }
 
+func TestRenderMessageList_BotAuthorAndBody(t *testing.T) {
+	out := captureTextOutput(t, func() {
+		renderMessageList([]client.Message{{
+			TS:         "1234567890.123456",
+			BotProfile: client.BotProfile{Name: "deploy-bot"},
+			Text:       "deployment complete",
+		}}, nil)
+	})
+	assert.Contains(t, out, "deploy-bot: deployment complete")
+}
+
 func TestHumanSize(t *testing.T) {
 	tests := []struct {
 		name     string
