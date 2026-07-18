@@ -1712,12 +1712,16 @@ func TestMessageBody_NilResolverTextPath(t *testing.T) {
 }
 
 func TestMessageAuthorFallback(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(mockUserInfoHandler))
+	defer server.Close()
+	resolver := client.NewUserResolver(client.NewWithConfig(server.URL, "test-token", nil))
+	assert.Equal(t, "alice", messageAuthor(client.Message{User: "U001", Username: "ignored"}, resolver))
+
 	tests := []struct {
 		name    string
 		message client.Message
 		want    string
 	}{
-		{"user", client.Message{User: "U123", Username: "ignored"}, "U123"},
 		{"username", client.Message{Username: "deploy-bot", BotProfile: client.BotProfile{Name: "ignored"}}, "deploy-bot"},
 		{"bot profile", client.Message{BotProfile: client.BotProfile{Name: "deploy-bot"}, BotID: "B123"}, "deploy-bot"},
 		{"bot id", client.Message{BotID: "B123", AppID: "A123"}, "B123"},
