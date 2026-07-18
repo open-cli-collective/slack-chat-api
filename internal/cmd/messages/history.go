@@ -64,7 +64,7 @@ func runHistory(channel string, opts *historyOptions, c *client.Client) error {
 		// blocks-vs-text distinction doesn't matter here.
 		body, _ := messageBody(m, resolver)
 		text := truncate(body, 80)
-		name := resolver.Resolve(m.User)
+		name := messageAuthor(m, resolver)
 		edited := ""
 		if m.Edited != nil {
 			edited = " [edited]"
