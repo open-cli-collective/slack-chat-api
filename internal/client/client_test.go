@@ -1209,7 +1209,7 @@ func TestClient_SearchMessages_Success(t *testing.T) {
 	defer server.Close()
 
 	client := NewWithConfig(server.URL, "test-token", nil)
-	result, err := client.SearchMessages("test query", 20, 1, "score", "desc", false, false)
+	result, err := client.SearchMessages("test query", 20, 1, "score", "desc", false)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -1251,7 +1251,7 @@ func TestClient_SearchMessages_WithHighlight(t *testing.T) {
 	defer server.Close()
 
 	client := NewWithConfig(server.URL, "test-token", nil)
-	_, err := client.SearchMessages("test", 20, 1, "score", "desc", true, false)
+	_, err := client.SearchMessages("test", 20, 1, "score", "desc", true)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -1270,13 +1270,66 @@ func TestClient_SearchMessages_APIError(t *testing.T) {
 	defer server.Close()
 
 	client := NewWithConfig(server.URL, "test-token", nil)
-	_, err := client.SearchMessages("test", 20, 1, "score", "desc", false, false)
+	_, err := client.SearchMessages("test", 20, 1, "score", "desc", false)
 
 	if err == nil {
 		t.Error("expected error for API failure")
 	}
 	if !strings.Contains(err.Error(), "not_authed") {
 		t.Errorf("expected error to contain 'not_authed', got %s", err.Error())
+	}
+}
+
+func TestClient_SearchOmitsBotFilterParameter(t *testing.T) {
+	tests := []struct {
+		name     string
+		endpoint string
+		search   func(*Client) error
+	}{
+		{
+			name:     "messages",
+			endpoint: "/search.messages",
+			search: func(c *Client) error {
+				_, err := c.SearchMessages("test", 20, 1, "score", "desc", false)
+				return err
+			},
+		},
+		{
+			name:     "files",
+			endpoint: "/search.files",
+			search: func(c *Client) error {
+				_, err := c.SearchFiles("test", 20, 1, "score", "desc", false)
+				return err
+			},
+		},
+		{
+			name:     "all",
+			endpoint: "/search.all",
+			search: func(c *Client) error {
+				_, err := c.SearchAll("test", 20, 1, "score", "desc", false)
+				return err
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path != tt.endpoint {
+					t.Errorf("path = %q, want %q", r.URL.Path, tt.endpoint)
+				}
+				if r.URL.Query().Has("search_exclude_bots") {
+					t.Error("search_exclude_bots should be omitted")
+				}
+				_ = json.NewEncoder(w).Encode(map[string]interface{}{"ok": true})
+			}))
+			defer server.Close()
+
+			c := NewWithConfig(server.URL, "test-token", nil)
+			if err := tt.search(c); err != nil {
+				t.Fatalf("search: %v", err)
+			}
+		})
 	}
 }
 
@@ -1315,7 +1368,7 @@ func TestClient_SearchFiles_Success(t *testing.T) {
 	defer server.Close()
 
 	client := NewWithConfig(server.URL, "test-token", nil)
-	result, err := client.SearchFiles("document", 20, 1, "score", "desc", false, false)
+	result, err := client.SearchFiles("document", 20, 1, "score", "desc", false)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -1389,7 +1442,7 @@ func TestClient_SearchAll_Success(t *testing.T) {
 	defer server.Close()
 
 	client := NewWithConfig(server.URL, "test-token", nil)
-	result, err := client.SearchAll("report", 20, 1, "timestamp", "asc", false, false)
+	result, err := client.SearchAll("report", 20, 1, "timestamp", "asc", false)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

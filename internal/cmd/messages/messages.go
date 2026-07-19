@@ -81,6 +81,18 @@ func messageBody(m client.Message, resolver *client.UserResolver) (body string, 
 	return rendered.Body, rendered.PreserveNewlines
 }
 
+func messageAuthor(m client.Message, resolver *client.UserResolver) string {
+	if m.User != "" {
+		return resolver.Resolve(m.User)
+	}
+	for _, name := range []string{m.Username, m.BotProfile.Name, m.BotID, m.AppID} {
+		if name != "" {
+			return name
+		}
+	}
+	return "bot"
+}
+
 // indentContinuation replaces interior newlines with "\n\t" so that every
 // line after the first is indented under the "[<ts>] <user>:" header.
 // Any trailing newline is trimmed first to avoid a dangling tab.

@@ -21,7 +21,6 @@ type allOptions struct {
 	before      string
 	hasLink     bool
 	hasReaction bool
-	includeBots bool
 }
 
 func newAllCmd() *cobra.Command {
@@ -68,8 +67,6 @@ Examples:
 	cmd.Flags().StringVar(&opts.before, "before", "", "Content before date (YYYY-MM-DD)")
 	cmd.Flags().BoolVar(&opts.hasLink, "has-link", false, "Content containing links")
 	cmd.Flags().BoolVar(&opts.hasReaction, "has-reaction", false, "Content with reactions")
-	cmd.Flags().BoolVar(&opts.includeBots, "include-bots", false, "Include bot messages in results")
-
 	return cmd
 }
 
@@ -102,7 +99,7 @@ func runSearchAll(query string, opts *allOptions, c *client.Client) error {
 	}
 	finalQuery := BuildQuery(query, queryOpts)
 
-	result, err := c.SearchAll(finalQuery, opts.count, opts.page, opts.sort, opts.sortDir, opts.highlight, opts.includeBots)
+	result, err := c.SearchAll(finalQuery, opts.count, opts.page, opts.sort, opts.sortDir, opts.highlight)
 	if err != nil {
 		return err
 	}

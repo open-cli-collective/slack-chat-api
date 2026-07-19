@@ -26,7 +26,6 @@ type messagesOptions struct {
 	before      string
 	hasLink     bool
 	hasReaction bool
-	includeBots bool
 }
 
 func newMessagesCmd() *cobra.Command {
@@ -54,8 +53,7 @@ Examples:
   slck search messages "project update" --from "@alice"
   slck search messages "deployment" --after 2025-01-01
   slck search messages "test" --scope public
-  slck search messages "meeting" --has-link --has-reaction
-  slck search messages "alert" --include-bots`,
+  slck search messages "meeting" --has-link --has-reaction`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runSearchMessages(args[0], opts, nil)
@@ -76,8 +74,6 @@ Examples:
 	cmd.Flags().StringVar(&opts.before, "before", "", "Messages before date (YYYY-MM-DD)")
 	cmd.Flags().BoolVar(&opts.hasLink, "has-link", false, "Messages containing links")
 	cmd.Flags().BoolVar(&opts.hasReaction, "has-reaction", false, "Messages with reactions")
-	cmd.Flags().BoolVar(&opts.includeBots, "include-bots", false, "Include bot messages in results")
-
 	return cmd
 }
 
@@ -110,7 +106,7 @@ func runSearchMessages(query string, opts *messagesOptions, c *client.Client) er
 	}
 	finalQuery := BuildQuery(query, queryOpts)
 
-	result, err := c.SearchMessages(finalQuery, opts.count, opts.page, opts.sort, opts.sortDir, opts.highlight, opts.includeBots)
+	result, err := c.SearchMessages(finalQuery, opts.count, opts.page, opts.sort, opts.sortDir, opts.highlight)
 	if err != nil {
 		return err
 	}

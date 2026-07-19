@@ -7,6 +7,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/open-cli-collective/slack-chat-api/internal/client"
 	"github.com/open-cli-collective/slack-chat-api/internal/output"
 )
@@ -846,67 +849,42 @@ func TestSearchMessages_WithHighlight(t *testing.T) {
 	}
 }
 
-func TestSearchMessages_WithIncludeBots(t *testing.T) {
-	response := map[string]interface{}{
-		"ok": true,
-		"messages": map[string]interface{}{
-			"total":   0,
-			"paging":  map[string]interface{}{"count": 20, "total": 0, "page": 1, "pages": 0},
-			"matches": []map[string]interface{}{},
-		},
-	}
-
+func TestSearchMessages_IncludesBotsByDefault(t *testing.T) {
 	c, server := newTestClient(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Query().Get("search_exclude_bots") != "false" {
-			t.Errorf("expected search_exclude_bots=false, got %s", r.URL.Query().Get("search_exclude_bots"))
+		matches := []map[string]interface{}{{
+			"type": "message", "channel": map[string]string{"id": "C1", "name": "general"},
+			"user": "U1", "username": "alice", "text": "human message", "ts": "1.0",
+		}}
+		if r.URL.Query().Has("search_exclude_bots") {
+			t.Error("search_exclude_bots should be omitted")
 		}
-		json.NewEncoder(w).Encode(response)
+		matches = append(matches, map[string]interface{}{
+			"type": "message", "channel": map[string]string{"id": "C1", "name": "general"},
+			"username": "deploy-bot", "text": "bot message", "ts": "2.0",
+		})
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"ok": true,
+			"messages": map[string]interface{}{
+				"total": len(matches), "paging": map[string]int{"count": 20, "total": len(matches), "page": 1, "pages": 1}, "matches": matches,
+			},
+		})
 	})
 	defer server.Close()
 
-	opts := &messagesOptions{
-		count:       20,
-		page:        1,
-		sort:        "score",
-		sortDir:     "desc",
-		includeBots: true,
-	}
-
-	err := runSearchMessages("bot-alert", opts, c)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	base := messagesOptions{count: 20, page: 1, sort: "score", sortDir: "desc"}
+	out := captureOutput(t, func() { require.NoError(t, runSearchMessages("test", &base, c)) })
+	assert.Contains(t, out, "alice")
+	assert.Contains(t, out, "deploy-bot")
 }
 
-func TestSearchMessages_WithoutIncludeBots(t *testing.T) {
-	response := map[string]interface{}{
-		"ok": true,
-		"messages": map[string]interface{}{
-			"total":   0,
-			"paging":  map[string]interface{}{"count": 20, "total": 0, "page": 1, "pages": 0},
-			"matches": []map[string]interface{}{},
-		},
-	}
-
-	c, server := newTestClient(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Query().Get("search_exclude_bots") != "" {
-			t.Errorf("expected search_exclude_bots to be absent, got %s", r.URL.Query().Get("search_exclude_bots"))
-		}
-		json.NewEncoder(w).Encode(response)
-	})
-	defer server.Close()
-
-	opts := &messagesOptions{
-		count:       20,
-		page:        1,
-		sort:        "score",
-		sortDir:     "desc",
-		includeBots: false,
-	}
-
-	err := runSearchMessages("test", opts, c)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+func TestContentSearchBotFlags(t *testing.T) {
+	for _, name := range []string{"messages", "files", "all"} {
+		t.Run(name, func(t *testing.T) {
+			cmd, _, err := NewCmd().Find([]string{name})
+			require.NoError(t, err)
+			assert.Nil(t, cmd.Flags().Lookup("exclude-bots"))
+			assert.Nil(t, cmd.Flags().Lookup("include-bots"))
+		})
 	}
 }
 

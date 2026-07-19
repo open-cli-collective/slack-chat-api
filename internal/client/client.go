@@ -266,10 +266,19 @@ type Edited struct {
 	TS   string `json:"ts"`
 }
 
+// BotProfile identifies the app/bot author of a message.
+type BotProfile struct {
+	Name string `json:"name"`
+}
+
 // Message represents a Slack message
 type Message struct {
 	Type        string       `json:"type"`
 	User        string       `json:"user"`
+	Username    string       `json:"username,omitempty"`
+	BotProfile  BotProfile   `json:"bot_profile,omitempty"`
+	BotID       string       `json:"bot_id,omitempty"`
+	AppID       string       `json:"app_id,omitempty"`
 	Text        string       `json:"text"`
 	TS          string       `json:"ts"`
 	ThreadTS    string       `json:"thread_ts,omitempty"`
@@ -1039,7 +1048,7 @@ func (c *Client) DownloadFile(downloadURL string, w io.Writer) error {
 // --- Search Methods (require user token) ---
 
 // SearchMessages searches for messages matching a query
-func (c *Client) SearchMessages(query string, count, page int, sort, sortDir string, highlight, includeBots bool) (*SearchResult, error) {
+func (c *Client) SearchMessages(query string, count, page int, sort, sortDir string, highlight bool) (*SearchResult, error) {
 	params := url.Values{}
 	params.Set("query", query)
 	params.Set("count", fmt.Sprintf("%d", count))
@@ -1049,10 +1058,6 @@ func (c *Client) SearchMessages(query string, count, page int, sort, sortDir str
 	if highlight {
 		params.Set("highlight", "true")
 	}
-	if includeBots {
-		params.Set("search_exclude_bots", "false")
-	}
-
 	body, err := c.get("search.messages", params)
 	if err != nil {
 		return nil, err
@@ -1067,7 +1072,7 @@ func (c *Client) SearchMessages(query string, count, page int, sort, sortDir str
 }
 
 // SearchFiles searches for files matching a query
-func (c *Client) SearchFiles(query string, count, page int, sort, sortDir string, highlight, includeBots bool) (*SearchResult, error) {
+func (c *Client) SearchFiles(query string, count, page int, sort, sortDir string, highlight bool) (*SearchResult, error) {
 	params := url.Values{}
 	params.Set("query", query)
 	params.Set("count", fmt.Sprintf("%d", count))
@@ -1077,10 +1082,6 @@ func (c *Client) SearchFiles(query string, count, page int, sort, sortDir string
 	if highlight {
 		params.Set("highlight", "true")
 	}
-	if includeBots {
-		params.Set("search_exclude_bots", "false")
-	}
-
 	body, err := c.get("search.files", params)
 	if err != nil {
 		return nil, err
@@ -1095,7 +1096,7 @@ func (c *Client) SearchFiles(query string, count, page int, sort, sortDir string
 }
 
 // SearchAll searches for both messages and files matching a query
-func (c *Client) SearchAll(query string, count, page int, sort, sortDir string, highlight, includeBots bool) (*SearchResult, error) {
+func (c *Client) SearchAll(query string, count, page int, sort, sortDir string, highlight bool) (*SearchResult, error) {
 	params := url.Values{}
 	params.Set("query", query)
 	params.Set("count", fmt.Sprintf("%d", count))
@@ -1105,10 +1106,6 @@ func (c *Client) SearchAll(query string, count, page int, sort, sortDir string, 
 	if highlight {
 		params.Set("highlight", "true")
 	}
-	if includeBots {
-		params.Set("search_exclude_bots", "false")
-	}
-
 	body, err := c.get("search.all", params)
 	if err != nil {
 		return nil, err

@@ -78,7 +78,7 @@ func renderMessageList(messages []client.Message, resolver *client.UserResolver)
 		} else {
 			text = flatten(body)
 		}
-		name := resolver.Resolve(m.User)
+		name := messageAuthor(m, resolver)
 		edited := ""
 		if m.Edited != nil {
 			edited = " [edited]"

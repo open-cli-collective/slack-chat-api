@@ -1711,6 +1711,65 @@ func TestMessageBody_NilResolverTextPath(t *testing.T) {
 	assert.Equal(t, "hello <@U123>", body)
 }
 
+func TestMessageAuthorFallback(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(mockUserInfoHandler))
+	defer server.Close()
+	resolver := client.NewUserResolver(client.NewWithConfig(server.URL, "test-token", nil))
+	assert.Equal(t, "alice", messageAuthor(client.Message{User: "U001", Username: "ignored"}, resolver))
+
+	tests := []struct {
+		name    string
+		message client.Message
+		want    string
+	}{
+		{"username", client.Message{Username: "deploy-bot", BotProfile: client.BotProfile{Name: "ignored"}}, "deploy-bot"},
+		{"bot profile", client.Message{BotProfile: client.BotProfile{Name: "deploy-bot"}, BotID: "B123"}, "deploy-bot"},
+		{"bot id", client.Message{BotID: "B123", AppID: "A123"}, "B123"},
+		{"app id", client.Message{AppID: "A123"}, "A123"},
+		{"stable fallback", client.Message{}, "bot"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, messageAuthor(tt.message, nil))
+		})
+	}
+}
+
+func TestRunHistory_BotAuthorAndBody(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"ok": true,
+			"messages": []map[string]interface{}{{
+				"type": "message", "subtype": "bot_message", "ts": "1234567890.123456",
+				"username": "deploy-bot", "bot_id": "B123", "app_id": "A123",
+				"bot_profile": map[string]interface{}{"name": "deploy-bot"},
+				"blocks": []map[string]interface{}{{
+					"type": "section", "text": map[string]interface{}{"type": "mrkdwn", "text": "deployment complete"},
+				}},
+			}},
+		})
+	}))
+	defer server.Close()
+
+	c := client.NewWithConfig(server.URL, "test-token", nil)
+	out := captureTextOutput(t, func() {
+		require.NoError(t, runHistory("C123", &historyOptions{limit: 20}, c))
+	})
+	assert.Contains(t, out, "deploy-bot: deployment complete")
+}
+
+func TestRenderMessageList_BotAuthorAndBody(t *testing.T) {
+	out := captureTextOutput(t, func() {
+		renderMessageList([]client.Message{{
+			TS:         "1234567890.123456",
+			BotProfile: client.BotProfile{Name: "deploy-bot"},
+			Text:       "deployment complete",
+		}}, nil)
+	})
+	assert.Contains(t, out, "deploy-bot: deployment complete")
+}
+
 func TestHumanSize(t *testing.T) {
 	tests := []struct {
 		name     string
