@@ -293,16 +293,52 @@ or `op read ... | slck set-credential --key bot_token --stdin`.
            "team:read",
            "usergroups:read",
            "users.profile:read",
-           "users:read"
+           "users:read",
+           "users:read.email"
          ],
          "user": [
+           "bookmarks:read",
+           "calls:read",
+           "canvases:read",
+           "canvases:write",
+           "channels:history",
+           "channels:read",
+           "channels:write",
+           "channels:write.invites",
+           "channels:write.topic",
+           "chat:write",
+           "dnd:read",
+           "emoji:read",
+           "files:read",
+           "files:write",
+           "groups:history",
+           "groups:read",
+           "groups:write",
+           "im:history",
+           "im:read",
+           "im:write",
+           "links:read",
+           "lists:read",
+           "mpim:history",
+           "mpim:read",
+           "mpim:write",
+           "pins:read",
+           "reactions:read",
+           "reactions:write",
+           "reminders:read",
+           "remote_files:read",
            "search:read",
            "search:read.files",
            "search:read.im",
            "search:read.mpim",
            "search:read.private",
            "search:read.public",
-           "search:read.users"
+           "search:read.users",
+           "team:read",
+           "usergroups:read",
+           "users.profile:read",
+           "users:read",
+           "users:read.email"
          ]
        },
        "pkce_enabled": false
@@ -316,7 +352,7 @@ or `op read ... | slck set-credential --key bot_token --stdin`.
    }
    ```
 
-   **Upgrading an existing install?** Paste the full manifest above into your app's **Features → App Manifest** tab (replacing the previous manifest), click **Save Changes**, then click **Install App → Reinstall to Workspace** to grant the new scopes. Copy the fresh `xoxb-…` token and run `slck init` (or `slck set-credential`).
+   **Upgrading an existing install?** Paste the full manifest above into your app's **Features → App Manifest** tab (replacing the previous manifest), click **Save Changes**, then click **Install App → Reinstall to Workspace** to grant the new scopes. Copy both refreshed tokens and run `slck init`, or store them separately with `slck set-credential --key bot_token --stdin` and `slck set-credential --key user_token --stdin`.
    </details>
 4. Click **Create** → **Install to Workspace** → **Allow**
 5. Copy the **Bot User OAuth Token** (starts with `xoxb-`)
@@ -329,7 +365,7 @@ or `op read ... | slck set-credential --key bot_token --stdin`.
 Your token is stored in the OS keyring (Keychain / Credential Manager /
 Secret Service). It is never written to a plaintext file.
 
-**NOTE:** If you plan on sending messages or taking actions using your user token _(See: Choosing Between Bot and User Tokens)_, you'll need to adjust the manifest above to have all the same scopes configured for your user as your bot (with the exception of the `"channels:manage"` scope, which only applies to bots).
+**NOTE:** The default manifest keeps the user token search-only. To run other commands with `--as-user`, use the extended manifest above; it includes the supported user equivalents for every current `slck` operation.
 
 ### Scripted / non-interactive setup
 
@@ -388,6 +424,7 @@ The **extended manifest** (see the collapsible section above) adds these capabil
 | `groups:write` | Create/archive private channels |
 | `chat:write.public` | Post to public channels the bot isn't a member of |
 | `users.profile:read` | Extended user profile (status, timezone, custom fields) |
+| `users:read.email` | Include email addresses in user lookup output |
 | `usergroups:read` | Resolve `@subteam` / user-group mentions |
 | `app_mentions:read` | Receive @-mention events (needed for event subscriptions) |
 | `reactions:read` | List reactions on a message |
@@ -400,7 +437,7 @@ This CLI supports two types of Slack tokens:
 | Token Type | Prefix | Commands | How to Get |
 |------------|--------|----------|------------|
 | Bot token | `xoxb-` | channels, users, messages, workspace | OAuth & Permissions → Bot User OAuth Token |
-| User token | `xoxp-` | search | OAuth & Permissions → User OAuth Token |
+| User token | `xoxp-` | search; any command run with `--as-user` when the matching user scopes are granted | OAuth & Permissions → User OAuth Token |
 
 Most commands use the **bot token**. Search commands require a **user token**.
 
@@ -422,6 +459,8 @@ Or run `slck init` for a guided, interactive setup of both.
 2. OAuth & Permissions → User Token Scopes → Add `search:read`
 3. Reinstall app to workspace (if already installed)
 4. Copy the **User OAuth Token** (starts with `xoxp-`)
+
+For broad `--as-user` access instead of search-only access, apply the extended manifest above before reinstalling.
 
 **Setup-time env-var ingress** (read once during `slck init`, never at runtime):
 
