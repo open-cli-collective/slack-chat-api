@@ -3,19 +3,27 @@ display_information:
   description: Command-line interface for Slack Chat API
   background_color: "#4A154B"
 
+features:
+  bot_user:
+    display_name: Slack Chat API
+    always_online: false
+
 oauth_config:
   scopes:
     bot:
+      - channels:history
+      - channels:manage
       - channels:read
-      - channels:write
       - chat:write
+      - emoji:read
+      - files:read
+      - groups:history
       - groups:read
-      - im:read
-      - mpim:read
       - reactions:write
-      - search:read
       - team:read
       - users:read
+    user:
+      - search:read
 
 settings:
   org_deploy_enabled: false
