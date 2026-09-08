@@ -105,6 +105,33 @@ func TestClient_GetChannelInfo_APIError(t *testing.T) {
 	}
 }
 
+func TestClient_GetChannelInfo_RetriesRateLimit(t *testing.T) {
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		if requests == 1 {
+			w.Header().Set("Retry-After", "0")
+			w.WriteHeader(http.StatusTooManyRequests)
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"ok":      true,
+			"channel": map[string]interface{}{"id": "C123456"},
+		})
+	}))
+	defer server.Close()
+
+	c := NewWithConfig(server.URL, "test-token", nil)
+	_, err := c.GetChannelInfo("C123456")
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if requests != 2 {
+		t.Fatalf("expected 2 requests, got %d", requests)
+	}
+}
+
 func TestClient_ListChannels_Success(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "GET" {

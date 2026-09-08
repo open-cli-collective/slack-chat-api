@@ -19,6 +19,7 @@ import (
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/messages"
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/search"
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/setcred"
+	"github.com/open-cli-collective/slack-chat-api/internal/cmd/unreads"
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/users"
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/workspace"
 	"github.com/open-cli-collective/slack-chat-api/internal/keychain"
@@ -140,6 +141,7 @@ func init() {
 	rootCmd.AddCommand(canvas.NewCmd())
 	rootCmd.AddCommand(channels.NewCmd())
 	rootCmd.AddCommand(users.NewCmd())
+	rootCmd.AddCommand(unreads.NewCmd())
 	rootCmd.AddCommand(messages.NewCmd())
 	rootCmd.AddCommand(search.NewCmd())
 	rootCmd.AddCommand(workspace.NewCmd())

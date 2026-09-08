@@ -23,7 +23,16 @@ oauth_config:
       - team:read
       - users:read
     user:
+      - channels:history
+      - channels:read
+      - groups:history
+      - groups:read
+      - im:history
+      - im:read
+      - mpim:history
+      - mpim:read
       - search:read
+      - users:read
 
 settings:
   org_deploy_enabled: false

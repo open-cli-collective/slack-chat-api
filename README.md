@@ -193,7 +193,16 @@ or `op read ... | slck set-credential --key bot_token --stdin`.
            "users:read"
          ],
          "user": [
-           "search:read"
+           "channels:history",
+           "channels:read",
+           "groups:history",
+           "groups:read",
+           "im:history",
+           "im:read",
+           "mpim:history",
+           "mpim:read",
+           "search:read",
+           "users:read"
          ]
        }
      },
@@ -229,7 +238,16 @@ or `op read ... | slck set-credential --key bot_token --stdin`.
          - "team:read"
          - "users:read"
        user:
+         - "channels:history"
+         - "channels:read"
+         - "groups:history"
+         - "groups:read"
+         - "im:history"
+         - "im:read"
+         - "mpim:history"
+         - "mpim:read"
          - "search:read"
+         - "users:read"
    settings:
      org_deploy_enabled: false
      socket_mode_enabled: false
@@ -437,9 +455,9 @@ This CLI supports two types of Slack tokens:
 | Token Type | Prefix | Commands | How to Get |
 |------------|--------|----------|------------|
 | Bot token | `xoxb-` | channels, users, messages, workspace | OAuth & Permissions → Bot User OAuth Token |
-| User token | `xoxp-` | search; any command run with `--as-user` when the matching user scopes are granted | OAuth & Permissions → User OAuth Token |
+| User token | `xoxp-` | search, unreads; any command run with `--as-user` when the matching user scopes are granted | OAuth & Permissions → User OAuth Token |
 
-Most commands use the **bot token**. Search commands require a **user token**.
+Most commands use the **bot token**. Search and unreads commands require a **user token**.
 
 **Setting up both tokens:**
 
@@ -447,7 +465,7 @@ Most commands use the **bot token**. Search commands require a **user token**.
 # Bot token (for channels, users, messages, workspace)
 op read 'op://Personal/slck/bot_token'  | slck set-credential --key bot_token  --stdin
 
-# User token (for search)
+# User token (for search and unreads)
 op read 'op://Personal/slck/user_token' | slck set-credential --key user_token --stdin
 ```
 
@@ -456,7 +474,7 @@ Or run `slck init` for a guided, interactive setup of both.
 **Getting a user token:**
 
 1. Go to [api.slack.com/apps](https://api.slack.com/apps) → Your app
-2. OAuth & Permissions → User Token Scopes → Add `search:read`
+2. OAuth & Permissions → User Token Scopes → add the user scopes from the manifest above
 3. Reinstall app to workspace (if already installed)
 4. Copy the **User OAuth Token** (starts with `xoxp-`)
 
@@ -500,6 +518,26 @@ slck messages send --as-bot C1234567890 "Uses bot token"
 ```
 
 ## Usage
+
+### Unreads
+
+```bash
+# Unread channels and human DMs
+slck unreads list
+
+# Include DMs with agents and apps
+slck unreads list --include-apps
+
+# Show only one conversation class
+slck unreads list --exclude-dms
+slck unreads list --exclude-channels
+```
+
+This command reconstructs unread conversations from Slack's conversation membership and sidebar-priority data through supported APIs. Large workspaces may take a few minutes because Slack requires per-conversation checks. Slack does not expose custom sidebar sections, exact sidebar ordering, or channel badge counts.
+
+| Command | Flags | Description |
+|---------|-------|-------------|
+| `list` | `--include-apps`, `--exclude-channels`, `--exclude-dms` | List unread conversations |
 
 ### Channels
 
