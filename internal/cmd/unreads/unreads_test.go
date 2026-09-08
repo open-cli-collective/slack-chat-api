@@ -93,3 +93,89 @@ func TestRunListGroupsUnreadConversations(t *testing.T) {
 	assert.Contains(t, buf.String(), "D2")
 	assert.Contains(t, buf.String(), "helper")
 }
+
+func TestRunListExclusions(t *testing.T) {
+	tests := []struct {
+		name        string
+		opts        listOptions
+		wantScanned []string
+		wantOutput  []string
+		notOutput   []string
+	}{
+		{
+			name:        "channels",
+			opts:        listOptions{excludeChannels: true},
+			wantScanned: []string{"D1", "G1"},
+			wantOutput:  []string{"D1", "G1"},
+			notOutput:   []string{"C1", "D2"},
+		},
+		{
+			name:        "direct messages",
+			opts:        listOptions{excludeDMs: true},
+			wantScanned: []string{"C1"},
+			wantOutput:  []string{"C1"},
+			notOutput:   []string{"D1", "D2", "G1"},
+		},
+		{
+			name:        "direct messages with apps included",
+			opts:        listOptions{excludeDMs: true, includeApps: true},
+			wantScanned: []string{"C1", "D2"},
+			wantOutput:  []string{"C1", "D2"},
+			notOutput:   []string{"D1", "G1"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var scanned []string
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				var response any
+				switch r.URL.Path {
+				case "/users.conversations":
+					response = map[string]any{
+						"ok": true,
+						"channels": []map[string]any{
+							{"id": "C1", "name": "channel"},
+							{"id": "D1", "is_im": true, "user": "U1", "priority": 1},
+							{"id": "D2", "is_im": true, "user": "B1", "priority": 1},
+							{"id": "G1", "name": "group", "is_mpim": true, "priority": 1},
+						},
+					}
+				case "/users.list":
+					response = map[string]any{
+						"ok": true,
+						"members": []map[string]any{
+							{"id": "U1", "name": "human"},
+							{"id": "B1", "name": "app", "is_app_user": true},
+						},
+					}
+				case "/conversations.info":
+					id := r.URL.Query().Get("channel")
+					scanned = append(scanned, id)
+					response = map[string]any{
+						"ok":      true,
+						"channel": map[string]any{"id": id, "unread_count": 1},
+					}
+				default:
+					t.Fatalf("unexpected request: %s", r.URL.String())
+				}
+				assert.NoError(t, json.NewEncoder(w).Encode(response))
+			}))
+			defer server.Close()
+
+			originalWriter := output.Writer
+			defer func() { output.Writer = originalWriter }()
+			var buf bytes.Buffer
+			output.Writer = &buf
+
+			require.NoError(t, runList(&tt.opts, client.NewWithConfig(server.URL, "xoxp-test", nil)))
+			assert.ElementsMatch(t, tt.wantScanned, scanned)
+			for _, value := range tt.wantOutput {
+				assert.Contains(t, buf.String(), value)
+			}
+			for _, value := range tt.notOutput {
+				assert.NotContains(t, buf.String(), value)
+			}
+		})
+	}
+}
