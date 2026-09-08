@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestNewWithConfig(t *testing.T) {
@@ -105,6 +106,61 @@ func TestClient_GetChannelInfo_APIError(t *testing.T) {
 	}
 }
 
+func TestClient_GetChannelInfo_RetriesRateLimit(t *testing.T) {
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/conversations.info" {
+			t.Errorf("expected /conversations.info, got %s", r.URL.Path)
+		}
+		requests++
+		if requests == 1 {
+			w.Header().Set("Retry-After", "1")
+			w.WriteHeader(http.StatusTooManyRequests)
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"ok":      true,
+			"channel": map[string]interface{}{"id": "C123456"},
+		})
+	}))
+	defer server.Close()
+
+	c := NewWithConfig(server.URL, "test-token", nil)
+	started := time.Now()
+	_, err := c.GetChannelInfo("C123456")
+	elapsed := time.Since(started)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if requests != 2 {
+		t.Fatalf("expected 2 requests, got %d", requests)
+	}
+	if elapsed < 900*time.Millisecond || elapsed > 3*time.Second {
+		t.Fatalf("expected retry after about 1 second, took %s", elapsed)
+	}
+}
+
+func TestClient_GetChannelInfo_StopsRetryingPersistentRateLimit(t *testing.T) {
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		w.Header().Set("Retry-After", "0")
+		w.WriteHeader(http.StatusTooManyRequests)
+	}))
+	defer server.Close()
+
+	c := NewWithConfig(server.URL, "test-token", nil)
+	_, err := c.GetChannelInfo("C123456")
+
+	if err == nil || !strings.Contains(err.Error(), "rate limit retries exhausted after 3 retries") {
+		t.Fatalf("expected exhausted retry error, got %v", err)
+	}
+	if requests != 4 {
+		t.Fatalf("expected 4 requests, got %d", requests)
+	}
+}
+
 func TestClient_ListChannels_Success(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "GET" {
@@ -190,6 +246,50 @@ func TestClient_ListChannels_Pagination(t *testing.T) {
 	}
 	if len(channels) != 2 {
 		t.Errorf("expected 2 channels total, got %d", len(channels))
+	}
+}
+
+func TestClient_ListUserConversations_Pagination(t *testing.T) {
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/users.conversations" {
+			t.Errorf("expected /users.conversations, got %s", r.URL.Path)
+		}
+		requests++
+		if requests == 1 {
+			if cursor := r.URL.Query().Get("cursor"); cursor != "" {
+				t.Errorf("expected no cursor on first request, got %s", cursor)
+			}
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"ok":                true,
+				"channels":          []map[string]interface{}{{"id": "C1"}},
+				"response_metadata": map[string]string{"next_cursor": "next-page"},
+			})
+			return
+		}
+
+		if cursor := r.URL.Query().Get("cursor"); cursor != "next-page" {
+			t.Errorf("expected cursor=next-page, got %s", cursor)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"ok":                true,
+			"channels":          []map[string]interface{}{{"id": "D1"}},
+			"response_metadata": map[string]string{"next_cursor": ""},
+		})
+	}))
+	defer server.Close()
+
+	c := NewWithConfig(server.URL, "test-token", nil)
+	conversations, err := c.ListUserConversations()
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if requests != 2 {
+		t.Fatalf("expected 2 API calls for pagination, got %d", requests)
+	}
+	if len(conversations) != 2 || conversations[0].ID != "C1" || conversations[1].ID != "D1" {
+		t.Fatalf("expected both pages in order, got %+v", conversations)
 	}
 }
 

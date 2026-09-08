@@ -193,7 +193,16 @@ or `op read ... | slck set-credential --key bot_token --stdin`.
            "users:read"
          ],
          "user": [
-           "search:read"
+           "channels:history",
+           "channels:read",
+           "groups:history",
+           "groups:read",
+           "im:history",
+           "im:read",
+           "mpim:history",
+           "mpim:read",
+           "search:read",
+           "users:read"
          ]
        }
      },
@@ -229,7 +238,16 @@ or `op read ... | slck set-credential --key bot_token --stdin`.
          - "team:read"
          - "users:read"
        user:
+         - "channels:history"
+         - "channels:read"
+         - "groups:history"
+         - "groups:read"
+         - "im:history"
+         - "im:read"
+         - "mpim:history"
+         - "mpim:read"
          - "search:read"
+         - "users:read"
    settings:
      org_deploy_enabled: false
      socket_mode_enabled: false
@@ -239,7 +257,7 @@ or `op read ... | slck set-credential --key bot_token --stdin`.
    <details>
    <summary><strong>Extended manifest</strong> — every read scope slck can use, plus all writes (DMs, group DMs, file uploads, canvas CRUD, etc.)</summary>
 
-   Use this if you want maximum capability out of the box — reading DMs and group DMs, uploading file attachments to any channel/DM/group-DM, creating/editing/deleting canvases, resolving `@subteam` mentions, extended user profile data, etc. Every scope here is either needed by an existing slck command or unlocks a capability that commonly extends one (e.g. `im:history` so `slck messages thread` works on DMs, `files:write` for `slck messages send --file`, `canvases:write` for `slck canvas create`).
+   Use this if you want maximum capability out of the box — writing to DMs and group DMs, uploading file attachments to any channel/DM/group-DM, creating/editing/deleting canvases, resolving `@subteam` mentions, extended user profile data, etc. Every scope here is either needed by an existing slck command or unlocks a capability that commonly extends one (e.g. `im:write` to send DMs, `files:write` for `slck messages send --file`, `canvases:write` for `slck canvas create`).
 
    ```json
    {
@@ -365,7 +383,7 @@ or `op read ... | slck set-credential --key bot_token --stdin`.
 Your token is stored in the OS keyring (Keychain / Credential Manager /
 Secret Service). It is never written to a plaintext file.
 
-**NOTE:** The default manifest keeps the user token search-only. To run other commands with `--as-user`, use the extended manifest above; it includes the supported user equivalents for every current `slck` operation.
+**NOTE:** The default manifest gives the user token search access plus the conversation, history, and user read scopes required by `slck unreads`. To run write commands or other commands with `--as-user`, use the extended manifest above; it includes the supported user equivalents for every current `slck` operation.
 
 ### Scripted / non-interactive setup
 
@@ -408,6 +426,8 @@ The manifest above includes these scopes:
 | `files:read` | Download files, get file info |
 | `groups:read` | List private channels |
 | `groups:history` | Read message history from private channels |
+| `im:read` / `im:history` | List and read direct messages (user token) |
+| `mpim:read` / `mpim:history` | List and read multi-person direct messages (user token) |
 | `reactions:write` | Add/remove reactions |
 | `team:read` | Get workspace info |
 | `users:read` | List users, get user info |
@@ -417,8 +437,8 @@ The **extended manifest** (see the collapsible section above) adds these capabil
 
 | Scope | Unlocks |
 |-------|---------|
-| `im:history` / `im:read` / `im:write` | Read messages in DMs, list DMs, open new DMs to post to |
-| `mpim:history` / `mpim:read` / `mpim:write` | Same for multi-person DMs (group DMs) |
+| `im:write` | Open new DMs to post to |
+| `mpim:write` | Open new multi-person DMs (group DMs) to post to |
 | `files:write` | Upload files — `slck messages send --file` in any channel/DM/group-DM |
 | `canvases:write` | Create, edit, delete canvases — `slck canvas create/edit/delete` |
 | `groups:write` | Create/archive private channels |
@@ -437,9 +457,9 @@ This CLI supports two types of Slack tokens:
 | Token Type | Prefix | Commands | How to Get |
 |------------|--------|----------|------------|
 | Bot token | `xoxb-` | channels, users, messages, workspace | OAuth & Permissions → Bot User OAuth Token |
-| User token | `xoxp-` | search; any command run with `--as-user` when the matching user scopes are granted | OAuth & Permissions → User OAuth Token |
+| User token | `xoxp-` | search, unreads; any command run with `--as-user` when the matching user scopes are granted | OAuth & Permissions → User OAuth Token |
 
-Most commands use the **bot token**. Search commands require a **user token**.
+Most commands use the **bot token**. Search and unreads commands require a **user token**.
 
 **Setting up both tokens:**
 
@@ -447,7 +467,7 @@ Most commands use the **bot token**. Search commands require a **user token**.
 # Bot token (for channels, users, messages, workspace)
 op read 'op://Personal/slck/bot_token'  | slck set-credential --key bot_token  --stdin
 
-# User token (for search)
+# User token (for search and unreads)
 op read 'op://Personal/slck/user_token' | slck set-credential --key user_token --stdin
 ```
 
@@ -456,11 +476,11 @@ Or run `slck init` for a guided, interactive setup of both.
 **Getting a user token:**
 
 1. Go to [api.slack.com/apps](https://api.slack.com/apps) → Your app
-2. OAuth & Permissions → User Token Scopes → Add `search:read`
+2. OAuth & Permissions → User Token Scopes → add the user scopes from the manifest above
 3. Reinstall app to workspace (if already installed)
 4. Copy the **User OAuth Token** (starts with `xoxp-`)
 
-For broad `--as-user` access instead of search-only access, apply the extended manifest above before reinstalling.
+For broad `--as-user` access beyond search and unreads, apply the extended manifest above before reinstalling.
 
 **Setup-time env-var ingress** (read once during `slck init`, never at runtime):
 
@@ -484,7 +504,7 @@ These flags are available on all commands:
 
 ### Choosing Between Bot and User Tokens
 
-By default, all commands other than search use your bot token. You can set the `SLCK_AS_USER` env var to `true` to make your user token the default. You can also use flags to specify which token to use for any specific command (and this will override the default behavior set by your env var).
+By default, all commands other than search and unreads use your bot token. You can set the `SLCK_AS_USER` env var to `true` to make your user token the default. You can also use flags to specify which token to use for any specific command (and this will override the default behavior set by your env var).
 
 ```bash
 # Send a message as yourself (using user token)
@@ -500,6 +520,26 @@ slck messages send --as-bot C1234567890 "Uses bot token"
 ```
 
 ## Usage
+
+### Unreads
+
+```bash
+# Unread channels and human DMs
+slck unreads list
+
+# Include DMs with agents and apps, even with --exclude-dms
+slck unreads list --include-apps
+
+# Show only one conversation class
+slck unreads list --exclude-dms
+slck unreads list --exclude-channels
+```
+
+This command reconstructs unread conversations from Slack's conversation membership and read state through supported APIs. Large workspaces may take a few minutes because Slack requires per-conversation checks. Slack does not expose custom sidebar sections, exact sidebar ordering, or channel badge counts.
+
+| Command | Flags | Description |
+|---------|-------|-------------|
+| `list` | `--include-apps`, `--exclude-channels`, `--exclude-dms` | List unread conversations |
 
 ### Channels
 

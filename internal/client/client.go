@@ -8,12 +8,16 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/open-cli-collective/slack-chat-api/internal/keychain"
 )
 
-const defaultBaseURL = "https://slack.com/api"
+const (
+	defaultBaseURL         = "https://slack.com/api"
+	maxRateLimitGetRetries = 3
+)
 
 // useUserToken stores which token to use, set by root command
 // nil = not explicitly set (check environment variable)
@@ -103,7 +107,7 @@ func NewUserClient() (*Client, error) {
 	defer func() { _ = st.Close() }()
 	token, err := st.UserToken()
 	if err != nil {
-		return nil, fmt.Errorf("user token required for search: %w", err)
+		return nil, fmt.Errorf("user token required: %w", err)
 	}
 
 	return &Client{
@@ -125,39 +129,50 @@ func (c *Client) get(endpoint string, params url.Values) (result []byte, err err
 		reqURL += "?" + params.Encode()
 	}
 
-	req, err := http.NewRequest("GET", reqURL, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("Authorization", "Bearer "+c.token)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		if cerr := resp.Body.Close(); cerr != nil && err == nil {
-			err = cerr
+	for retries := 0; ; retries++ {
+		req, err := http.NewRequest("GET", reqURL, nil)
+		if err != nil {
+			return nil, err
 		}
-	}()
+		req.Header.Set("Authorization", "Bearer "+c.token)
+		req.Header.Set("Content-Type", "application/json")
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			return nil, err
+		}
+		if resp.StatusCode == http.StatusTooManyRequests {
+			_ = resp.Body.Close()
+			retryAfter, parseErr := strconv.Atoi(resp.Header.Get("Retry-After"))
+			if parseErr != nil {
+				return nil, fmt.Errorf("slack API rate limited without a valid Retry-After header")
+			}
+			if retries == maxRateLimitGetRetries {
+				return nil, fmt.Errorf("slack API rate limit retries exhausted after %d retries", maxRateLimitGetRetries)
+			}
+			time.Sleep(time.Duration(retryAfter) * time.Second)
+			continue
+		}
+
+		body, readErr := io.ReadAll(resp.Body)
+		closeErr := resp.Body.Close()
+		if readErr != nil {
+			return nil, readErr
+		}
+		if closeErr != nil {
+			return nil, closeErr
+		}
+
+		var slackResp SlackResponse
+		if err := json.Unmarshal(body, &slackResp); err != nil {
+			return nil, err
+		}
+		if !slackResp.OK {
+			return nil, fmt.Errorf("slack API error: %s", slackResp.Error)
+		}
+
+		return body, nil
 	}
-
-	var slackResp SlackResponse
-	if err := json.Unmarshal(body, &slackResp); err != nil {
-		return nil, err
-	}
-
-	if !slackResp.OK {
-		return nil, fmt.Errorf("slack API error: %s", slackResp.Error)
-	}
-
-	return body, nil
 }
 
 func (c *Client) post(endpoint string, data interface{}) (result []byte, err error) {
@@ -205,11 +220,16 @@ func (c *Client) post(endpoint string, data interface{}) (result []byte, err err
 
 // Channel represents a Slack channel
 type Channel struct {
-	ID         string `json:"id"`
-	Name       string `json:"name"`
-	IsPrivate  bool   `json:"is_private"`
-	IsArchived bool   `json:"is_archived"`
-	Topic      struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	IsPrivate   bool   `json:"is_private"`
+	IsArchived  bool   `json:"is_archived"`
+	IsIM        bool   `json:"is_im"`
+	IsMpIM      bool   `json:"is_mpim"`
+	User        string `json:"user"`
+	LastRead    string `json:"last_read"`
+	UnreadCount *int   `json:"unread_count"`
+	Topic       struct {
 		Value string `json:"value"`
 	} `json:"topic"`
 	Purpose struct {
@@ -220,12 +240,13 @@ type Channel struct {
 
 // User represents a Slack user
 type User struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	RealName string `json:"real_name"`
-	IsAdmin  bool   `json:"is_admin"`
-	IsBot    bool   `json:"is_bot"`
-	Profile  struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	RealName  string `json:"real_name"`
+	IsAdmin   bool   `json:"is_admin"`
+	IsBot     bool   `json:"is_bot"`
+	IsAppUser bool   `json:"is_app_user"`
+	Profile   struct {
 		Email       string `json:"email"`
 		DisplayName string `json:"display_name"`
 		StatusText  string `json:"status_text"`
@@ -408,6 +429,44 @@ func (c *Client) ListChannels(types string, excludeArchived bool, limit int) ([]
 	}
 
 	return allChannels, nil
+}
+
+// ListUserConversations returns every conversation the token's user belongs to.
+func (c *Client) ListUserConversations() ([]Channel, error) {
+	var conversations []Channel
+	cursor := ""
+
+	for {
+		params := url.Values{
+			"exclude_archived": {"true"},
+			"limit":            {"200"},
+			"types":            {"public_channel,private_channel,im,mpim"},
+		}
+		if cursor != "" {
+			params.Set("cursor", cursor)
+		}
+
+		body, err := c.get("users.conversations", params)
+		if err != nil {
+			return nil, err
+		}
+
+		var result struct {
+			Channels         []Channel `json:"channels"`
+			ResponseMetadata struct {
+				NextCursor string `json:"next_cursor"`
+			} `json:"response_metadata"`
+		}
+		if err := json.Unmarshal(body, &result); err != nil {
+			return nil, err
+		}
+
+		conversations = append(conversations, result.Channels...)
+		if result.ResponseMetadata.NextCursor == "" {
+			return conversations, nil
+		}
+		cursor = result.ResponseMetadata.NextCursor
+	}
 }
 
 // GetChannelInfo returns channel details
