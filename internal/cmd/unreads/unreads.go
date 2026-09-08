@@ -43,7 +43,7 @@ func newListCmd() *cobra.Command {
 	}
 	cmd.Flags().BoolVar(&opts.excludeChannels, "exclude-channels", false, "Exclude channels")
 	cmd.Flags().BoolVar(&opts.excludeDMs, "exclude-dms", false, "Exclude direct messages")
-	cmd.Flags().BoolVar(&opts.includeApps, "include-apps", false, "Include direct messages with agents and apps")
+	cmd.Flags().BoolVar(&opts.includeApps, "include-apps", false, "Include agent and app DMs even when --exclude-dms is set")
 	return cmd
 }
 

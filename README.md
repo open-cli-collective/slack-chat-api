@@ -480,7 +480,7 @@ Or run `slck init` for a guided, interactive setup of both.
 3. Reinstall app to workspace (if already installed)
 4. Copy the **User OAuth Token** (starts with `xoxp-`)
 
-For broad `--as-user` access instead of search-only access, apply the extended manifest above before reinstalling.
+For broad `--as-user` access beyond search and unreads, apply the extended manifest above before reinstalling.
 
 **Setup-time env-var ingress** (read once during `slck init`, never at runtime):
 
@@ -504,7 +504,7 @@ These flags are available on all commands:
 
 ### Choosing Between Bot and User Tokens
 
-By default, all commands other than search use your bot token. You can set the `SLCK_AS_USER` env var to `true` to make your user token the default. You can also use flags to specify which token to use for any specific command (and this will override the default behavior set by your env var).
+By default, all commands other than search and unreads use your bot token. You can set the `SLCK_AS_USER` env var to `true` to make your user token the default. You can also use flags to specify which token to use for any specific command (and this will override the default behavior set by your env var).
 
 ```bash
 # Send a message as yourself (using user token)
@@ -527,7 +527,7 @@ slck messages send --as-bot C1234567890 "Uses bot token"
 # Unread channels and human DMs
 slck unreads list
 
-# Include DMs with agents and apps
+# Include DMs with agents and apps, even with --exclude-dms
 slck unreads list --include-apps
 
 # Show only one conversation class

@@ -14,7 +14,10 @@ import (
 	"github.com/open-cli-collective/slack-chat-api/internal/keychain"
 )
 
-const defaultBaseURL = "https://slack.com/api"
+const (
+	defaultBaseURL         = "https://slack.com/api"
+	maxRateLimitGetRetries = 3
+)
 
 // useUserToken stores which token to use, set by root command
 // nil = not explicitly set (check environment variable)
@@ -126,7 +129,7 @@ func (c *Client) get(endpoint string, params url.Values) (result []byte, err err
 		reqURL += "?" + params.Encode()
 	}
 
-	for {
+	for retries := 0; ; retries++ {
 		req, err := http.NewRequest("GET", reqURL, nil)
 		if err != nil {
 			return nil, err
@@ -143,6 +146,9 @@ func (c *Client) get(endpoint string, params url.Values) (result []byte, err err
 			retryAfter, parseErr := strconv.Atoi(resp.Header.Get("Retry-After"))
 			if parseErr != nil {
 				return nil, fmt.Errorf("slack API rate limited without a valid Retry-After header")
+			}
+			if retries == maxRateLimitGetRetries {
+				return nil, fmt.Errorf("slack API rate limit retries exhausted after %d retries", maxRateLimitGetRetries)
 			}
 			time.Sleep(time.Duration(retryAfter) * time.Second)
 			continue

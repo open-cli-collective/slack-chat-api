@@ -141,6 +141,26 @@ func TestClient_GetChannelInfo_RetriesRateLimit(t *testing.T) {
 	}
 }
 
+func TestClient_GetChannelInfo_StopsRetryingPersistentRateLimit(t *testing.T) {
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		w.Header().Set("Retry-After", "0")
+		w.WriteHeader(http.StatusTooManyRequests)
+	}))
+	defer server.Close()
+
+	c := NewWithConfig(server.URL, "test-token", nil)
+	_, err := c.GetChannelInfo("C123456")
+
+	if err == nil || !strings.Contains(err.Error(), "rate limit retries exhausted after 3 retries") {
+		t.Fatalf("expected exhausted retry error, got %v", err)
+	}
+	if requests != 4 {
+		t.Fatalf("expected 4 requests, got %d", requests)
+	}
+}
+
 func TestClient_ListChannels_Success(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "GET" {
