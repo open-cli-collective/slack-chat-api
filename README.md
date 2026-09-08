@@ -257,7 +257,7 @@ or `op read ... | slck set-credential --key bot_token --stdin`.
    <details>
    <summary><strong>Extended manifest</strong> — every read scope slck can use, plus all writes (DMs, group DMs, file uploads, canvas CRUD, etc.)</summary>
 
-   Use this if you want maximum capability out of the box — reading DMs and group DMs, uploading file attachments to any channel/DM/group-DM, creating/editing/deleting canvases, resolving `@subteam` mentions, extended user profile data, etc. Every scope here is either needed by an existing slck command or unlocks a capability that commonly extends one (e.g. `im:history` so `slck messages thread` works on DMs, `files:write` for `slck messages send --file`, `canvases:write` for `slck canvas create`).
+   Use this if you want maximum capability out of the box — writing to DMs and group DMs, uploading file attachments to any channel/DM/group-DM, creating/editing/deleting canvases, resolving `@subteam` mentions, extended user profile data, etc. Every scope here is either needed by an existing slck command or unlocks a capability that commonly extends one (e.g. `im:write` to send DMs, `files:write` for `slck messages send --file`, `canvases:write` for `slck canvas create`).
 
    ```json
    {
@@ -383,7 +383,7 @@ or `op read ... | slck set-credential --key bot_token --stdin`.
 Your token is stored in the OS keyring (Keychain / Credential Manager /
 Secret Service). It is never written to a plaintext file.
 
-**NOTE:** The default manifest keeps the user token search-only. To run other commands with `--as-user`, use the extended manifest above; it includes the supported user equivalents for every current `slck` operation.
+**NOTE:** The default manifest gives the user token search access plus the conversation, history, and user read scopes required by `slck unreads`. To run write commands or other commands with `--as-user`, use the extended manifest above; it includes the supported user equivalents for every current `slck` operation.
 
 ### Scripted / non-interactive setup
 
@@ -426,6 +426,8 @@ The manifest above includes these scopes:
 | `files:read` | Download files, get file info |
 | `groups:read` | List private channels |
 | `groups:history` | Read message history from private channels |
+| `im:read` / `im:history` | List and read direct messages (user token) |
+| `mpim:read` / `mpim:history` | List and read multi-person direct messages (user token) |
 | `reactions:write` | Add/remove reactions |
 | `team:read` | Get workspace info |
 | `users:read` | List users, get user info |
@@ -435,8 +437,8 @@ The **extended manifest** (see the collapsible section above) adds these capabil
 
 | Scope | Unlocks |
 |-------|---------|
-| `im:history` / `im:read` / `im:write` | Read messages in DMs, list DMs, open new DMs to post to |
-| `mpim:history` / `mpim:read` / `mpim:write` | Same for multi-person DMs (group DMs) |
+| `im:write` | Open new DMs to post to |
+| `mpim:write` | Open new multi-person DMs (group DMs) to post to |
 | `files:write` | Upload files — `slck messages send --file` in any channel/DM/group-DM |
 | `canvases:write` | Create, edit, delete canvases — `slck canvas create/edit/delete` |
 | `groups:write` | Create/archive private channels |
@@ -533,7 +535,7 @@ slck unreads list --exclude-dms
 slck unreads list --exclude-channels
 ```
 
-This command reconstructs unread conversations from Slack's conversation membership and sidebar-priority data through supported APIs. Large workspaces may take a few minutes because Slack requires per-conversation checks. Slack does not expose custom sidebar sections, exact sidebar ordering, or channel badge counts.
+This command reconstructs unread conversations from Slack's conversation membership and read state through supported APIs. Large workspaces may take a few minutes because Slack requires per-conversation checks. Slack does not expose custom sidebar sections, exact sidebar ordering, or channel badge counts.
 
 | Command | Flags | Description |
 |---------|-------|-------------|

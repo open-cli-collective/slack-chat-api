@@ -214,16 +214,15 @@ func (c *Client) post(endpoint string, data interface{}) (result []byte, err err
 
 // Channel represents a Slack channel
 type Channel struct {
-	ID          string  `json:"id"`
-	Name        string  `json:"name"`
-	IsPrivate   bool    `json:"is_private"`
-	IsArchived  bool    `json:"is_archived"`
-	IsIM        bool    `json:"is_im"`
-	IsMpIM      bool    `json:"is_mpim"`
-	User        string  `json:"user"`
-	LastRead    string  `json:"last_read"`
-	Priority    float64 `json:"priority"`
-	UnreadCount *int    `json:"unread_count"`
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	IsPrivate   bool   `json:"is_private"`
+	IsArchived  bool   `json:"is_archived"`
+	IsIM        bool   `json:"is_im"`
+	IsMpIM      bool   `json:"is_mpim"`
+	User        string `json:"user"`
+	LastRead    string `json:"last_read"`
+	UnreadCount *int   `json:"unread_count"`
 	Topic       struct {
 		Value string `json:"value"`
 	} `json:"topic"`

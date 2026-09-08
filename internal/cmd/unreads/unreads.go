@@ -77,9 +77,6 @@ func runList(opts *listOptions, c *client.Client) error {
 		isApp := conversation.IsIM && isApp(users[conversation.User])
 		switch {
 		case conversation.IsIM || conversation.IsMpIM:
-			if conversation.Priority <= 0 {
-				continue
-			}
 			if (isApp && !opts.includeApps) || (!isApp && opts.excludeDMs) {
 				continue
 			}

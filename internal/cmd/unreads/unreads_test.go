@@ -25,10 +25,10 @@ func TestRunListGroupsUnreadConversations(t *testing.T) {
 				"channels": []map[string]any{
 					{"id": "C1", "name": "alerts"},
 					{"id": "C2", "name": "general"},
-					{"id": "D1", "is_im": true, "user": "U1", "priority": 0.2},
-					{"id": "D2", "is_im": true, "user": "B1", "priority": 0.1},
-					{"id": "D3", "is_im": true, "user": "U1", "priority": 0},
-					{"id": "G1", "name": "project", "is_mpim": true, "priority": 0.05},
+					{"id": "D1", "is_im": true, "user": "U1", "priority": 0},
+					{"id": "D2", "is_im": true, "user": "B1"},
+					{"id": "D3", "is_im": true, "user": "U1"},
+					{"id": "G1", "name": "project", "is_mpim": true, "priority": 0},
 				},
 			}
 		case "/users.list":
@@ -41,7 +41,6 @@ func TestRunListGroupsUnreadConversations(t *testing.T) {
 			}
 		case "/conversations.info":
 			id := r.URL.Query().Get("channel")
-			assert.NotEqual(t, "D3", id, "dormant DMs should not be scanned")
 			channel := map[string]any{"id": id, "last_read": "1.000000"}
 			switch id {
 			case "D1":
@@ -82,7 +81,9 @@ func TestRunListGroupsUnreadConversations(t *testing.T) {
 	assert.Contains(t, buf.String(), "C1")
 	assert.NotContains(t, buf.String(), "C2")
 	assert.Contains(t, buf.String(), "Direct messages")
+	assert.Contains(t, buf.String(), "D1")
 	assert.Contains(t, buf.String(), "Alice")
+	assert.Contains(t, buf.String(), "G1")
 	assert.Contains(t, buf.String(), "project")
 	assert.NotContains(t, buf.String(), "Agents & apps")
 	assert.NotContains(t, buf.String(), "helper")
@@ -136,9 +137,9 @@ func TestRunListExclusions(t *testing.T) {
 						"ok": true,
 						"channels": []map[string]any{
 							{"id": "C1", "name": "channel"},
-							{"id": "D1", "is_im": true, "user": "U1", "priority": 1},
-							{"id": "D2", "is_im": true, "user": "B1", "priority": 1},
-							{"id": "G1", "name": "group", "is_mpim": true, "priority": 1},
+							{"id": "D1", "is_im": true, "user": "U1"},
+							{"id": "D2", "is_im": true, "user": "B1"},
+							{"id": "G1", "name": "group", "is_mpim": true},
 						},
 					}
 				case "/users.list":
