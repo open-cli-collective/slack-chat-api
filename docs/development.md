@@ -20,6 +20,8 @@ make clean      # remove build artifacts
 make install    # install to /usr/local/bin
 ```
 
+On macOS, set `CODESIGN_IDENTITY` to a code-signing certificate in your login keychain (name or SHA-1) and `make build` re-signs `bin/slck` with a stable designated requirement, so Keychain asks for "Always Allow" once per credential instead of once per rebuild. Unset (the default, and on CI/Linux) the build is unchanged.
+
 ## Repo Structure
 
 ```text

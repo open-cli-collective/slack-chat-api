@@ -17,8 +17,17 @@ export GOFLAGS := -tags=keyring_no1password,keyring_nopassage
 
 all: build
 
+# macOS code-signing for local builds: a stable designated requirement so the
+# Keychain "Always Allow" grant survives a rebuild (cli-common distribution.md
+# §2A). Identifier scheme and flags mirror open-cli-collective/.github
+# macos-codesign-setup/codesign-darwin.sh, which signs releases. CODESIGN_IDENTITY
+# unset (the CI/Linux default) is a no-op.
 build:
 	go build $(LDFLAGS) -o bin/$(BINARY) ./cmd/slck
+	@if [ -n "$(CODESIGN_IDENTITY)" ] && [ "$$(uname -s)" = Darwin ] && [ "$$(go env GOOS)" = darwin ]; then \
+		codesign --force --timestamp=none --sign "$(CODESIGN_IDENTITY)" --identifier "org.open-cli-collective.$(BINARY)" bin/$(BINARY) && \
+		codesign --verify --strict -R '=identifier "org.open-cli-collective.$(BINARY)"' bin/$(BINARY); \
+	fi
 	@if [ -n "$(CODESIGN_IDENTITY)" ] && [ "$$(uname -s)" = Darwin ]; then \
 		codesign --force --timestamp=none --sign "$(CODESIGN_IDENTITY)" --identifier "org.open-cli-collective.$(BINARY)" bin/$(BINARY); \
 		codesign --verify --strict bin/$(BINARY); \
