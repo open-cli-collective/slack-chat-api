@@ -19,6 +19,10 @@ all: build
 
 build:
 	go build $(LDFLAGS) -o bin/$(BINARY) ./cmd/slck
+	@if [ -n "$(CODESIGN_IDENTITY)" ] && [ "$$(uname -s)" = Darwin ]; then \
+		codesign --force --timestamp=none --sign "$(CODESIGN_IDENTITY)" --identifier "org.open-cli-collective.$(BINARY)" bin/$(BINARY); \
+		codesign --verify --strict bin/$(BINARY); \
+	fi
 
 test:
 	go test -v -race ./...
