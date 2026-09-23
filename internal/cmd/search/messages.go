@@ -14,6 +14,7 @@ import (
 )
 
 type messagesOptions struct {
+	full        bool
 	count       int
 	page        int
 	sort        string
@@ -53,7 +54,8 @@ Examples:
   slck search messages "project update" --from "@alice"
   slck search messages "deployment" --after 2025-01-01
   slck search messages "test" --scope public
-  slck search messages "meeting" --has-link --has-reaction`,
+  slck search messages "meeting" --has-link --has-reaction
+  slck search messages "release notes" --full`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runSearchMessages(args[0], opts, nil)
@@ -65,6 +67,7 @@ Examples:
 	cmd.Flags().StringVarP(&opts.sort, "sort", "s", "score", "Sort by: score or timestamp")
 	cmd.Flags().StringVar(&opts.sortDir, "sort-dir", "desc", "Sort direction: asc or desc")
 	cmd.Flags().BoolVar(&opts.highlight, "highlight", false, "Highlight matching terms in results")
+	cmd.Flags().BoolVar(&opts.full, "full", false, "Print each message's full text instead of a truncated one-line table (output can be large; pair with a small --count)")
 
 	// Query builder flags
 	cmd.Flags().StringVar(&opts.scope, "scope", "", "Search scope: all, public, private, dm, mpim")
@@ -132,7 +135,7 @@ func runSearchMessages(query string, opts *messagesOptions, c *client.Client) er
 		ref := messageref.Ref{ChannelID: m.Channel.ID, TS: m.TS}.String()
 		rows = append(rows, []string{ref, m.Channel.Name, m.Username, when, body})
 	}
-	output.SearchTable(headers, rows, 60)
+	renderSearchRows(headers, rows, opts.full)
 
 	paging := result.Messages.Paging
 	output.Printf("\nPage %d of %d (showing %d of %d results)\n",

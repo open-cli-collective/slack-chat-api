@@ -10,6 +10,7 @@ import (
 )
 
 type filesOptions struct {
+	full      bool
 	count     int
 	page      int
 	sort      string
@@ -58,6 +59,7 @@ Examples:
 	cmd.Flags().StringVarP(&opts.sort, "sort", "s", "score", "Sort by: score or timestamp")
 	cmd.Flags().StringVar(&opts.sortDir, "sort-dir", "desc", "Sort direction: asc or desc")
 	cmd.Flags().BoolVar(&opts.highlight, "highlight", false, "Highlight matching terms in results")
+	cmd.Flags().BoolVar(&opts.full, "full", false, "Print each file's full name and title instead of a truncated one-line table (output can be large; pair with a small --count)")
 
 	// Query builder flags
 	cmd.Flags().StringVar(&opts.scope, "scope", "", "Search scope: all, public, private, dm, mpim")
@@ -118,7 +120,7 @@ func runSearchFiles(query string, opts *filesOptions, c *client.Client) error {
 		created := formatUnixTimestamp(f.Created)
 		rows = append(rows, []string{f.ID, f.Filetype, f.User, created, fileLabel(f.Name, f.Title)})
 	}
-	output.SearchTable(headers, rows, 60)
+	renderSearchRows(headers, rows, opts.full)
 
 	paging := result.Files.Paging
 	output.Printf("\nPage %d of %d (showing %d of %d results)\n",

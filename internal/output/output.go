@@ -27,6 +27,9 @@ var (
 
 	// Writer is where output goes (default os.Stdout, can be changed for testing)
 	Writer io.Writer = os.Stdout
+
+	// ErrWriter is where notices and warnings go (default os.Stderr, can be changed for testing)
+	ErrWriter io.Writer = os.Stderr
 )
 
 // PrintJSON encodes data as indented JSON to Writer. It is a pure encoder
@@ -144,8 +147,73 @@ func SearchTable(headers []string, rows [][]string, lastColMaxRunes int) {
 	}
 }
 
+// SearchBlocks writes search results with the last column in full, for when
+// the truncated SearchTable column hides what a result says.
+//
+// It prints the header line of every column but the last once, then one block
+// per row: the row's other cells on one line (sanitized as in SearchTable),
+// followed by the last cell with its line breaks kept and each line indented
+// by two spaces. The two-space indent is what marks a body line: the body is
+// written verbatim apart from dropping carriage returns and terminal control
+// characters (see stripControl), so a literal "|" in the body is data, not a
+// column separator. Blocks are separated by a blank line.
+func SearchBlocks(headers []string, rows [][]string) {
+	if len(headers) == 0 {
+		return
+	}
+
+	lastIdx := len(headers) - 1
+	cleanHeaders := make([]string, lastIdx)
+	for i := 0; i < lastIdx; i++ {
+		cleanHeaders[i] = sanitizeSearchCell(headers[i])
+	}
+	if lastIdx > 0 {
+		_, _ = fmt.Fprintln(Writer, strings.Join(cleanHeaders, " | "))
+	}
+
+	for n, row := range rows {
+		if n > 0 || lastIdx > 0 {
+			_, _ = fmt.Fprintln(Writer)
+		}
+		meta := make([]string, lastIdx)
+		for i := 0; i < lastIdx; i++ {
+			var raw string
+			if i < len(row) {
+				raw = row[i]
+			}
+			meta[i] = sanitizeSearchCell(raw)
+		}
+		if lastIdx > 0 {
+			_, _ = fmt.Fprintln(Writer, strings.Join(meta, " | "))
+		}
+		var body string
+		if lastIdx < len(row) {
+			body = stripControl(row[lastIdx])
+		}
+		for _, line := range strings.Split(body, "\n") {
+			_, _ = fmt.Fprintln(Writer, "  "+line)
+		}
+	}
+}
+
+// stripControl drops carriage returns and every other control character
+// except newline and tab, so text another workspace member wrote (a message,
+// a display name, a channel name) cannot carry terminal escape sequences into
+// the output. Every search cell goes through it.
+func stripControl(s string) string {
+	return strings.Map(func(r rune) rune {
+		if r == '\n' || r == '\t' {
+			return r
+		}
+		if r < 0x20 || r == 0x7f || (r >= 0x80 && r <= 0x9f) {
+			return -1
+		}
+		return r
+	}, s)
+}
+
 func sanitizeSearchCell(s string) string {
-	s = strings.ReplaceAll(s, "\r", "")
+	s = stripControl(s)
 	s = strings.ReplaceAll(s, "\n", " ")
 	s = strings.ReplaceAll(s, "|", "¦")
 	return s

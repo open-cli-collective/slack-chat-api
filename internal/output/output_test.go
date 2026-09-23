@@ -188,6 +188,20 @@ func TestPrintJSON_PureEncoder(t *testing.T) {
 	}
 }
 
+func TestSearchCellsStripControlCharacters(t *testing.T) {
+	var buf bytes.Buffer
+	origWriter := Writer
+	Writer = &buf
+	defer func() { Writer = origWriter }()
+
+	SearchTable([]string{"USER", "TEXT"}, [][]string{{"ev\x1b[2Jil", "t\x07ext"}}, 0)
+	SearchBlocks([]string{"USER", "TEXT"}, [][]string{{"ev\x1b[2Jil", "body"}})
+
+	if got := buf.String(); strings.ContainsAny(got, "\x1b\x07") {
+		t.Errorf("control characters reached the output: %q", got)
+	}
+}
+
 func TestSearchTableTruncatesRunesNotBytes(t *testing.T) {
 	var buf bytes.Buffer
 	origWriter := Writer
@@ -200,5 +214,69 @@ func TestSearchTableTruncatesRunesNotBytes(t *testing.T) {
 	out := buf.String()
 	if !strings.Contains(out, "你好...") {
 		t.Errorf("expected rune-aware truncation, got: %q", out)
+	}
+}
+
+func TestSearchBlocks(t *testing.T) {
+	var buf bytes.Buffer
+	origWriter := Writer
+	Writer = &buf
+	defer func() { Writer = origWriter }()
+
+	SearchBlocks(
+		[]string{"REF", "USER", "TEXT"},
+		[][]string{
+			{"C1/1.0", "al|ice", "line one\r\nline two"},
+			{"C2/2.0", "bob", "single"},
+		},
+	)
+
+	want := "REF | USER\n" +
+		"\n" +
+		"C1/1.0 | al¦ice\n" +
+		"  line one\n" +
+		"  line two\n" +
+		"\n" +
+		"C2/2.0 | bob\n" +
+		"  single\n"
+	if got := buf.String(); got != want {
+		t.Errorf("SearchBlocks output mismatch\n got: %q\nwant: %q", got, want)
+	}
+}
+
+func TestSearchBlocksBodyVerbatimWithoutControlCharacters(t *testing.T) {
+	var buf bytes.Buffer
+	origWriter := Writer
+	Writer = &buf
+	defer func() { Writer = origWriter }()
+
+	SearchBlocks(
+		[]string{"REF", "TEXT"},
+		[][]string{{"C1/1.0", "a | b\tc\x1b[2Jcleared\x07\u009bend"}},
+	)
+
+	want := "REF\n" +
+		"\n" +
+		"C1/1.0\n" +
+		"  a | b\tc[2Jclearedend\n"
+	if got := buf.String(); got != want {
+		t.Errorf("SearchBlocks body mismatch\n got: %q\nwant: %q", got, want)
+	}
+}
+
+func TestSearchBlocksShortRowAndNoHeaders(t *testing.T) {
+	var buf bytes.Buffer
+	origWriter := Writer
+	Writer = &buf
+	defer func() { Writer = origWriter }()
+
+	SearchBlocks(nil, [][]string{{"x"}})
+	if buf.Len() != 0 {
+		t.Errorf("expected no output without headers, got %q", buf.String())
+	}
+
+	SearchBlocks([]string{"REF", "TEXT"}, [][]string{{"C1/1.0"}})
+	if got := buf.String(); !strings.Contains(got, "C1/1.0\n  \n") {
+		t.Errorf("expected an empty body line for a row missing its last cell, got %q", got)
 	}
 }

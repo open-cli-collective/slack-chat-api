@@ -272,6 +272,7 @@ First, create a message with a unique identifier that we can search for:
 | 2 | `slck search messages "$SEARCH_ID" -o json` | ~~Valid JSON output~~ (#173 removed) — errors: invalid output format |
 | 3 | `slck search messages "$SEARCH_ID" -o table` | Table format output |
 | 4 | `slck search messages "in:#$TEST_CHANNEL_NAME $SEARCH_ID"` | Same message (filtered by channel) |
+| 5 | `slck search messages "$SEARCH_ID" --full` | Same message as a block: ref, channel, user and time on one line, the complete text indented below it with line breaks kept |
 
 ### 3B.3 Search with Pagination
 
