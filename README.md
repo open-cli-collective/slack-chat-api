@@ -703,6 +703,9 @@ slck search all "quarterly" --sort timestamp
 # With pagination
 slck search messages "error" --count 50 --page 2
 
+# Full message text instead of the truncated one-line table
+slck search messages "release notes" --full
+
 # Using query builder flags (alternative to modifiers in query string)
 slck search messages "meeting" --in "#general"
 slck search messages "update" --from "@alice"
@@ -728,9 +731,9 @@ slck search files "document" --type pdf
 
 | Command | Flags | Description |
 |---------|-------|-------------|
-| `messages <query>` | `--count`, `--page`, `--sort`, `--sort-dir`, `--highlight`, `--scope`, `--in`, `--from`, `--after`, `--before`, `--has-link`, `--has-reaction` | Search messages |
-| `files <query>` | `--count`, `--page`, `--sort`, `--sort-dir`, `--highlight`, `--scope`, `--in`, `--from`, `--after`, `--before`, `--type`, `--has-pin` | Search files |
-| `all <query>` | `--count`, `--page`, `--sort`, `--sort-dir`, `--highlight`, `--scope`, `--in`, `--from`, `--after`, `--before`, `--has-link`, `--has-reaction` | Search messages and files |
+| `messages <query>` | `--count`, `--page`, `--sort`, `--sort-dir`, `--highlight`, `--full`, `--scope`, `--in`, `--from`, `--after`, `--before`, `--has-link`, `--has-reaction` | Search messages |
+| `files <query>` | `--count`, `--page`, `--sort`, `--sort-dir`, `--highlight`, `--full`, `--scope`, `--in`, `--from`, `--after`, `--before`, `--type`, `--has-pin` | Search files |
+| `all <query>` | `--count`, `--page`, `--sort`, `--sort-dir`, `--highlight`, `--full`, `--scope`, `--in`, `--from`, `--after`, `--before`, `--has-link`, `--has-reaction` | Search messages and files |
 
 #### Search Flags
 
@@ -741,6 +744,7 @@ slck search files "document" --type pdf
 | `--sort` | `-s` | `score` | Sort by: `score` or `timestamp` |
 | `--sort-dir` | | `desc` | Sort direction: `asc` or `desc` |
 | `--highlight` | | `false` | Highlight matching terms |
+| `--full` | | `false` | Print each result's complete text (messages) or name and title (files), one block per result, instead of the one-line table that cuts the last column at 60 characters |
 
 #### Query Builder Flags
 

@@ -202,3 +202,47 @@ func TestSearchTableTruncatesRunesNotBytes(t *testing.T) {
 		t.Errorf("expected rune-aware truncation, got: %q", out)
 	}
 }
+
+func TestSearchBlocks(t *testing.T) {
+	var buf bytes.Buffer
+	origWriter := Writer
+	Writer = &buf
+	defer func() { Writer = origWriter }()
+
+	SearchBlocks(
+		[]string{"REF", "USER", "TEXT"},
+		[][]string{
+			{"C1/1.0", "al|ice", "line one\r\nline two"},
+			{"C2/2.0", "bob", "single"},
+		},
+	)
+
+	want := "REF | USER\n" +
+		"\n" +
+		"C1/1.0 | al¦ice\n" +
+		"  line one\n" +
+		"  line two\n" +
+		"\n" +
+		"C2/2.0 | bob\n" +
+		"  single\n"
+	if got := buf.String(); got != want {
+		t.Errorf("SearchBlocks output mismatch\n got: %q\nwant: %q", got, want)
+	}
+}
+
+func TestSearchBlocksShortRowAndNoHeaders(t *testing.T) {
+	var buf bytes.Buffer
+	origWriter := Writer
+	Writer = &buf
+	defer func() { Writer = origWriter }()
+
+	SearchBlocks(nil, [][]string{{"x"}})
+	if buf.Len() != 0 {
+		t.Errorf("expected no output without headers, got %q", buf.String())
+	}
+
+	SearchBlocks([]string{"REF", "TEXT"}, [][]string{{"C1/1.0"}})
+	if got := buf.String(); !strings.Contains(got, "C1/1.0\n  \n") {
+		t.Errorf("expected an empty body line for a row missing its last cell, got %q", got)
+	}
+}

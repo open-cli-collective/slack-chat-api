@@ -144,6 +144,53 @@ func SearchTable(headers []string, rows [][]string, lastColMaxRunes int) {
 	}
 }
 
+// SearchBlocks writes search results with the last column in full, for when
+// the truncated SearchTable column hides what a result says.
+//
+// It prints the header line of every column but the last once, then one block
+// per row: the row's other cells on one line (sanitized as in SearchTable),
+// followed by the last cell with its line breaks kept and each line indented
+// by two spaces, so body lines never read as a result header. Carriage returns
+// are stripped. Blocks are separated by a blank line.
+func SearchBlocks(headers []string, rows [][]string) {
+	if len(headers) == 0 {
+		return
+	}
+
+	lastIdx := len(headers) - 1
+	cleanHeaders := make([]string, lastIdx)
+	for i := 0; i < lastIdx; i++ {
+		cleanHeaders[i] = sanitizeSearchCell(headers[i])
+	}
+	if lastIdx > 0 {
+		_, _ = fmt.Fprintln(Writer, strings.Join(cleanHeaders, " | "))
+	}
+
+	for n, row := range rows {
+		if n > 0 || lastIdx > 0 {
+			_, _ = fmt.Fprintln(Writer)
+		}
+		meta := make([]string, lastIdx)
+		for i := 0; i < lastIdx; i++ {
+			var raw string
+			if i < len(row) {
+				raw = row[i]
+			}
+			meta[i] = sanitizeSearchCell(raw)
+		}
+		if lastIdx > 0 {
+			_, _ = fmt.Fprintln(Writer, strings.Join(meta, " | "))
+		}
+		var body string
+		if lastIdx < len(row) {
+			body = strings.ReplaceAll(row[lastIdx], "\r", "")
+		}
+		for _, line := range strings.Split(body, "\n") {
+			_, _ = fmt.Fprintln(Writer, "  "+line)
+		}
+	}
+}
+
 func sanitizeSearchCell(s string) string {
 	s = strings.ReplaceAll(s, "\r", "")
 	s = strings.ReplaceAll(s, "\n", " ")
