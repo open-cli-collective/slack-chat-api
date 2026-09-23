@@ -230,6 +230,26 @@ func TestSearchBlocks(t *testing.T) {
 	}
 }
 
+func TestSearchBlocksBodyVerbatimWithoutControlCharacters(t *testing.T) {
+	var buf bytes.Buffer
+	origWriter := Writer
+	Writer = &buf
+	defer func() { Writer = origWriter }()
+
+	SearchBlocks(
+		[]string{"REF", "TEXT"},
+		[][]string{{"C1/1.0", "a | b\tc\x1b[2Jcleared\x07\u009bend"}},
+	)
+
+	want := "REF\n" +
+		"\n" +
+		"C1/1.0\n" +
+		"  a | b\tc[2Jclearedend\n"
+	if got := buf.String(); got != want {
+		t.Errorf("SearchBlocks body mismatch\n got: %q\nwant: %q", got, want)
+	}
+}
+
 func TestSearchBlocksShortRowAndNoHeaders(t *testing.T) {
 	var buf bytes.Buffer
 	origWriter := Writer

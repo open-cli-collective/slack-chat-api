@@ -150,8 +150,10 @@ func SearchTable(headers []string, rows [][]string, lastColMaxRunes int) {
 // It prints the header line of every column but the last once, then one block
 // per row: the row's other cells on one line (sanitized as in SearchTable),
 // followed by the last cell with its line breaks kept and each line indented
-// by two spaces, so body lines never read as a result header. Carriage returns
-// are stripped. Blocks are separated by a blank line.
+// by two spaces. The two-space indent is what marks a body line: the body is
+// written verbatim apart from dropping carriage returns and terminal control
+// characters (see stripControl), so a literal "|" in the body is data, not a
+// column separator. Blocks are separated by a blank line.
 func SearchBlocks(headers []string, rows [][]string) {
 	if len(headers) == 0 {
 		return
@@ -183,12 +185,27 @@ func SearchBlocks(headers []string, rows [][]string) {
 		}
 		var body string
 		if lastIdx < len(row) {
-			body = strings.ReplaceAll(row[lastIdx], "\r", "")
+			body = stripControl(row[lastIdx])
 		}
 		for _, line := range strings.Split(body, "\n") {
 			_, _ = fmt.Fprintln(Writer, "  "+line)
 		}
 	}
+}
+
+// stripControl drops carriage returns and every other control character
+// except newline and tab from message text, so text another workspace member
+// wrote cannot carry terminal escape sequences into the output.
+func stripControl(s string) string {
+	return strings.Map(func(r rune) rune {
+		if r == '\n' || r == '\t' {
+			return r
+		}
+		if r < 0x20 || r == 0x7f || (r >= 0x80 && r <= 0x9f) {
+			return -1
+		}
+		return r
+	}, s)
 }
 
 func sanitizeSearchCell(s string) string {
