@@ -27,6 +27,9 @@ var (
 
 	// Writer is where output goes (default os.Stdout, can be changed for testing)
 	Writer io.Writer = os.Stdout
+
+	// ErrWriter is where notices and warnings go (default os.Stderr, can be changed for testing)
+	ErrWriter io.Writer = os.Stderr
 )
 
 // PrintJSON encodes data as indented JSON to Writer. It is a pure encoder

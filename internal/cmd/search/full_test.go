@@ -121,9 +121,9 @@ func TestRunSearchFiles_FullPrintsCompleteName(t *testing.T) {
 
 func TestFullNoticeAboveThreshold(t *testing.T) {
 	var notice bytes.Buffer
-	orig := noticeWriter
-	noticeWriter = &notice
-	defer func() { noticeWriter = orig }()
+	orig := output.ErrWriter
+	output.ErrWriter = &notice
+	defer func() { output.ErrWriter = orig }()
 
 	var out bytes.Buffer
 	origOut := output.Writer
