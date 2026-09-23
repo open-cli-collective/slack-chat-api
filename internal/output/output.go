@@ -194,8 +194,9 @@ func SearchBlocks(headers []string, rows [][]string) {
 }
 
 // stripControl drops carriage returns and every other control character
-// except newline and tab from message text, so text another workspace member
-// wrote cannot carry terminal escape sequences into the output.
+// except newline and tab, so text another workspace member wrote (a message,
+// a display name, a channel name) cannot carry terminal escape sequences into
+// the output. Every search cell goes through it.
 func stripControl(s string) string {
 	return strings.Map(func(r rune) rune {
 		if r == '\n' || r == '\t' {
@@ -209,7 +210,7 @@ func stripControl(s string) string {
 }
 
 func sanitizeSearchCell(s string) string {
-	s = strings.ReplaceAll(s, "\r", "")
+	s = stripControl(s)
 	s = strings.ReplaceAll(s, "\n", " ")
 	s = strings.ReplaceAll(s, "|", "¦")
 	return s

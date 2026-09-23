@@ -188,6 +188,20 @@ func TestPrintJSON_PureEncoder(t *testing.T) {
 	}
 }
 
+func TestSearchCellsStripControlCharacters(t *testing.T) {
+	var buf bytes.Buffer
+	origWriter := Writer
+	Writer = &buf
+	defer func() { Writer = origWriter }()
+
+	SearchTable([]string{"USER", "TEXT"}, [][]string{{"ev\x1b[2Jil", "t\x07ext"}}, 0)
+	SearchBlocks([]string{"USER", "TEXT"}, [][]string{{"ev\x1b[2Jil", "body"}})
+
+	if got := buf.String(); strings.ContainsAny(got, "\x1b\x07") {
+		t.Errorf("control characters reached the output: %q", got)
+	}
+}
+
 func TestSearchTableTruncatesRunesNotBytes(t *testing.T) {
 	var buf bytes.Buffer
 	origWriter := Writer
