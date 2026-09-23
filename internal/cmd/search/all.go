@@ -59,7 +59,7 @@ Examples:
 	cmd.Flags().StringVarP(&opts.sort, "sort", "s", "score", "Sort by: score or timestamp")
 	cmd.Flags().StringVar(&opts.sortDir, "sort-dir", "desc", "Sort direction: asc or desc")
 	cmd.Flags().BoolVar(&opts.highlight, "highlight", false, "Highlight matching terms in results")
-	cmd.Flags().BoolVar(&opts.full, "full", false, "Print each message's full text and each file's full name instead of a truncated one-line table")
+	cmd.Flags().BoolVar(&opts.full, "full", false, "Print each message's full text and each file's full name instead of a truncated one-line table (output can be large; pair with a small --count)")
 
 	// Query builder flags
 	cmd.Flags().StringVar(&opts.scope, "scope", "", "Search scope: all, public, private, dm, mpim")

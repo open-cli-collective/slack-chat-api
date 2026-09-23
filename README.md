@@ -704,7 +704,10 @@ slck search all "quarterly" --sort timestamp
 slck search messages "error" --count 50 --page 2
 
 # Full message text instead of the truncated one-line table
-slck search messages "release notes" --full
+slck search messages "release notes" --full --count 5
+# Full text is unbounded per result, so keep --count small: a page of full
+# messages can be long to read and costly to feed to an agent. slck prints a
+# note to stderr when --full prints more than 10 results.
 
 # Using query builder flags (alternative to modifiers in query string)
 slck search messages "meeting" --in "#general"

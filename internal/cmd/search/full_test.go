@@ -1,6 +1,7 @@
 package search
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -8,6 +9,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/open-cli-collective/slack-chat-api/internal/output"
 )
 
 // longMultiLineText is longer than the default table column and spans lines,
@@ -114,4 +117,40 @@ func TestRunSearchFiles_FullPrintsCompleteName(t *testing.T) {
 		require.NoError(t, runSearchFiles("notes", &filesOptions{count: 20, page: 1, sort: "score", sortDir: "desc"}, c))
 	})
 	assert.NotContains(t, table, "END-OF-TITLE")
+}
+
+func TestFullNoticeAboveThreshold(t *testing.T) {
+	var notice bytes.Buffer
+	orig := noticeWriter
+	noticeWriter = &notice
+	defer func() { noticeWriter = orig }()
+
+	var out bytes.Buffer
+	origOut := output.Writer
+	output.Writer = &out
+	defer func() { output.Writer = origOut }()
+
+	rows := make([][]string, fullNoticeThreshold)
+	for i := range rows {
+		rows[i] = []string{"C1/1.0", "text"}
+	}
+	renderSearchRows([]string{"REF", "TEXT"}, rows, true)
+	if notice.Len() != 0 {
+		t.Errorf("expected no notice at the threshold, got %q", notice.String())
+	}
+
+	rows = append(rows, []string{"C1/2.0", "text"})
+	renderSearchRows([]string{"REF", "TEXT"}, rows, true)
+	if !strings.Contains(notice.String(), "11 results") {
+		t.Errorf("expected a notice above the threshold, got %q", notice.String())
+	}
+	if strings.Contains(out.String(), "note:") {
+		t.Errorf("notice leaked into the results output")
+	}
+
+	notice.Reset()
+	renderSearchRows([]string{"REF", "TEXT"}, rows, false)
+	if notice.Len() != 0 {
+		t.Errorf("expected no notice without --full, got %q", notice.String())
+	}
 }
