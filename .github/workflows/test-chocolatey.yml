@@ -25,6 +25,19 @@ jobs:
       - name: Build binary for testing
         run: go build -o packaging/chocolatey/tools/slck.exe ./cmd/slck
 
+      - name: Validate download template
+        shell: pwsh
+        run: |
+          $script = Get-Content packaging/chocolatey/tools/chocolateyInstall.ps1 -Raw
+          $tokens = $null
+          $errors = $null
+          $null = [System.Management.Automation.Language.Parser]::ParseInput($script, [ref]$tokens, [ref]$errors)
+          if ($errors.Count) { throw $errors[0] }
+          foreach ($placeholder in @('URL_AMD64_PLACEHOLDER', 'URL_ARM64_PLACEHOLDER', 'CHECKSUM_AMD64_PLACEHOLDER', 'CHECKSUM_ARM64_PLACEHOLDER')) {
+            if (-not $script.Contains($placeholder)) { throw "Missing $placeholder" }
+          }
+          if ($script.Contains('ChocolateyPackageVersion')) { throw 'Runtime version in install script' }
+
       - name: Prepare test package
         shell: pwsh
         working-directory: packaging/chocolatey
