@@ -43,23 +43,37 @@ jobs:
           echo "X64_HASH=$x64Hash" >> $env:GITHUB_ENV
           echo "ARM64_HASH=$arm64Hash" >> $env:GITHUB_ENV
 
-      - name: Update version and checksums
+      - name: Update version, URLs, and checksums
         shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
         run: |
-          $version = "${{ inputs.version }}"
+          $version = $env:RELEASE_VERSION
+          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "Invalid version: $version" }
 
           # Update version in nuspec
           $nuspec = 'packaging/chocolatey/slack-chat-cli.nuspec'
           (Get-Content $nuspec) -replace '<version>0.0.0</version>', "<version>$version</version>" | Set-Content $nuspec
           Write-Host "Updated nuspec to version $version"
 
-          # Inject checksums into install script
+          # Inject literal release URLs and checksums into install script
           $script = 'packaging/chocolatey/tools/chocolateyInstall.ps1'
           $content = Get-Content $script -Raw
-          $content = $content -replace 'CHECKSUM_AMD64_PLACEHOLDER', $env:X64_HASH
-          $content = $content -replace 'CHECKSUM_ARM64_PLACEHOLDER', $env:ARM64_HASH
+          $urlAmd64 = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/v$version/slck_v${version}_windows_amd64.zip"
+          $urlArm64 = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/v$version/slck_v${version}_windows_arm64.zip"
+          $values = @{
+            URL_AMD64_PLACEHOLDER = $urlAmd64
+            URL_ARM64_PLACEHOLDER = $urlArm64
+            CHECKSUM_AMD64_PLACEHOLDER = $env:X64_HASH
+            CHECKSUM_ARM64_PLACEHOLDER = $env:ARM64_HASH
+          }
+          foreach ($placeholder in $values.Keys) {
+            if (-not $content.Contains($placeholder) -or -not $values[$placeholder]) { throw "Missing value or placeholder: $placeholder" }
+            $content = $content.Replace($placeholder, $values[$placeholder])
+          }
+          if ($content.Contains('PLACEHOLDER') -or $content.Contains('ChocolateyPackageVersion')) { throw 'Unresolved Chocolatey install script' }
           Set-Content $script $content
-          Write-Host "Injected checksums into install script"
+          Write-Host "Injected release URLs and checksums into install script"
 
       - name: Pack and push
         shell: pwsh
