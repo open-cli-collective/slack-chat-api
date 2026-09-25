@@ -11,6 +11,8 @@ on:
 jobs:
   publish:
     runs-on: windows-latest
+    env:
+      RELEASE_VERSION: ${{ inputs.version }}
     steps:
       - uses: actions/checkout@v4
 
@@ -19,19 +21,20 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $release = gh release view "v${{ inputs.version }}" --repo ${{ github.repository }} --json tagName 2>&1
+          if ($env:RELEASE_VERSION -notmatch '^\d+\.\d+\.\d+$') { throw "Invalid version: $env:RELEASE_VERSION" }
+          $release = gh release view "v$env:RELEASE_VERSION" --repo ${{ github.repository }} --json tagName 2>&1
           if ($LASTEXITCODE -ne 0) {
-            Write-Error "Release v${{ inputs.version }} not found"
+            Write-Error "Release v$env:RELEASE_VERSION not found"
             exit 1
           }
-          Write-Host "Found release v${{ inputs.version }}"
+          Write-Host "Found release v$env:RELEASE_VERSION"
 
       - name: Get checksums from release
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release download "v${{ inputs.version }}" --repo ${{ github.repository }} --pattern "checksums.txt" --dir .
+          gh release download "v$env:RELEASE_VERSION" --repo ${{ github.repository }} --pattern "checksums.txt" --dir .
 
           $checksums = Get-Content checksums.txt
           $x64Hash = ($checksums | Select-String "windows_amd64.zip").Line.Split()[0]
@@ -43,37 +46,13 @@ jobs:
           echo "X64_HASH=$x64Hash" >> $env:GITHUB_ENV
           echo "ARM64_HASH=$arm64Hash" >> $env:GITHUB_ENV
 
-      - name: Update version, URLs, and checksums
+      - name: Render package
         shell: pwsh
-        env:
-          RELEASE_VERSION: ${{ inputs.version }}
         run: |
-          $version = $env:RELEASE_VERSION
-          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "Invalid version: $version" }
-
-          # Update version in nuspec
-          $nuspec = 'packaging/chocolatey/slack-chat-cli.nuspec'
-          (Get-Content $nuspec) -replace '<version>0.0.0</version>', "<version>$version</version>" | Set-Content $nuspec
-          Write-Host "Updated nuspec to version $version"
-
-          # Inject literal release URLs and checksums into install script
-          $script = 'packaging/chocolatey/tools/chocolateyInstall.ps1'
-          $content = Get-Content $script -Raw
-          $urlAmd64 = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/v$version/slck_v${version}_windows_amd64.zip"
-          $urlArm64 = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/v$version/slck_v${version}_windows_arm64.zip"
-          $values = @{
-            URL_AMD64_PLACEHOLDER = $urlAmd64
-            URL_ARM64_PLACEHOLDER = $urlArm64
-            CHECKSUM_AMD64_PLACEHOLDER = $env:X64_HASH
-            CHECKSUM_ARM64_PLACEHOLDER = $env:ARM64_HASH
-          }
-          foreach ($placeholder in $values.Keys) {
-            if (-not $content.Contains($placeholder) -or -not $values[$placeholder]) { throw "Missing value or placeholder: $placeholder" }
-            $content = $content.Replace($placeholder, $values[$placeholder])
-          }
-          if ($content.Contains('PLACEHOLDER') -or $content.Contains('ChocolateyPackageVersion')) { throw 'Unresolved Chocolatey install script' }
-          Set-Content $script $content
-          Write-Host "Injected release URLs and checksums into install script"
+          & packaging/chocolatey/render.ps1 `
+            -Version $env:RELEASE_VERSION `
+            -Amd64Checksum $env:X64_HASH `
+            -Arm64Checksum $env:ARM64_HASH
 
       - name: Pack and push
         shell: pwsh
