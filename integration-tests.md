@@ -193,8 +193,9 @@ Using **TS₁** from step 3.1:
 | 1 | `slck messages react $TEST_CHANNEL_ID <TS₁> thumbsup` | "Added :thumbsup: reaction" |
 | 2 | `slck messages react $TEST_CHANNEL_ID <TS₁> :heart:` | "Added :heart: reaction" (colons stripped) |
 | 3 | `slck messages react $TEST_CHANNEL_ID <TS₁> thumbsup` | "Already reacted with :thumbsup:" (idempotent, exit 0) |
-| 4 | `slck messages unreact $TEST_CHANNEL_ID <TS₁> thumbsup` | "Removed :thumbsup: reaction" |
-| 5 | `slck messages unreact $TEST_CHANNEL_ID <TS₁> heart` | "Removed :heart: reaction" |
+| 4 | `slck messages history $TEST_CHANNEL_ID --limit 5` | TS₁ line is followed by an indented `reactions: :+1: 1 (<you>), :heart: 1 (<you>)` line (Slack reports thumbsup as `+1`) |
+| 5 | `slck messages unreact $TEST_CHANNEL_ID <TS₁> thumbsup` | "Removed :thumbsup: reaction" |
+| 6 | `slck messages unreact $TEST_CHANNEL_ID <TS₁> heart` | "Removed :heart: reaction" |
 
 ### 3.4 Threading
 

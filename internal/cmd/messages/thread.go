@@ -67,7 +67,8 @@ func runThread(channel, threadTS string, opts *threadOptions, c *client.Client) 
 
 // renderMessageList prints "[ts] user: body" lines for each message, with
 // continuation indentation for multi-line bodies, edited markers, and file
-// attachment lines. Shared between `messages thread` and `messages read`.
+// attachment and reaction lines. Shared between `messages thread` and
+// `messages read`.
 func renderMessageList(messages []client.Message, resolver *client.UserResolver) {
 	for _, m := range messages {
 		ts := formatTimestamp(m.TS)
@@ -92,6 +93,9 @@ func renderMessageList(messages []client.Message, resolver *client.UserResolver)
 		output.Printf("[%s] %s: %s%s\n", ts, name, text, edited)
 		if files := renderFiles(m.Files); files != "" {
 			output.Printf("%s", files)
+		}
+		if reactions := renderReactions(m.Reactions, resolver); reactions != "" {
+			output.Printf("%s", reactions)
 		}
 	}
 }

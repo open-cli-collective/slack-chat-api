@@ -137,6 +137,33 @@ func renderFiles(files []client.File) string {
 	return b.String()
 }
 
+// renderReactions returns one tab-indented "reactions:" line listing each
+// emoji with its count and the names of the users who reacted, terminated
+// with "\n". Returns "" when there are no reactions. Slack caps the users
+// array on large reactions, so any users beyond it are summarized as
+// "+N more".
+func renderReactions(reactions []client.Reaction, resolver *client.UserResolver) string {
+	if len(reactions) == 0 {
+		return ""
+	}
+	parts := make([]string, 0, len(reactions))
+	for _, r := range reactions {
+		names := make([]string, 0, len(r.Users)+1)
+		for _, u := range r.Users {
+			names = append(names, resolver.Resolve(u))
+		}
+		if extra := r.Count - len(r.Users); extra > 0 && len(r.Users) > 0 {
+			names = append(names, fmt.Sprintf("+%d more", extra))
+		}
+		part := fmt.Sprintf(":%s: %d", r.Name, r.Count)
+		if len(names) > 0 {
+			part += " (" + strings.Join(names, ", ") + ")"
+		}
+		parts = append(parts, part)
+	}
+	return "\treactions: " + strings.Join(parts, ", ") + "\n"
+}
+
 // unescapeShellChars removes backslash escaping from common shell-escaped characters.
 // Some shells (particularly zsh) escape certain characters like ! even within single quotes.
 // This function restores the intended text by removing these unnecessary escapes.

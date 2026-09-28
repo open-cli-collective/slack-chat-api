@@ -665,6 +665,9 @@ slck messages thread C1234567890 1234567890.123456
 slck messages thread C1234567890 1234567890.123456 --limit 50
 slck messages thread C1234567890 1234567890.123456 --since 1234567890.000000  # Only newer replies
 
+# Read the thread for a message ref (as printed by search)
+slck messages read C1234567890/1234567890.123456
+
 # Add/remove reactions
 slck messages react C1234567890 1234567890.123456 thumbsup
 slck messages unreact C1234567890 1234567890.123456 thumbsup
@@ -679,8 +682,16 @@ slck messages unreact C1234567890 1234567890.123456 thumbsup
 | `delete <channel> <ts>` | `--force` | Delete a message (prompts for confirmation) |
 | `history <channel>` | `--limit`, `--oldest`, `--latest` | Get channel history |
 | `thread <channel> <ts>` | `--limit`, `--since` | Get thread replies |
+| `read <message-ref>` | `--limit` | Read the thread for a message ref |
 | `react <channel> <ts> <emoji>` | | Add reaction |
 | `unreact <channel> <ts> <emoji>` | | Remove reaction |
+
+`history`, `thread` and `read` print each message's reactions on an indented line under it, with each emoji's count and the names of the users who reacted:
+
+```text
+[2025-01-15 09:30] alice: Ready to ship?
+	reactions: :+1: 2 (alice, bob), :eyes: 1 (carol)
+```
 
 ### Search
 

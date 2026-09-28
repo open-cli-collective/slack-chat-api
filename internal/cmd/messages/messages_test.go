@@ -2665,3 +2665,96 @@ func TestRunRead_EmptyMessages(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), "No messages found")
 }
+
+func TestRenderReactions(t *testing.T) {
+	t.Run("empty returns empty string", func(t *testing.T) {
+		assert.Equal(t, "", renderReactions(nil, nil))
+		assert.Equal(t, "", renderReactions([]client.Reaction{}, nil))
+	})
+
+	t.Run("nil resolver falls back to user IDs", func(t *testing.T) {
+		got := renderReactions([]client.Reaction{
+			{Name: "+1", Count: 2, Users: []string{"U001", "U002"}},
+			{Name: "eyes", Count: 1, Users: []string{"U003"}},
+		}, nil)
+		assert.Equal(t, "\treactions: :+1: 2 (U001, U002), :eyes: 1 (U003)\n", got)
+	})
+
+	t.Run("summarizes users beyond the returned list", func(t *testing.T) {
+		got := renderReactions([]client.Reaction{
+			{Name: "tada", Count: 5, Users: []string{"U001", "U002"}},
+		}, nil)
+		assert.Equal(t, "\treactions: :tada: 5 (U001, U002, +3 more)\n", got)
+	})
+
+	t.Run("omits the name list when no users are returned", func(t *testing.T) {
+		got := renderReactions([]client.Reaction{{Name: "heart", Count: 3}}, nil)
+		assert.Equal(t, "\treactions: :heart: 3\n", got)
+	})
+}
+
+// reactionMessagesHandler serves one reacted message and one plain message
+// from the given endpoint, plus users.info lookups.
+func reactionMessagesHandler(endpoint string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case endpoint:
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"ok": true,
+				"messages": []map[string]interface{}{
+					{
+						"ts":   "1234567890.123456",
+						"user": "U001",
+						"text": "Ship it?",
+						"reactions": []map[string]interface{}{
+							{"name": "+1", "count": 2, "users": []string{"U001", "U002"}},
+							{"name": "eyes", "count": 1, "users": []string{"U002"}},
+						},
+					},
+					{"ts": "1234567890.123457", "user": "U002", "text": "No reactions here"},
+				},
+			})
+		case "/users.info":
+			mockUserInfoHandler(w, r)
+		}
+	}
+}
+
+func TestRunHistory_RendersReactions(t *testing.T) {
+	server := httptest.NewServer(reactionMessagesHandler("/conversations.history"))
+	defer server.Close()
+
+	c := client.NewWithConfig(server.URL, "test-token", nil)
+	out := captureTextOutput(t, func() {
+		require.NoError(t, runHistory("C123", &historyOptions{limit: 20}, c))
+	})
+
+	assert.Contains(t, out, "alice: Ship it?\n\treactions: :+1: 2 (alice, bob), :eyes: 1 (bob)\n")
+	assert.Equal(t, 1, strings.Count(out, "reactions:"))
+}
+
+func TestRunThread_RendersReactions(t *testing.T) {
+	server := httptest.NewServer(reactionMessagesHandler("/conversations.replies"))
+	defer server.Close()
+
+	c := client.NewWithConfig(server.URL, "test-token", nil)
+	out := captureTextOutput(t, func() {
+		require.NoError(t, runThread("C123", "1234567890.123456", &threadOptions{limit: 100}, c))
+	})
+
+	assert.Contains(t, out, "alice: Ship it?\n\treactions: :+1: 2 (alice, bob), :eyes: 1 (bob)\n")
+	assert.Equal(t, 1, strings.Count(out, "reactions:"))
+}
+
+func TestRunRead_RendersReactions(t *testing.T) {
+	server := httptest.NewServer(reactionMessagesHandler("/conversations.replies"))
+	defer server.Close()
+
+	c := client.NewWithConfig(server.URL, "test-token", nil)
+	out := captureTextOutput(t, func() {
+		require.NoError(t, runRead("C123/1234567890.123456", &readOptions{limit: 100}, c))
+	})
+
+	assert.Contains(t, out, "alice: Ship it?\n\treactions: :+1: 2 (alice, bob), :eyes: 1 (bob)\n")
+	assert.Equal(t, 1, strings.Count(out, "reactions:"))
+}
