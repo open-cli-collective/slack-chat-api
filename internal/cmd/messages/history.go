@@ -73,6 +73,9 @@ func runHistory(channel string, opts *historyOptions, c *client.Client) error {
 		if files := renderFiles(m.Files); files != "" {
 			output.Printf("%s", files)
 		}
+		if reactions := renderReactions(m.Reactions, resolver); reactions != "" {
+			output.Printf("%s", reactions)
+		}
 	}
 
 	return nil
