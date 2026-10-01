@@ -17,11 +17,13 @@ packaging/chocolatey/
 
 1. **Release Workflow**: When a new version is released, the GitHub Actions workflow:
    - Downloads `checksums.txt` from the release
-   - Injects the Windows checksums into `chocolateyInstall.ps1`
+   - Injects literal Windows release URLs and checksums into `chocolateyInstall.ps1`
    - Updates the version in `slack-chat-cli.nuspec`
    - Packs and pushes to Chocolatey
 
-2. **Checksum Placeholders**: The install script uses placeholders that are replaced at build time:
+2. **URL and Checksum Placeholders**: The install script uses placeholders that are replaced at build time:
+   - `URL_AMD64_PLACEHOLDER` → literal Windows x64 release URL
+   - `URL_ARM64_PLACEHOLDER` → literal Windows ARM64 release URL
    - `CHECKSUM_AMD64_PLACEHOLDER` → SHA256 of Windows x64 zip
    - `CHECKSUM_ARM64_PLACEHOLDER` → SHA256 of Windows ARM64 zip
 
@@ -68,6 +70,6 @@ Chocolatey has automated moderation. Key rules followed:
 
 - **CPMR0041**: `projectUrl` uses `#readme` suffix to differ from `projectSourceUrl`
 - **CPMR0055**: Only uses `Install-ChocolateyZipPackage` (no custom downloaders)
-- **CPMR0073**: Checksums are required and injected at build time
+- **CPMR0073**: Checksums and literal URLs are injected at build time
 
 First submissions typically take 1-3 days for human review. Subsequent versions are usually auto-approved.
