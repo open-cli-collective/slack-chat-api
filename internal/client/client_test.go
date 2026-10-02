@@ -393,7 +393,7 @@ func TestClient_SendMessage_Success(t *testing.T) {
 	defer server.Close()
 
 	client := NewWithConfig(server.URL, "test-token", nil)
-	msg, err := client.SendMessage("C123", "Hello, World!", "", nil, true)
+	msg, err := client.SendMessage("C123", "Hello, World!", "", nil, true, false)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -424,7 +424,7 @@ func TestClient_SendMessage_WithThread(t *testing.T) {
 	defer server.Close()
 
 	client := NewWithConfig(server.URL, "test-token", nil)
-	_, err := client.SendMessage("C123", "Reply", "1111111111.111111", nil, true)
+	_, err := client.SendMessage("C123", "Reply", "1111111111.111111", nil, true, false)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -463,7 +463,7 @@ func TestClient_SendMessage_WithBlocks(t *testing.T) {
 	}
 
 	client := NewWithConfig(server.URL, "test-token", nil)
-	_, err := client.SendMessage("C123", "Hello", "", blocks, true)
+	_, err := client.SendMessage("C123", "Hello", "", blocks, true, false)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

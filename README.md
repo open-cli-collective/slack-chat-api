@@ -643,6 +643,9 @@ slck messages send C1234567890 "Fallback" --blocks '[{"type":"section","text":{"
 # Reply in a thread
 slck messages send C1234567890 "Thread reply" --thread 1234567890.123456
 
+# Reply in a thread and also send it to the channel
+slck messages send C1234567890 "Thread reply" --thread 1234567890.123456 --broadcast
+
 # Upload files with a message
 slck messages send C1234567890 "Here's the report" --file ./report.csv
 slck messages send C1234567890 --file ./a.csv --file ./b.csv
@@ -677,7 +680,7 @@ slck messages unreact C1234567890 1234567890.123456 thumbsup
 
 | Command | Flags | Description |
 |---------|-------|-------------|
-| `send <channel> <text>` | `--thread`, `--blocks`, `--simple`, `--channel`, `--file` | Send a message (use `-` for stdin) |
+| `send <channel> <text>` | `--thread`, `--broadcast`, `--blocks`, `--simple`, `--channel`, `--file` | Send a message (use `-` for stdin) |
 | `update <channel> <ts> <text>` | `--blocks`, `--simple` | Update a message |
 | `delete <channel> <ts>` | `--force` | Delete a message (prompts for confirmation) |
 | `history <channel>` | `--limit`, `--oldest`, `--latest` | Get channel history |

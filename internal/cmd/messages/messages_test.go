@@ -506,6 +506,62 @@ func TestRunSend_WithThread(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestRunSend_WithThreadBroadcast(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]interface{}
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		assert.Equal(t, "1234567890.000000", body["thread_ts"])
+		assert.Equal(t, true, body["reply_broadcast"])
+
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"ok": true,
+			"ts": "1234567890.123456",
+		})
+	}))
+	defer server.Close()
+
+	c := client.NewWithConfig(server.URL, "test-token", nil)
+	opts := &sendOptions{threadTS: "1234567890.000000", broadcast: true, simple: true}
+
+	err := runSend("C123", "Reply", opts, c)
+	require.NoError(t, err)
+}
+
+func TestRunSend_WithThreadOmitsBroadcastByDefault(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]interface{}
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		_, present := body["reply_broadcast"]
+		assert.False(t, present)
+
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"ok": true,
+			"ts": "1234567890.123456",
+		})
+	}))
+	defer server.Close()
+
+	c := client.NewWithConfig(server.URL, "test-token", nil)
+	opts := &sendOptions{threadTS: "1234567890.000000", simple: true}
+
+	err := runSend("C123", "Reply", opts, c)
+	require.NoError(t, err)
+}
+
+func TestRunSend_BroadcastRequiresThread(t *testing.T) {
+	opts := &sendOptions{simple: true, broadcast: true}
+	err := runSend("C123456789", "Hello", opts, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "--broadcast requires --thread")
+}
+
+func TestRunSend_BroadcastRejectsFiles(t *testing.T) {
+	opts := &sendOptions{threadTS: "1234567890.000000", broadcast: true, files: []string{"report.pdf"}}
+	err := runSend("C123456789", "Hello", opts, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "--broadcast cannot be used with --file")
+}
+
 func TestRunSend_WithBlocks(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var body map[string]interface{}

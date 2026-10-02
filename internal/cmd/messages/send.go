@@ -19,6 +19,7 @@ import (
 type sendOptions struct {
 	channel     string
 	threadTS    string
+	broadcast   bool
 	blocksJSON  string
 	blocksFile  string
 	blocksStdin bool
@@ -80,6 +81,17 @@ Examples:
   slck messages send C1234567890 --file ./report.pdf --file-title "Monthly Report"
   slck messages send C1234567890 --file ./a.csv --file ./b.csv
 
+THREAD REPLIES
+
+  --thread          Reply in the thread with this parent timestamp.
+  --broadcast       Also send the thread reply to the channel (Slack's
+                    "Also send to channel"). Requires --thread; not
+                    available with --file.
+
+Examples:
+  slck messages send C1234567890 "Fixed now" --thread 1234567890.123456
+  slck messages send C1234567890 "Fixed now" --thread 1234567890.123456 --broadcast
+
 The channel can also be specified via --channel instead of as a positional argument:
   slck messages send --channel general "Hello team"`,
 		Args: cobra.RangeArgs(0, 2),
@@ -107,6 +119,7 @@ The channel can also be specified via --channel instead of as a positional argum
 
 	cmd.Flags().StringVar(&opts.channel, "channel", "", "Channel/user name or ID (alternative to positional argument)")
 	cmd.Flags().StringVar(&opts.threadTS, "thread", "", "Thread timestamp for reply")
+	cmd.Flags().BoolVar(&opts.broadcast, "broadcast", false, "Also send the thread reply to the channel (requires --thread)")
 	cmd.Flags().StringVar(&opts.blocksJSON, "blocks", "", "Inline Block Kit JSON array (for simple blocks)")
 	cmd.Flags().StringVar(&opts.blocksFile, "blocks-file", "", "Read blocks from JSON file (recommended for complex payloads)")
 	cmd.Flags().BoolVar(&opts.blocksStdin, "blocks-stdin", false, "Read blocks from stdin (for piping from other tools)")
@@ -126,6 +139,12 @@ func runSend(channel, text string, opts *sendOptions, c *client.Client) error {
 			return err
 		}
 		opts.threadTS = validate.NormalizeTimestamp(opts.threadTS)
+	}
+	if opts.broadcast && opts.threadTS == "" {
+		return fmt.Errorf("--broadcast requires --thread")
+	}
+	if opts.broadcast && len(opts.files) > 0 {
+		return fmt.Errorf("--broadcast cannot be used with --file; Slack file uploads cannot be broadcast from a thread")
 	}
 
 	// Validate mutually exclusive blocks options
@@ -241,7 +260,7 @@ func runSend(channel, text string, opts *sendOptions, c *client.Client) error {
 		blocks = buildDefaultBlocks(text)
 	}
 
-	msg, err := c.SendMessage(channelID, text, opts.threadTS, blocks, !opts.noUnfurl)
+	msg, err := c.SendMessage(channelID, text, opts.threadTS, blocks, !opts.noUnfurl, opts.broadcast)
 	if err != nil {
 		return client.WrapError("send message", err)
 	}
