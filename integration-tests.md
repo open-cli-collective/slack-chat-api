@@ -207,6 +207,8 @@ Using **TS₁** from step 3.1:
 | 2 | `slck messages thread $TEST_CHANNEL_ID <TS₁>` | Shows parent + reply, full text (not truncated) |
 | 3 | `slck messages thread $TEST_CHANNEL_ID <TS₁> -o json` | ~~JSON array of thread messages ~~ (#173 removed) — errors: invalid output format |
 | 4 | `slck messages thread $TEST_CHANNEL_ID <TS₁> --since <TS₁>` | Only replies after TS₁ (may exclude parent) |
+| 5 | `slck messages send $TEST_CHANNEL_ID "Broadcast reply" --thread <TS₁> --broadcast` | "Message sent"; the reply appears in the thread and in the channel |
+| 6 | `slck messages send $TEST_CHANNEL_ID "x" --broadcast` | Error: `--broadcast requires --thread` |
 
 ### 3.5 Update Message
 

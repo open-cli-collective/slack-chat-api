@@ -626,7 +626,8 @@ func (c *Client) OpenDM(userID string) (string, error) {
 // SendMessage sends a message to a channel.
 // Text can be empty if blocks are provided (Slack API allows this).
 // The unfurl parameter controls whether link previews are shown (unfurl_links and unfurl_media).
-func (c *Client) SendMessage(channel, text, threadTS string, blocks []interface{}, unfurl bool) (*Message, error) {
+// broadcast sets reply_broadcast, which also posts a thread reply to the channel; it only applies with threadTS.
+func (c *Client) SendMessage(channel, text, threadTS string, blocks []interface{}, unfurl, broadcast bool) (*Message, error) {
 	data := map[string]interface{}{
 		"channel":      channel,
 		"unfurl_links": unfurl,
@@ -638,6 +639,9 @@ func (c *Client) SendMessage(channel, text, threadTS string, blocks []interface{
 	}
 	if threadTS != "" {
 		data["thread_ts"] = threadTS
+		if broadcast {
+			data["reply_broadcast"] = true
+		}
 	}
 	if len(blocks) > 0 {
 		data["blocks"] = blocks
