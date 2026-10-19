@@ -895,7 +895,7 @@ slck apps delete A0123456789
 |---------|-------|-------------|
 | `get <app-id>` | `--to-file` | Print an app's manifest as indented JSON with sorted keys |
 | `validate` | `--file`, `--app` | Check a manifest with `apps.manifest.validate` |
-| `diff <app-id>` | `--file` | Compare the live manifest with a file, one line per difference |
+| `diff <app-id>` | `--file` | Compare the live manifest with a file, one line per difference; settings Slack fills in with false or empty defaults are not differences |
 | `create` | `--file`, `--credentials-file` | Create an app; prints its ID and install URL |
 | `update <app-id>` | `--file` | Replace an app's manifest; says when a reinstall is needed |
 | `delete <app-id>` | `--force` | Permanently delete an app |
