@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"slices"
 	"strconv"
 	"time"
 
@@ -951,6 +952,42 @@ func (c *Client) UnarchiveChannel(channel string) error {
 	}
 	_, err := c.post("conversations.unarchive", data)
 	return err
+}
+
+// JoinChannel adds the caller to a public channel. It reports whether the
+// caller was already a member, which Slack signals with an
+// already_in_channel warning rather than an error, alongside any others.
+func (c *Client) JoinChannel(channel string) (alreadyMember bool, err error) {
+	body, err := c.post("conversations.join", map[string]interface{}{"channel": channel})
+	if err != nil {
+		return false, err
+	}
+	var resp struct {
+		ResponseMetadata struct {
+			Warnings []string `json:"warnings"`
+		} `json:"response_metadata"`
+	}
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return false, err
+	}
+	return slices.Contains(resp.ResponseMetadata.Warnings, "already_in_channel"), nil
+}
+
+// LeaveChannel removes the caller from a channel. It reports whether the
+// caller was not a member, which Slack signals with not_in_channel on a
+// successful response.
+func (c *Client) LeaveChannel(channel string) (notMember bool, err error) {
+	body, err := c.post("conversations.leave", map[string]interface{}{"channel": channel})
+	if err != nil {
+		return false, err
+	}
+	var resp struct {
+		NotInChannel bool `json:"not_in_channel"`
+	}
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return false, err
+	}
+	return resp.NotInChannel, nil
 }
 
 // SetChannelTopic sets the channel topic

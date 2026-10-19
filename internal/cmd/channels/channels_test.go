@@ -485,3 +485,55 @@ func TestRunUnarchive_NotInChannel(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not_in_channel")
 }
+
+func slackStub(t *testing.T, path string, reply map[string]interface{}) *httptest.Server {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, path, r.URL.Path)
+		var body map[string]interface{}
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		assert.Equal(t, "C123", body["channel"])
+		_ = json.NewEncoder(w).Encode(reply)
+	}))
+	t.Cleanup(server.Close)
+	return server
+}
+
+func TestRunJoin(t *testing.T) {
+	for name, reply := range map[string]map[string]interface{}{
+		"joins": {"ok": true},
+		"already member": {"ok": true, "warning": "missing_charset,already_in_channel",
+			"response_metadata": map[string]interface{}{"warnings": []string{"missing_charset", "already_in_channel"}}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			server := slackStub(t, "/conversations.join", reply)
+			require.NoError(t, runJoin("C123", &joinOptions{}, client.NewWithConfig(server.URL, "test-token", nil)))
+		})
+	}
+}
+
+func TestRunJoin_Error(t *testing.T) {
+	server := slackStub(t, "/conversations.join", map[string]interface{}{"ok": false, "error": "is_archived"})
+	err := runJoin("C123", &joinOptions{}, client.NewWithConfig(server.URL, "test-token", nil))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "is_archived")
+}
+
+func TestRunLeave(t *testing.T) {
+	for name, reply := range map[string]map[string]interface{}{
+		"leaves":     {"ok": true},
+		"not member": {"ok": true, "not_in_channel": true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			server := slackStub(t, "/conversations.leave", reply)
+			require.NoError(t, runLeave("C123", &leaveOptions{}, client.NewWithConfig(server.URL, "test-token", nil)))
+		})
+	}
+}
+
+func TestRunLeave_Error(t *testing.T) {
+	server := slackStub(t, "/conversations.leave", map[string]interface{}{"ok": false, "error": "cant_leave_general"})
+	err := runLeave("C123", &leaveOptions{}, client.NewWithConfig(server.URL, "test-token", nil))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "cant_leave_general")
+}
