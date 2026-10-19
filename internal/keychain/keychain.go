@@ -31,10 +31,14 @@ import (
 const (
 	KeyBotToken  = "bot_token"
 	KeyUserToken = "user_token"
+	// KeyAppConfigToken holds the app configuration token pair (access
+	// token, refresh token and expiry) as one JSON value, so a rotation
+	// replaces the pair in a single write. See internal/apptoken.
+	KeyAppConfigToken = "app_config_token"
 )
 
-// allowedKeys is slck's §1.5.2 allowlist: exactly the two bundle keys.
-var allowedKeys = []string{KeyBotToken, KeyUserToken}
+// allowedKeys is slck's §1.5.2 allowlist.
+var allowedKeys = []string{KeyBotToken, KeyUserToken, KeyAppConfigToken}
 
 // Store is an open handle to slck's credential bundle. Construct with Open,
 // always Close. It carries the resolved ref so callers can report it in
@@ -152,6 +156,12 @@ func (s *Store) BotToken() (string, error) { return s.get(KeyBotToken, ErrMissin
 // UserToken returns the user token from the keyring.
 func (s *Store) UserToken() (string, error) { return s.get(KeyUserToken, ErrMissingUserToken) }
 
+// AppConfigToken returns the stored app configuration token pair as its
+// JSON value.
+func (s *Store) AppConfigToken() (string, error) {
+	return s.get(KeyAppConfigToken, ErrMissingAppConfigToken)
+}
+
 func (s *Store) get(key string, missing error) (string, error) {
 	v, err := s.cs.Get(s.profile, key)
 	if errors.Is(err, credstore.ErrNotFound) || (err == nil && v == "") {
@@ -168,6 +178,10 @@ func (s *Store) get(key string, missing error) (string, error) {
 // set-credential after the value arrived via stdin/env per §1.5).
 func (s *Store) SetBotToken(v string) error  { return s.set(KeyBotToken, v) }
 func (s *Store) SetUserToken(v string) error { return s.set(KeyUserToken, v) }
+
+// SetAppConfigToken stores the app configuration token pair. It is written
+// by set-credential and again after every rotation.
+func (s *Store) SetAppConfigToken(v string) error { return s.set(KeyAppConfigToken, v) }
 
 func (s *Store) set(key, v string) error {
 	if err := s.cs.Set(s.profile, key, v, credstore.WithOverwrite()); err != nil {
@@ -199,6 +213,9 @@ func (s *Store) del(key string) error {
 func (s *Store) HasBotToken() bool  { return s.has(KeyBotToken) }
 func (s *Store) HasUserToken() bool { return s.has(KeyUserToken) }
 
+// HasAppConfigToken reports whether an app configuration token pair is stored.
+func (s *Store) HasAppConfigToken() bool { return s.has(KeyAppConfigToken) }
+
 func (s *Store) has(key string) bool {
 	ok, err := s.cs.Exists(s.profile, key)
 	return err == nil && ok
@@ -215,6 +232,9 @@ func (s *Store) Clear() ([]string, error) {
 var (
 	ErrMissingBotToken  = errors.New("slck: no bot token in keyring — run `slck init` or `slck set-credential --key bot_token --stdin`")
 	ErrMissingUserToken = errors.New("slck: no user token in keyring — run `slck init` or `slck set-credential --key user_token --stdin`")
+	// ErrMissingAppConfigToken is returned by the apps commands when no
+	// app configuration token pair is stored.
+	ErrMissingAppConfigToken = errors.New("slck: no app configuration token in keyring; generate one at api.slack.com/apps and pipe {\"token\", \"refresh_token\", \"exp\"} JSON to `slck set-credential --key app_config_token --stdin`")
 )
 
 // DetectTokenType returns "bot" for xoxb-*, "user" for xoxp-*, else

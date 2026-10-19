@@ -1,0 +1,1 @@
+{"ok":false,"error":"invalid_manifest","errors":[{"message":"Event subscription requests must be sent to an https URL.","pointer":"/settings/event_subscriptions/request_url"}]}

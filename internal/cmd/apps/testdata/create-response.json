@@ -1,0 +1,1 @@
+{"ok":true,"app_id":"A0TESTAPP01","credentials":{"client_id":"1111.2222","client_secret":"CANARY-client-secret-5d1e","verification_token":"CANARY-verification-9b2c","signing_secret":"CANARY-signing-secret-77aa"},"oauth_authorize_url":"https://slack.com/oauth/v2/authorize?client_id=1111.2222&scope=chat:write"}

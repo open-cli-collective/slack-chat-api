@@ -46,7 +46,10 @@ slack-chat-api/
 ## Output Contract
 
 Resource and mutation-success commands emit text or table output. JSON is
-reserved for local control-plane carve-outs, currently `slck config show --json`.
+reserved for local control-plane carve-outs, currently `slck config show --json`,
+and for `slck apps get`, whose output is the app's manifest itself (the
+document `apps validate`, `diff`, `create` and `update` read back), not a
+rendering of it.
 The project-level JSON-vs-text contract lives in `ARCHITECTURE.md`.
 
 Source of truth: https://github.com/open-cli-collective/slack-chat-api/blob/main/ARCHITECTURE.md

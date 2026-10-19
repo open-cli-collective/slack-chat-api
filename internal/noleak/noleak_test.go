@@ -186,3 +186,33 @@ func TestNoLeak_APICommandClasses(t *testing.T) {
 		})
 	}
 }
+
+// TestNoLeak_AppConfigToken stores an app configuration token pair through
+// set-credential and reads its status through config show; neither the
+// access token nor the refresh token may appear in any output.
+func TestNoLeak_AppConfigToken(t *testing.T) {
+	const access = "xoxe.xoxp-1-NOLEAK-access-canary-4b7e2a"
+	const refresh = "xoxe-1-NOLEAK-refresh-canary-9d3f61"
+	pairCanaries := []string{access, access[:20], refresh, refresh[:16]}
+	check := func(name, out string) {
+		t.Helper()
+		if leak := credstore.NoLeakAssertion([]byte(out), pairCanaries...); leak != nil {
+			t.Fatalf("%s leaked the app configuration token (%v).\n--- captured ---\n%s", name, leak, out)
+		}
+	}
+
+	testutil.Setup(t)
+	set := setcred.NewCmd()
+	set.SetArgs([]string{"--key", "app_config_token", "--stdin"})
+	check("set-credential app_config_token", captureAll(t,
+		`{"token": "`+access+`", "refresh_token": "`+refresh+`", "exp": 1790043200}`+"\n",
+		func() { _ = set.Execute() }))
+
+	for _, args := range [][]string{{"show"}, {"show", "--json"}} {
+		c := cfgcmd.NewCmd()
+		c.SetArgs(args)
+		out := captureAll(t, "", func() { _ = c.Execute() })
+		require.Contains(t, out, "2026-")
+		check("config "+strings.Join(args, " "), out)
+	}
+}

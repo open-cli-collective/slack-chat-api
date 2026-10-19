@@ -85,3 +85,36 @@ func TestSetCredential_EmptyRejected(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "empty")
 }
+
+func TestSetCredential_AppConfigToken(t *testing.T) {
+	testutil.Setup(t)
+	const access = "xoxe.xoxp-1-SETCRED-access-canary"
+	const refresh = "xoxe-1-SETCRED-refresh-canary"
+	pair := `{"token": "` + access + `", "refresh_token": "` + refresh + `", "exp": 1790043200}`
+	out, err := capture(t, func() error {
+		return run(&options{key: keychain.KeyAppConfigToken, stdin: true, in: strings.NewReader(pair + "\n")})
+	})
+	require.NoError(t, err)
+	if leak := credstore.NoLeakAssertion([]byte(out), access, refresh); leak != nil {
+		t.Fatalf("set-credential echoed the value: %v", leak)
+	}
+	st, err := keychain.Open()
+	require.NoError(t, err)
+	defer func() { _ = st.Close() }()
+	got, err := st.AppConfigToken()
+	require.NoError(t, err)
+	require.Contains(t, got, refresh)
+}
+
+func TestSetCredential_RejectsAMalformedAppConfigToken(t *testing.T) {
+	testutil.Setup(t)
+	_, err := capture(t, func() error {
+		return run(&options{key: keychain.KeyAppConfigToken, stdin: true, in: strings.NewReader("xoxe.xoxp-1-bare-canary\n")})
+	})
+	require.Error(t, err)
+	require.NotContains(t, err.Error(), "canary")
+	st, err := keychain.Open()
+	require.NoError(t, err)
+	defer func() { _ = st.Close() }()
+	require.False(t, st.HasAppConfigToken())
+}
