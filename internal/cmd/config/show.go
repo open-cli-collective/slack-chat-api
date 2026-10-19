@@ -1,10 +1,13 @@
 package config
 
 import (
+	"time"
+
 	"github.com/spf13/cobra"
 
 	"github.com/open-cli-collective/cli-common/credstore"
 
+	"github.com/open-cli-collective/slack-chat-api/internal/apptoken"
 	appconfig "github.com/open-cli-collective/slack-chat-api/internal/config"
 	"github.com/open-cli-collective/slack-chat-api/internal/keychain"
 	"github.com/open-cli-collective/slack-chat-api/internal/output"
@@ -45,6 +48,11 @@ type showStatus struct {
 	Workspace        string `json:"workspace,omitempty"`
 	BotToken         bool   `json:"bot_token_present"`
 	UserToken        bool   `json:"user_token_present"`
+	AppConfigToken   bool   `json:"app_config_token_present"`
+	// AppConfigExpires is the access token's expiry (RFC 3339); slck rotates
+	// the pair when it is used near or after this time.
+	AppConfigExpires string `json:"app_config_token_expires,omitempty"`
+	AppConfigTeamID  string `json:"app_config_token_team_id,omitempty"`
 }
 
 func runShow(opts *showOptions) error {
@@ -71,6 +79,15 @@ func runShow(opts *showOptions) error {
 		Workspace:      cfg.Workspace,
 		BotToken:       st.HasBotToken(),
 		UserToken:      st.HasUserToken(),
+		AppConfigToken: st.HasAppConfigToken(),
+	}
+	if status.AppConfigToken {
+		if raw, err := st.AppConfigToken(); err == nil {
+			if pair, err := apptoken.Parse(raw); err == nil {
+				status.AppConfigExpires = pair.Expiry().UTC().Format(time.RFC3339)
+				status.AppConfigTeamID = pair.TeamID
+			}
+		}
 	}
 	if backend == credstore.BackendFile {
 		svc, _, _ := credstore.ParseRef(st.Ref())
@@ -94,7 +111,15 @@ func runShow(opts *showOptions) error {
 	}
 	output.Printf("bot_token:      %s\n", presence(status.BotToken))
 	output.Printf("user_token:     %s\n", presence(status.UserToken))
-	if !status.BotToken && !status.UserToken {
+	appConfig := presence(status.AppConfigToken)
+	if status.AppConfigExpires != "" {
+		appConfig += ", access token expires " + status.AppConfigExpires
+	}
+	if status.AppConfigTeamID != "" {
+		appConfig += ", team " + status.AppConfigTeamID
+	}
+	output.Printf("app_config_token: %s\n", appConfig)
+	if !status.BotToken && !status.UserToken && !status.AppConfigToken {
 		output.Println()
 		output.Println("No credentials configured. Run 'slck init' or")
 		output.Println("'slck set-credential --key bot_token --stdin'.")

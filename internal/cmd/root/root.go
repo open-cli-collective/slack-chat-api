@@ -1,7 +1,9 @@
 package root
 
 import (
+	"errors"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -9,6 +11,7 @@ import (
 	"github.com/open-cli-collective/cli-common/credstore"
 
 	"github.com/open-cli-collective/slack-chat-api/internal/client"
+	"github.com/open-cli-collective/slack-chat-api/internal/cmd/apps"
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/canvas"
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/channels"
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/config"
@@ -122,9 +125,26 @@ func Command() *cobra.Command { return rootCmd }
 // Execute runs the root command
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		os.Exit(exitCode(err, os.Stderr))
 	}
+}
+
+// exitCode prints err and returns the process exit status: 1, or the code
+// an error carries for commands whose status means more than failure (slck
+// apps diff exits 1 for "differs" and 2 when it could not compare).
+func exitCode(err error, stderr io.Writer) int {
+	var coded interface {
+		ExitCode() int
+		Silent() bool
+	}
+	if errors.As(err, &coded) {
+		if !coded.Silent() {
+			_, _ = fmt.Fprintln(stderr, err)
+		}
+		return coded.ExitCode()
+	}
+	_, _ = fmt.Fprintln(stderr, err)
+	return 1
 }
 
 func init() {
@@ -138,6 +158,7 @@ func init() {
 	rootCmd.SetVersionTemplate("slck " + version.Info() + "\n")
 
 	// Add subcommands
+	rootCmd.AddCommand(apps.NewCmd())
 	rootCmd.AddCommand(canvas.NewCmd())
 	rootCmd.AddCommand(channels.NewCmd())
 	rootCmd.AddCommand(users.NewCmd())

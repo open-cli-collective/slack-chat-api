@@ -641,6 +641,52 @@ Using **CANVAS_ID₁** from step 10.1:
 
 ---
 
+## Part 11: Apps Tests
+
+Needs an app configuration token pair for the test workspace, generated at api.slack.com/apps under "Your App Configuration Tokens", and the ID of an app in that workspace (APP_ID). The read-only steps change nothing; steps 11.4 and 11.5 create and delete a throwaway app.
+
+### 11.1 Store the Token Pair
+
+| Step | Command | Expected |
+|------|---------|----------|
+| 1 | `printf '{"token":"%s","refresh_token":"%s","exp":%s}' "$ACCESS" "$REFRESH" "$EXP" \| slck set-credential --key app_config_token --stdin` | "Stored app_config_token in ..." with no token in the output |
+| 2 | `slck config show` | `app_config_token: present, access token expires ...` |
+
+### 11.2 Read-Only
+
+| Step | Command | Expected |
+|------|---------|----------|
+| 1 | `slck apps get <APP_ID> --to-file app.json` | "Wrote the manifest of ..." |
+| 2 | `slck apps validate --file app.json --app <APP_ID>` | "Valid: app.json", exit 0 |
+| 3 | `slck apps diff <APP_ID> --file app.json` | "No differences", exit 0 |
+| 4 | Add a scope to `app.json`, then `slck apps diff <APP_ID> --file app.json` | One `~ /oauth_config/scopes/bot` line, exit 1 |
+| 5 | `slck apps diff <APP_ID> --file missing.json` | Read error, exit 2 |
+
+### 11.3 Rotation
+
+| Step | Command | Expected |
+|------|---------|----------|
+| 1 | Store a pair whose `exp` is in the past (11.1 with `EXP` set to an earlier time), then `slck apps get <APP_ID>` | Manifest printed |
+| 2 | `slck config show` | A new expiry about 12 hours out and the team ID |
+
+### 11.4 Create and Update a Throwaway App
+
+| Step | Command | Expected |
+|------|---------|----------|
+| 1 | `slck apps create --file throwaway.json --credentials-file creds.json` | "Created app A..." and an install URL; no secret in the output; `creds.json` is mode 0600 |
+| 2 | `slck apps update <NEW_APP_ID> --file throwaway.json` | "Updated app ..." |
+| 3 | Add a scope, then `slck apps update <NEW_APP_ID> --file throwaway.json` | Also "reinstall the app ..." |
+
+### 11.5 Cleanup: Delete the Throwaway App
+
+| Step | Command | Expected |
+|------|---------|----------|
+| 1 | `slck apps delete <NEW_APP_ID> < /dev/null` | Refuses: stdin is not a terminal, pass --force |
+| 2 | `slck apps delete <NEW_APP_ID> --force` | "Deleted app ..." |
+| 3 | `rm creds.json` | |
+
+---
+
 ## Troubleshooting
 
 | Error | Cause | Solution |
@@ -703,3 +749,4 @@ slck messages history $TEST_CHANNEL_ID --limit 5
 | Part 3B (Search) | Search test message TS₃ | `messages delete` |
 | Part 5 (Destructive) | Test channels | `channels archive` |
 | Part 10 (Canvas) | Test canvases CANVAS_ID₁–₃ | `canvas delete` |
+| Part 11 (Apps) | Throwaway app NEW_APP_ID, `creds.json` | `apps delete --force`, `rm` |

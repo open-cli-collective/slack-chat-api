@@ -1,8 +1,13 @@
 package root
 
 import (
+	"bytes"
+	"errors"
+	"fmt"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/open-cli-collective/slack-chat-api/internal/client"
 	"github.com/open-cli-collective/slack-chat-api/internal/testutil"
@@ -91,4 +96,27 @@ func TestRootRegistersMeNotWhoami(t *testing.T) {
 	if meCount != 1 {
 		t.Errorf("expected exactly one `me` command, found %d", meCount)
 	}
+}
+
+type codedError struct {
+	code   int
+	silent bool
+}
+
+func (e codedError) Error() string { return "differs" }
+func (e codedError) ExitCode() int { return e.code }
+func (e codedError) Silent() bool  { return e.silent }
+
+func TestExitCode(t *testing.T) {
+	var stderr bytes.Buffer
+	assert.Equal(t, 1, exitCode(errors.New("boom"), &stderr))
+	assert.Equal(t, "boom\n", stderr.String())
+
+	stderr.Reset()
+	assert.Equal(t, 1, exitCode(fmt.Errorf("wrapped: %w", codedError{code: 1, silent: true}), &stderr))
+	assert.Empty(t, stderr.String())
+
+	stderr.Reset()
+	assert.Equal(t, 2, exitCode(codedError{code: 2}, &stderr))
+	assert.Equal(t, "differs\n", stderr.String())
 }

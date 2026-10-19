@@ -854,6 +854,52 @@ slck canvas delete F12345ABC
 
 > **Note:** Canvas commands require additional Slack app scopes not included in the default manifest. See [Slack Canvas API docs](https://docs.slack.dev/surfaces/canvases/) for required scopes.
 
+### Apps
+
+Manage Slack apps through their manifests, so an app's configuration can live in version control and be reviewed like code.
+
+```bash
+# Store an app configuration token pair (generate one at api.slack.com/apps,
+# "Your App Configuration Tokens"); the JSON is
+# {"token": "xoxe.xoxp-...", "refresh_token": "xoxe-...", "exp": <unix seconds>}
+<command that prints the pair> | slck set-credential --key app_config_token --stdin
+
+# Export an app's manifest
+slck apps get A0123456789 > app-manifest.json
+
+# Check a manifest, optionally as an update to an existing app
+slck apps validate --file app-manifest.json --app A0123456789
+
+# See what an update would change (exit 0 same, 1 different, 2 could not compare)
+slck apps diff A0123456789 --file app-manifest.json
+
+# Apply it
+slck apps update A0123456789 --file app-manifest.json
+
+# Create an app; its secrets go only to a new 0600 file
+slck apps create --file app-manifest.json --credentials-file app-credentials.json
+
+# Permanently delete an app (prompts; --force skips the prompt)
+slck apps delete A0123456789
+```
+
+#### Apps Command Reference
+
+| Command | Flags | Description |
+|---------|-------|-------------|
+| `get <app-id>` | `--to-file` | Print an app's manifest as indented JSON with sorted keys |
+| `validate` | `--file`, `--app` | Check a manifest with `apps.manifest.validate` |
+| `diff <app-id>` | `--file` | Compare the live manifest with a file, one line per difference |
+| `create` | `--file`, `--credentials-file` | Create an app; prints its ID and install URL |
+| `update <app-id>` | `--file` | Replace an app's manifest; says when a reinstall is needed |
+| `delete <app-id>` | `--force` | Permanently delete an app |
+
+Manifest files are JSON, or YAML when the name ends in `.yaml` or `.yml`.
+
+The apps commands authenticate with the app configuration token, not the bot or user token. slck rotates the pair with `tooling.tokens.rotate` when the access token is within five minutes of expiry or Slack rejects it, and saves the new pair to the keyring before using it. `slck config show` shows when the access token expires and which team it belongs to, never the tokens.
+
+Installing an app to a workspace and reading its bot token need a person in a browser; these commands do neither.
+
 ### Identity
 
 ```bash
@@ -884,7 +930,7 @@ Ingress is at the top level, not under `config`:
 | Command | Flags | Description |
 |---------|-------|-------------|
 | `slck init` | `--bot-token-from-env`, `--user-token-from-env`, `--bot-token-stdin`, `--overwrite`, `--no-verify` | Guided setup; stores into the keyring |
-| `slck set-credential` | `--key`, `--stdin`, `--from-env`, `--ref` | Set one credential (stdin/env only) |
+| `slck set-credential` | `--key`, `--stdin`, `--from-env`, `--ref` | Set one credential (stdin/env only): `bot_token`, `user_token` or `app_config_token` |
 
 `config` subcommands (none accept a secret value):
 

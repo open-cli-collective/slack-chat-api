@@ -1,0 +1,25 @@
+{
+  "display_information": {
+    "description": "Posts build results.",
+    "name": "Example Bot"
+  },
+  "features": {
+    "bot_user": {
+      "always_online": false,
+      "display_name": "Example Bot"
+    }
+  },
+  "oauth_config": {
+    "scopes": {
+      "bot": [
+        "chat:write",
+        "channels:read"
+      ]
+    }
+  },
+  "settings": {
+    "org_deploy_enabled": false,
+    "socket_mode_enabled": false,
+    "token_rotation_enabled": false
+  }
+}
