@@ -20,7 +20,11 @@ type change struct {
 
 // diffManifests lists the differences between two manifests, sorted by
 // pointer. Objects are compared key by key; arrays and scalars are compared
-// as whole values, so a reordered scope list counts as a change.
+// as whole values, so a reordered scope list counts as a change. A key on one
+// side only whose value is false, empty or null is not a difference: Slack
+// exports the defaults of settings a manifest leaves out, such as
+// "pkce_enabled": false, so a freshly created app would otherwise never match
+// its own file.
 func diffManifests(live, file json.RawMessage) ([]change, error) {
 	var l, f any
 	if err := json.Unmarshal(live, &l); err != nil {
@@ -56,6 +60,7 @@ func walk(ptr string, live, file any, out *[]change) {
 		lv, inLive := lm[k]
 		fv, inFile := fm[k]
 		switch {
+		case (!inFile && isDefault(lv)) || (!inLive && isDefault(fv)):
 		case !inFile:
 			*out = append(*out, change{Pointer: child, Live: lv, Side: "live"})
 		case !inLive:
@@ -64,6 +69,28 @@ func walk(ptr string, live, file any, out *[]change) {
 			walk(child, lv, fv, out)
 		}
 	}
+}
+
+// isDefault reports whether v is the value Slack assumes for an omitted key.
+func isDefault(v any) bool {
+	switch t := v.(type) {
+	case nil:
+		return true
+	case bool:
+		return !t
+	case string:
+		return t == ""
+	case []any:
+		return len(t) == 0
+	case map[string]any:
+		for _, child := range t {
+			if !isDefault(child) {
+				return false
+			}
+		}
+		return true
+	}
+	return false
 }
 
 // escapePointer escapes a key for a JSON pointer (RFC 6901).

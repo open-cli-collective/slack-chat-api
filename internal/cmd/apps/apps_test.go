@@ -223,6 +223,40 @@ func TestDiffExitsOneAndListsDifferences(t *testing.T) {
 `, out.String())
 }
 
+func TestDiffIgnoresDefaultsTheFileLeavesOut(t *testing.T) {
+	_, api := newFakeSlack(t, map[string][]string{"apps.manifest.export": {"manifest-export-with-defaults.json"}})
+	out := captureOutput(t)
+
+	err := runDiff(newTestSession(api, storedPair(t, now.Add(time.Hour))), "A0TESTAPP01", "testdata/manifest.json")
+
+	var exit *exitError
+	require.True(t, errors.As(err, &exit))
+	assert.Equal(t, 1, exit.ExitCode())
+	assert.Equal(t, "- /settings/interactivity: {\"is_enabled\":true} (live only)\n", out.String(),
+		"false defaults Slack adds on export are not differences; a live-only setting that is on still is")
+}
+
+func TestIsDefault(t *testing.T) {
+	cases := map[string]bool{
+		`null`:                       true,
+		`false`:                      true,
+		`""`:                         true,
+		`[]`:                         true,
+		`{}`:                         true,
+		`{"a":false,"b":{"c":[]}}`:   true,
+		`true`:                       false,
+		`0`:                          false,
+		`"x"`:                        false,
+		`["chat:write"]`:             false,
+		`{"a":false,"b":{"c":true}}`: false,
+	}
+	for raw, want := range cases {
+		var v any
+		require.NoError(t, json.Unmarshal([]byte(raw), &v))
+		assert.Equal(t, want, isDefault(v), raw)
+	}
+}
+
 func TestDiffExitsTwoWhenItCannotCompare(t *testing.T) {
 	_, api := newFakeSlack(t, map[string][]string{})
 	captureOutput(t)
