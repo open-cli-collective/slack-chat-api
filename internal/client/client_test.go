@@ -1707,3 +1707,56 @@ func TestClient_GetPermalink_Error(t *testing.T) {
 		t.Fatal("expected an error for a not-OK response, got nil")
 	}
 }
+
+func membershipServer(t *testing.T, reply string) *Client {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(reply))
+	}))
+	t.Cleanup(server.Close)
+	return NewWithConfig(server.URL, "test-token", nil)
+}
+
+func TestJoinChannelReportsExistingMembership(t *testing.T) {
+	cases := map[string]struct {
+		reply string
+		want  bool
+	}{
+		"joined": {`{"ok":true}`, false},
+		// Slack's reply for an existing member, with the warning among others.
+		"already member":     {`{"ok":true,"warning":"missing_charset,already_in_channel","response_metadata":{"warnings":["missing_charset","already_in_channel"]}}`, true},
+		"other warning only": {`{"ok":true,"warning":"missing_charset","response_metadata":{"warnings":["missing_charset"]}}`, false},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			got, err := membershipServer(t, c.reply).JoinChannel("C123")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got != c.want {
+				t.Errorf("alreadyMember = %v, want %v", got, c.want)
+			}
+		})
+	}
+}
+
+func TestLeaveChannelReportsMissingMembership(t *testing.T) {
+	cases := map[string]struct {
+		reply string
+		want  bool
+	}{
+		"left":       {`{"ok":true}`, false},
+		"not member": {`{"ok":true,"not_in_channel":true}`, true},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			got, err := membershipServer(t, c.reply).LeaveChannel("C123")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got != c.want {
+				t.Errorf("notMember = %v, want %v", got, c.want)
+			}
+		})
+	}
+}
