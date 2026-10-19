@@ -456,6 +456,17 @@ Using **NEW_CHANNEL_ID** from step 5.1:
 | 3 | `slck channels unarchive <NEW_CHANNEL_ID>` | "Unarchived channel" |
 | 4 | `slck channels unarchive <NEW_CHANNEL_ID>` | "Channel not archived" (idempotent, exit 0) |
 
+### 5.3a Join & Leave
+
+Using a public channel the user token's account is not in:
+
+| Step | Command | Expected |
+|------|---------|----------|
+| 1 | `slck channels join <CHANNEL> --as-user` | "Joined channel" |
+| 2 | `slck channels join <CHANNEL> --as-user` | "Already in channel" (idempotent, exit 0) |
+| 3 | `slck channels leave <CHANNEL> --as-user` | "Left channel" |
+| 4 | `slck channels leave <CHANNEL> --as-user` | "Not in channel" (idempotent, exit 0) |
+
 ### 5.4 Cleanup: Archive Test Channels
 
 | Step | Command | Expected |

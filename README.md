@@ -573,6 +573,10 @@ slck channels set-purpose C1234567890 "Channel purpose"
 
 # Invite users
 slck channels invite C1234567890 U1111111111 U2222222222
+
+# Join or leave a channel yourself (to invite others to a channel you are not in, join it first)
+slck channels join C1234567890 --as-user
+slck channels leave C1234567890 --as-user
 ```
 
 #### Channels Command Reference
@@ -587,6 +591,8 @@ slck channels invite C1234567890 U1111111111 U2222222222
 | `set-topic <id> <topic>` | | Set channel topic |
 | `set-purpose <id> <purpose>` | | Set channel purpose |
 | `invite <id> <user>...` | | Invite users to channel |
+| `join <id>` | | Join a public channel as the token's identity (idempotent) |
+| `leave <id>` | | Leave a channel as the token's identity (idempotent) |
 
 ### Users
 

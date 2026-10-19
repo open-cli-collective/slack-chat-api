@@ -20,6 +20,8 @@ func NewCmd() *cobra.Command {
 	cmd.AddCommand(newSetTopicCmd())
 	cmd.AddCommand(newSetPurposeCmd())
 	cmd.AddCommand(newInviteCmd())
+	cmd.AddCommand(newJoinCmd())
+	cmd.AddCommand(newLeaveCmd())
 
 	return cmd
 }
