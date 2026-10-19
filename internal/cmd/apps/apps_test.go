@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -319,6 +320,38 @@ func TestDeleteWithConfirmationOrForce(t *testing.T) {
 
 			assert.Contains(t, out.String(), "Deleted app A0TESTAPP01")
 			assert.Equal(t, "A0TESTAPP01", fake.calls[0].form["app_id"])
+		})
+	}
+}
+
+func TestCreateRemovesTheCredentialsFileWhenCreateFails(t *testing.T) {
+	_, api := newFakeSlack(t, map[string][]string{"apps.manifest.create": {"invalid-manifest-response.json"}})
+	captureOutput(t)
+	path := filepath.Join(t.TempDir(), "creds.json")
+
+	err := runCreate(newTestSession(api, storedPair(t, now.Add(time.Hour))), "testdata/manifest.json", path)
+
+	require.Error(t, err)
+	_, statErr := os.Stat(path)
+	assert.True(t, os.IsNotExist(statErr), "no empty credentials file is left behind")
+}
+
+func TestDiffInvocationErrorsExitTwo(t *testing.T) {
+	for name, args := range map[string][]string{
+		"no app id":    {"diff", "--file", "testdata/manifest.json"},
+		"unknown flag": {"diff", "A0TESTAPP01", "--bogus"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			cmd := NewCmd()
+			cmd.SetArgs(args)
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
+
+			err := cmd.Execute()
+
+			var exit *exitError
+			require.True(t, errors.As(err, &exit), "got %v", err)
+			assert.Equal(t, 2, exit.ExitCode())
 		})
 	}
 }

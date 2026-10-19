@@ -40,15 +40,17 @@ type ManifestError struct {
 	Pointer string `json:"pointer"`
 }
 
-// APIError is a Slack answer with ok=false. Errors carries the manifest
-// problems Slack lists for invalid_manifest.
-type APIError struct {
+// AppsAPIError is a Slack answer with ok=false from an AppsClient method.
+// Errors carries the manifest problems Slack lists for invalid_manifest.
+// Client (the bot and user token client) does not return it; its errors are
+// matched with IsSlackError.
+type AppsAPIError struct {
 	Method string
 	Code   string
 	Errors []ManifestError
 }
 
-func (e *APIError) Error() string {
+func (e *AppsAPIError) Error() string {
 	msg := fmt.Sprintf("slack API error: %s (%s)", e.Code, e.Method)
 	for _, m := range e.Errors {
 		msg += fmt.Sprintf("\n  %s: %s", m.Pointer, m.Message)
@@ -58,7 +60,7 @@ func (e *APIError) Error() string {
 
 // ExpiredToken reports whether the error means the access token no longer
 // works, so a rotation may recover it.
-func (e *APIError) ExpiredToken() bool {
+func (e *AppsAPIError) ExpiredToken() bool {
 	return e.Code == "token_expired" || e.Code == "invalid_auth"
 }
 
@@ -99,7 +101,7 @@ func (c *AppsClient) ExportManifest(token, appID string) (json.RawMessage, error
 }
 
 // ValidateManifest checks a manifest, against an existing app when appID is
-// set. A manifest with problems returns an *APIError listing them.
+// set. A manifest with problems returns an *AppsAPIError listing them.
 func (c *AppsClient) ValidateManifest(token string, manifest json.RawMessage, appID string) error {
 	params := url.Values{"manifest": {string(manifest)}}
 	if appID != "" {
@@ -170,7 +172,7 @@ func (c *AppsClient) call(method, token string, params url.Values, out any) erro
 		return fmt.Errorf("%s: unexpected response (HTTP %d)", method, resp.StatusCode)
 	}
 	if !status.OK {
-		return &APIError{Method: method, Code: status.Error, Errors: status.Errors}
+		return &AppsAPIError{Method: method, Code: status.Error, Errors: status.Errors}
 	}
 	if out == nil {
 		return nil

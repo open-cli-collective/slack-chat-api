@@ -33,10 +33,18 @@ func (e *exitError) Error() string {
 	}
 	return e.err.Error()
 }
-func (e *exitError) Unwrap() error   { return e.err }
-func (e *exitError) ExitCode() int   { return e.code }
-func (e *exitError) Silent() bool    { return e.silent }
-func usageOrFailure(err error) error { return &exitError{code: 2, err: err} }
+func (e *exitError) Unwrap() error { return e.err }
+func (e *exitError) ExitCode() int { return e.code }
+func (e *exitError) Silent() bool  { return e.silent }
+
+// cannotCompare is diff's exit status 2: the comparison could not be made,
+// whether from a bad invocation, an unreadable file or a failed export.
+func cannotCompare(err error) error {
+	if err == nil {
+		return nil
+	}
+	return &exitError{code: 2, err: err}
+}
 
 // appsHints map apps.manifest.* error codes to what to do about them.
 var appsHints = map[string]string{
@@ -49,7 +57,7 @@ var appsHints = map[string]string{
 
 // wrap names the operation and adds a hint for known apps.manifest.* errors.
 func wrap(operation string, err error) error {
-	var apiErr *client.APIError
+	var apiErr *client.AppsAPIError
 	if errors.As(err, &apiErr) {
 		if hint, ok := appsHints[apiErr.Code]; ok {
 			return fmt.Errorf("%s: %w\nHint: %s", operation, err, hint)
@@ -180,20 +188,24 @@ key only the file has. Paths are JSON pointers.
 Exit status: 0 when they match, 1 when they differ, 2 when the comparison
 could not be made.`,
 		Example: `  slck apps diff A0123456789 --file app-manifest.json`,
-		Args:    cobra.ExactArgs(1),
+		// A mistyped invocation must not exit 1, which means "differs".
+		Args: func(cmd *cobra.Command, args []string) error {
+			return cannotCompare(cobra.ExactArgs(1)(cmd, args))
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			quiet(cmd)
 			return runDiff(newSession(), args[0], file)
 		},
 	}
 	cmd.Flags().StringVarP(&file, "file", "F", "", "Manifest file (.json, .yaml or .yml)")
+	cmd.SetFlagErrorFunc(func(_ *cobra.Command, err error) error { return cannotCompare(err) })
 	return cmd
 }
 
 func runDiff(s *session, appID, file string) error {
 	manifest, err := readManifest(file)
 	if err != nil {
-		return usageOrFailure(err)
+		return cannotCompare(err)
 	}
 	var live json.RawMessage
 	err = s.do(func(token string) (err error) {
@@ -201,11 +213,11 @@ func runDiff(s *session, appID, file string) error {
 		return err
 	})
 	if err != nil {
-		return usageOrFailure(wrap("export manifest of "+appID, err))
+		return cannotCompare(wrap("export manifest of "+appID, err))
 	}
 	changes, err := diffManifests(live, manifest)
 	if err != nil {
-		return usageOrFailure(err)
+		return cannotCompare(err)
 	}
 	if len(changes) == 0 {
 		output.Printf("No differences between %s and %s\n", appID, file)

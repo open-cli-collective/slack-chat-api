@@ -43,7 +43,7 @@ func (s *session) do(call func(token string) error) error {
 		rotated = true
 	}
 	err = call(pair.Token)
-	var apiErr *client.APIError
+	var apiErr *client.AppsAPIError
 	if rotated || !errors.As(err, &apiErr) || !apiErr.ExpiredToken() {
 		return err
 	}
