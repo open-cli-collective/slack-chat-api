@@ -4,11 +4,15 @@ on:
   pull_request:
     paths:
       - 'packaging/chocolatey/**'
+      - '.github/workflows/chocolatey-publish.yml'
+      - '.github/workflows/release.yml'
       - '.github/workflows/test-chocolatey.yml'
   push:
     branches: [main]
     paths:
       - 'packaging/chocolatey/**'
+      - '.github/workflows/chocolatey-publish.yml'
+      - '.github/workflows/release.yml'
       - '.github/workflows/test-chocolatey.yml'
 
 jobs:
@@ -25,55 +29,80 @@ jobs:
       - name: Build binary for testing
         run: go build -o packaging/chocolatey/tools/slck.exe ./cmd/slck
 
-      - name: Prepare test package
-        shell: pwsh
-        working-directory: packaging/chocolatey
-        run: |
-          # Replace placeholder version with test version (must not be prerelease)
-          (Get-Content slack-chat-cli.nuspec) `
-            -replace '<version>0.0.0</version>', '<version>0.0.1</version>' |
-            Set-Content slack-chat-cli.nuspec
-
-          # Create a simple install script that uses the local binary
-          # (the real script downloads from GitHub, but we test structure here)
-          @'
-          $ErrorActionPreference = 'Stop'
-          $toolsDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
-
-          # Binary is already in tools/ from CI build
-          Write-Host "slack-chat-cli installed from local build for testing"
-          '@ | Set-Content tools/chocolateyInstall.ps1
-
-      - name: Pack Chocolatey package
-        shell: pwsh
-        working-directory: packaging/chocolatey
-        run: choco pack
-
-      - name: Install package locally
-        shell: pwsh
-        working-directory: packaging/chocolatey
-        run: choco install slack-chat-cli -dv -s . --force
-
-      - name: Verify installation
+      - name: Render and inspect Chocolatey package
         shell: pwsh
         run: |
-          Write-Host "Testing slck --version..."
-          slck --version
-          if ($LASTEXITCODE -ne 0) {
-            Write-Error "slck --version failed"
-            exit 1
+          $testVersion = '0.0.1'
+          $x64Hash = ('a' * 64) -join ''
+          $arm64Hash = ('b' * 64) -join ''
+          $repository = 'open-cli-collective/slack-chat-api'
+          $x64Url = "https://github.com/$repository/releases/download/v$testVersion/slck_v${testVersion}_windows_amd64.zip"
+          $arm64Url = "https://github.com/$repository/releases/download/v$testVersion/slck_v${testVersion}_windows_arm64.zip"
+          $checkDir = Join-Path $env:RUNNER_TEMP 'slck-chocolatey-render'
+          if (Test-Path $checkDir) { Remove-Item $checkDir -Recurse -Force }
+          New-Item -ItemType Directory -Path $checkDir -Force | Out-Null
+          Copy-Item packaging/chocolatey/* $checkDir -Recurse -Force
+
+          & packaging/chocolatey/render.ps1 `
+            -PackageDirectory $checkDir `
+            -Repository $repository `
+            -Version $testVersion `
+            -Amd64Checksum $x64Hash `
+            -Arm64Checksum $arm64Hash
+
+          Push-Location $checkDir
+          try {
+            choco pack
+            if ($LASTEXITCODE -ne 0) { throw 'choco pack failed' }
+          } finally {
+            Pop-Location
           }
-          Write-Host "slck is working!"
+          $packages = @(Get-ChildItem $checkDir -Filter '*.nupkg')
+          if ($packages.Count -ne 1) { throw "Expected one nupkg, found $($packages.Count)" }
 
-      - name: Test uninstall
-        shell: pwsh
-        run: |
-          choco uninstall slack-chat-cli -y
-
-          # Verify slck is no longer available
-          $slckPath = Get-Command slck -ErrorAction SilentlyContinue
-          if ($slckPath) {
-            Write-Error "slck should not be available after uninstall"
-            exit 1
+          $zipPath = Join-Path $env:RUNNER_TEMP 'slck-chocolatey-render.nupkg.zip'
+          $extractDir = Join-Path $env:RUNNER_TEMP 'slck-chocolatey-extract'
+          if (Test-Path $extractDir) { Remove-Item $extractDir -Recurse -Force }
+          Copy-Item $packages[0].FullName $zipPath -Force
+          Expand-Archive $zipPath -DestinationPath $extractDir
+          $rendered = Get-Content (Join-Path $extractDir 'tools/chocolateyInstall.ps1') -Raw
+          foreach ($value in @($x64Url, $arm64Url, $x64Hash, $arm64Hash)) {
+            if (-not $rendered.Contains($value)) { throw "Packaged install script is missing $value" }
           }
-          Write-Host "Uninstall successful!"
+          if ($rendered -match 'URL_(?:AMD64|ARM64)_PLACEHOLDER|CHECKSUM_(?:AMD64|ARM64)_PLACEHOLDER|ChocolateyPackageVersion|\$\{\s*version\s*\}') {
+            throw 'Packaged install script contains an unresolved placeholder or runtime version expression'
+          }
+
+          $installPath = Join-Path $extractDir 'tools/chocolateyInstall.ps1'
+          function Test-InstallArchitecture {
+            param(
+              [string]$Architecture,
+              [string]$ExpectedUrl,
+              [string]$ExpectedChecksum
+            )
+            $env:PROCESSOR_ARCHITECTURE = $Architecture
+            $global:stubUrl = $null
+            $global:stubChecksum = $null
+            function global:Install-ChocolateyZipPackage {
+              param(
+                [string]$PackageName,
+                [string]$Url,
+                [string]$UnzipLocation,
+                [string]$Checksum,
+                [string]$ChecksumType
+              )
+              $global:stubUrl = $Url
+              $global:stubChecksum = $Checksum
+              if ($ChecksumType -ne 'sha256') { throw "Unexpected checksum type $ChecksumType" }
+            }
+            try {
+              . $installPath
+            } finally {
+              Remove-Item Function:\Install-ChocolateyZipPackage -ErrorAction SilentlyContinue
+            }
+            if ($global:stubUrl -ne $ExpectedUrl) { throw "${Architecture} selected $global:stubUrl" }
+            if ($global:stubChecksum -ne $ExpectedChecksum) { throw "${Architecture} selected the wrong checksum" }
+          }
+
+          Test-InstallArchitecture 'AMD64' $x64Url $x64Hash
+          Test-InstallArchitecture 'ARM64' $arm64Url $arm64Hash
