@@ -94,9 +94,10 @@ func TestStore_RoundTripsAndKeepsRemovedWatchesRemoved(t *testing.T) {
 	assert.Len(t, all, 1, "the listener file is not a watch")
 
 	require.NoError(t, s.Remove(w.Ref()))
-	require.NoError(t, s.Update(w), "updating a removed watch is not an error")
+	err = s.Modify(w.Ref(), func(*Watch) bool { return true })
+	assert.ErrorIs(t, err, ErrNotWatched)
 	_, err = s.Load(w.Ref())
-	assert.ErrorIs(t, err, ErrNotWatched, "and does not bring it back")
+	assert.ErrorIs(t, err, ErrNotWatched, "a change to a removed watch does not bring it back")
 	assert.ErrorIs(t, s.Remove(w.Ref()), ErrNotWatched)
 }
 
@@ -131,6 +132,8 @@ func (r *recorder) Event(ev json.RawMessage) {
 }
 
 func TestListen_AcknowledgesEnvelopesDeliversEventsAndReconnectsWhenAsked(t *testing.T) {
+	pingEvery = 20 * time.Millisecond
+	t.Cleanup(func() { pingEvery = PingEvery })
 	frames, err := os.Open(filepath.Join("testdata", "socket-frames.jsonl"))
 	require.NoError(t, err)
 	defer func() { _ = frames.Close() }()
@@ -168,7 +171,11 @@ func TestListen_AcknowledgesEnvelopesDeliversEventsAndReconnectsWhenAsked(t *tes
 				acks <- string(data)
 			}
 		}()
-		for _, frame := range script {
+		for i, frame := range script {
+			if i == 0 {
+				// Say hello only after a ping or two went through.
+				time.Sleep(5 * pingEvery)
+			}
 			if err := conn.Write(ctx, websocket.MessageText, []byte(frame)); err != nil {
 				return
 			}
@@ -207,7 +214,29 @@ func TestListen_AcknowledgesEnvelopesDeliversEventsAndReconnectsWhenAsked(t *tes
 	rec.mu.Lock()
 	defer rec.mu.Unlock()
 	assert.Equal(t, 1, rec.connected)
-	assert.Zero(t, rec.aliveBeforeConnected, "Connected must see how long the listener was away")
+	assert.Zero(t, rec.aliveBeforeConnected, "pings before hello must not count as alive, so Connected sees how long the listener was away")
 	require.Len(t, rec.events, 1)
 	assert.Contains(t, string(rec.events[0]), `"reaction":"eyes"`)
+}
+
+func TestStore_SerializesConcurrentChanges(t *testing.T) {
+	s, err := OpenDir(t.TempDir())
+	require.NoError(t, err)
+	w := parentWatch()
+	require.NoError(t, s.Save(w))
+	var wg sync.WaitGroup
+	for i := 0; i < 20; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			assert.NoError(t, s.Modify(w.Ref(), func(cur *Watch) bool {
+				cur.Activity += "x"
+				return true
+			}))
+		}()
+	}
+	wg.Wait()
+	got, err := s.Load(w.Ref())
+	require.NoError(t, err)
+	assert.Len(t, got.Activity, 20, "no change was lost to a concurrent read-modify-write")
 }

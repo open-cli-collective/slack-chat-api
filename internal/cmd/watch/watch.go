@@ -4,7 +4,6 @@ package watch
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -15,14 +14,11 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/open-cli-collective/slack-chat-api/internal/client"
-	"github.com/open-cli-collective/slack-chat-api/internal/cmd/messages"
 	"github.com/open-cli-collective/slack-chat-api/internal/messageref"
 	"github.com/open-cli-collective/slack-chat-api/internal/output"
+	"github.com/open-cli-collective/slack-chat-api/internal/render"
 	"github.com/open-cli-collective/slack-chat-api/internal/watch"
 )
-
-// threadLimit bounds the replies read when a watch starts or catches up.
-const threadLimit = 1000
 
 // NewCmd creates the watch command with its subcommands.
 func NewCmd() *cobra.Command {
@@ -103,11 +99,9 @@ func runAdd(input string, days int, store *watch.Store, c *client.Client, now ti
 	if days < 1 {
 		return fmt.Errorf("--days must be at least 1")
 	}
-	w := &watch.Watch{Channel: ref.ChannelID, TS: ref.TS, AddedAt: now, ExpiresAt: now.AddDate(0, 0, days)}
-	if err := refresh(w, c, client.NewUserResolver(c)); err != nil {
-		return err
-	}
-	if err := store.Save(w); err != nil {
+	syncer := watch.NewSyncer(context.Background(), store, c, renderer(c), func() time.Time { return now }, os.Getpid(), logf)
+	w, err := syncer.Add(ref, days)
+	if err != nil {
 		return err
 	}
 	output.Printf("Watching %s until %s.\n", ref, w.ExpiresAt.Local().Format("2006-01-02"))
@@ -117,36 +111,11 @@ func runAdd(input string, days int, store *watch.Store, c *client.Client, now ti
 	return nil
 }
 
-// refresh reads the watched message's thread from Slack and renders it.
-func refresh(w *watch.Watch, c *client.Client, resolver *client.UserResolver) error {
-	thread := w.ThreadTS
-	if thread == "" {
-		thread = w.TS
-	}
-	msgs, err := c.GetThreadReplies(w.Channel, thread, threadLimit, "")
-	if err != nil {
-		return err
-	}
-	if w.ThreadTS == "" {
-		w.ThreadTS = w.TS
-		for _, m := range msgs {
-			if m.TS == w.TS && m.ThreadTS != "" {
-				w.ThreadTS = m.ThreadTS
-			}
-		}
-		if w.ThreadTS != w.TS {
-			// A reply: its thread is read from the parent.
-			if msgs, err = c.GetThreadReplies(w.Channel, w.ThreadTS, threadLimit, ""); err != nil {
-				return err
-			}
-		}
-	}
-	if len(msgs) == 0 {
-		return fmt.Errorf("no message %s", w.Ref())
-	}
-	w.SetMessages(msgs)
-	w.Activity = messages.FormatMessageList(w.Messages, resolver)
-	return nil
+// renderer renders a watch's messages as `messages read` prints them,
+// resolving names with c.
+func renderer(c *client.Client) watch.Render {
+	resolver := client.NewUserResolver(c)
+	return func(msgs []client.Message) string { return render.MessageList(msgs, resolver) }
 }
 
 func newListCmd() *cobra.Command {
@@ -353,96 +322,14 @@ func runListen(ctx context.Context, store *watch.Store, app, user *client.Client
 	if l, err := store.Listener(); err == nil && l.Live(time.Now()) && l.PID != os.Getpid() {
 		return fmt.Errorf("a listener is already %s", l.Describe(time.Now()))
 	}
-	h := &listener{store: store, user: user, resolver: client.NewUserResolver(user), state: watch.Listener{PID: os.Getpid()}}
-	defer func() {
-		h.state.LastOK = time.Time{}
-		_ = store.SaveListener(h.state)
-	}()
+	syncer := watch.NewSyncer(ctx, store, user, renderer(user), time.Now, os.Getpid(), logf)
+	defer syncer.Close()
+	// apps.connections.open is one short request under the client's 30s
+	// timeout; Listen checks ctx around it.
 	open := func(context.Context) (string, error) { return app.OpenSocketConnection() }
-	return watch.Listen(ctx, open, h, logf)
+	return watch.Listen(ctx, open, syncer, logf)
 }
 
 func logf(format string, args ...any) {
 	fmt.Fprintf(os.Stderr, "%s %s\n", time.Now().Format(time.RFC3339), fmt.Sprintf(format, args...))
-}
-
-// catchUpAfter is how long the connection may be gone before the listener
-// rereads every watched thread on reconnecting. A reconnect Slack asks for
-// opens the new connection within a second or two and misses nothing.
-const catchUpAfter = 15 * time.Second
-
-type listener struct {
-	store    *watch.Store
-	user     *client.Client
-	resolver *client.UserResolver
-	state    watch.Listener
-}
-
-func (h *listener) Connected() {
-	now := time.Now()
-	gap := h.state.LastOK.IsZero() || now.Sub(h.state.LastOK) > catchUpAfter
-	if h.state.ConnectedSince.IsZero() || gap {
-		h.state.ConnectedSince = now
-	}
-	h.Alive()
-	logf("connected")
-	if gap {
-		h.catchUp(now)
-	}
-}
-
-// catchUp rereads every watched thread, for what happened while the
-// listener was not connected, and drops expired watches.
-func (h *listener) catchUp(now time.Time) {
-	watches, err := h.store.List()
-	if err != nil {
-		logf("listing watches: %v", err)
-		return
-	}
-	for _, w := range watches {
-		if now.After(w.ExpiresAt) {
-			if err := h.store.Remove(w.Ref()); err == nil {
-				logf("%s expired", w.Ref())
-			}
-			continue
-		}
-		before := w.Activity
-		if err := refresh(w, h.user, h.resolver); err != nil {
-			logf("catching up on %s: %v", w.Ref(), err)
-			continue
-		}
-		if w.Activity != before {
-			h.save(w, "changed while the listener was away")
-		}
-	}
-	logf("caught up on %d watches", len(watches))
-}
-
-func (h *listener) Event(ev json.RawMessage) {
-	watches, err := h.store.List()
-	if err != nil {
-		logf("listing watches: %v", err)
-		return
-	}
-	for _, w := range watches {
-		if w.Apply(ev) {
-			w.Activity = messages.FormatMessageList(w.Messages, h.resolver)
-			h.save(w, "activity")
-		}
-	}
-}
-
-func (h *listener) save(w *watch.Watch, what string) {
-	if err := h.store.Update(w); err != nil {
-		logf("saving %s: %v", w.Ref(), err)
-		return
-	}
-	logf("%s: %s", w.Ref(), what)
-}
-
-func (h *listener) Alive() {
-	h.state.LastOK = time.Now()
-	if err := h.store.SaveListener(h.state); err != nil {
-		logf("saving listener state: %v", err)
-	}
 }

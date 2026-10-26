@@ -136,7 +136,7 @@ func (s *Store) List() ([]*Watch, error) {
 	}
 	var watches []*Watch
 	for _, e := range entries {
-		if e.IsDir() || e.Name() == listenerFile || !strings.HasSuffix(e.Name(), ".json") {
+		if e.IsDir() || e.Name() == listenerFile || !strings.HasSuffix(e.Name(), ".json") || strings.HasPrefix(e.Name(), ".") {
 			continue
 		}
 		var w Watch
@@ -153,30 +153,98 @@ func (s *Store) List() ([]*Watch, error) {
 	return watches, nil
 }
 
-// Save writes a watch.
+// Save writes a watch, replacing any watch of the same message.
 func (s *Store) Save(w *Watch) error {
-	return writeJSON(s.path(w.Ref()), w)
-}
-
-// Update rewrites a watch only while it is still watched, so the listener
-// never brings back one that was removed meanwhile.
-func (s *Store) Update(w *Watch) error {
-	if _, err := os.Stat(s.path(w.Ref())); err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return nil
-		}
-		return err
-	}
-	return s.Save(w)
+	return s.withLock(func() error { return s.write(w) })
 }
 
 // Remove deletes a watch. ErrNotWatched when there is none.
 func (s *Store) Remove(ref messageref.Ref) error {
-	err := os.Remove(s.path(ref))
-	if errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("%s: %w", ref, ErrNotWatched)
+	return s.withLock(func() error {
+		err := os.Remove(s.path(ref))
+		if errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("%s: %w", ref, ErrNotWatched)
+		}
+		return err
+	})
+}
+
+// Modify changes one watch under the store lock and writes it when change
+// reports a change. A watch removed meanwhile stays removed:
+// ErrNotWatched.
+func (s *Store) Modify(ref messageref.Ref, change func(*Watch) bool) error {
+	return s.withLock(func() error {
+		w, err := s.Load(ref)
+		if err != nil {
+			return err
+		}
+		if !change(w) {
+			return nil
+		}
+		return s.write(w)
+	})
+}
+
+// ModifyAll offers every watch to change under the store lock and writes
+// the ones it changed. It returns the changed watches.
+func (s *Store) ModifyAll(change func(*Watch) bool) ([]*Watch, error) {
+	var changed []*Watch
+	err := s.withLock(func() error {
+		watches, err := s.List()
+		if err != nil {
+			return err
+		}
+		for _, w := range watches {
+			if !change(w) {
+				continue
+			}
+			if err := s.write(w); err != nil {
+				return err
+			}
+			changed = append(changed, w)
+		}
+		return nil
+	})
+	return changed, err
+}
+
+func (s *Store) write(w *Watch) error {
+	return writeJSON(s.path(w.Ref()), w)
+}
+
+const (
+	lockFile = ".lock"
+	// A lock older than this was left by a process that died holding it;
+	// every holder finishes in well under a second.
+	staleLock = 10 * time.Second
+	lockWait  = 15 * time.Second
+)
+
+// withLock runs fn holding the store's lock file, which serializes writers
+// across processes: the listener, and add and remove from the CLI.
+func (s *Store) withLock(fn func() error) error {
+	path := filepath.Join(s.dir, lockFile)
+	deadline := time.Now().Add(lockWait)
+	for {
+		f, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+		if err == nil {
+			_ = f.Close()
+			break
+		}
+		if !errors.Is(err, os.ErrExist) {
+			return err
+		}
+		if info, err := os.Stat(path); err == nil && time.Since(info.ModTime()) > staleLock {
+			_ = os.Remove(path)
+			continue
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("the watch store is locked (%s)", path)
+		}
+		time.Sleep(5 * time.Millisecond)
 	}
-	return err
+	defer func() { _ = os.Remove(path) }()
+	return fn()
 }
 
 // Listener reads the listener's state; a listener that never ran has none.

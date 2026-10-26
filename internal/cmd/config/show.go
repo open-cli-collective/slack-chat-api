@@ -122,7 +122,7 @@ func runShow(opts *showOptions) error {
 	}
 	output.Printf("app_config_token: %s\n", appConfig)
 	output.Printf("app_token:      %s\n", presence(status.AppToken))
-	if !status.BotToken && !status.UserToken && !status.AppConfigToken {
+	if !status.BotToken && !status.UserToken && !status.AppConfigToken && !status.AppToken {
 		output.Println()
 		output.Println("No credentials configured. Run 'slck init' or")
 		output.Println("'slck set-credential --key bot_token --stdin'.")

@@ -30,6 +30,8 @@ slack-chat-api/
 │   ├── client/     # Slack API client wrapper
 │   ├── keychain/   # cli-common credstore adapter
 │   ├── output/     # text/table rendering helpers
+│   ├── render/     # message lines shared by messages and watch
+│   ├── watch/      # watch store, event application, Socket Mode listener
 │   └── version/    # build-time version injection
 ├── ARCHITECTURE.md # project-level JSON-vs-text contract
 ├── .golangci.yml
@@ -63,6 +65,9 @@ Local convenience copy, if present: `../cli-common/docs/output-and-rendering.md`
 ```
 
 ## Credentials And Config
+
+`app_token` holds an app-level token (xapp-) with `connections:write`; only
+`slck watch listen` reads it, to open the Socket Mode connection.
 
 `slck` stores credentials in the OS keyring through `cli-common/credstore`.
 Non-secret config such as `credential_ref`, `workspace`, and `keyring.backend`
@@ -111,11 +116,24 @@ Source of truth: https://github.com/open-cli-collective/.github
 Local convenience copy, if present: `../.github`
 ```
 
+## Watch
+
+`slck watch` keeps one file per watched message, and the listener's
+`listener.json`, under `watches/` in slck's data directory. Only the listener
+(through `watch.Syncer`) changes a watch's messages, so a file's `activity`
+always matches them; writers across processes serialize on a `.lock` file in
+that directory. `status` and `wait` read the files and never call Slack. They
+trust them only while the listener confirmed its connection within
+`LiveWithin` (75s; it pings every `PingEvery`, 20s) and fail otherwise. After
+a gap longer than `CatchUpAfter` the listener rereads every watched thread
+off the read loop and applies again the events that arrived meanwhile.
+
 ## Dependencies
 
 - `github.com/open-cli-collective/cli-common` - shared credential storage.
 - `github.com/spf13/cobra` - command framework.
 - `golang.org/x/term` - no-echo prompt support.
+- `github.com/coder/websocket` - the Socket Mode connection.
 
 The Slack HTTP client is implemented in `internal/client`; this repo does not
 use `slack-go` or `zalando`.

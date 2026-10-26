@@ -1,3 +1,7 @@
+# The baseline app for slck's messaging, search and channel commands.
+# `slck watch` additionally needs Socket Mode, user-scoped message and
+# reaction events, and history and reaction read user scopes; see
+# `slck watch --help` or the README's Watch section.
 display_information:
   name: Slack Chat API
   description: Command-line interface for Slack Chat API
