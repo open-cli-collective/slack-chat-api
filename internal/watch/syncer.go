@@ -28,6 +28,14 @@ type ThreadReader interface {
 // Render turns a watch's messages into the text status and wait compare.
 type Render func([]client.Message) string
 
+// Renderers render watches two ways. Render may call Slack to resolve user
+// names; Cached renders from names already resolved and never does, so it
+// is safe under the store lock.
+type Renderers struct {
+	Render Render
+	Cached Render
+}
+
 // Syncer keeps the watch files current: it starts watches, applies the
 // events a Socket Mode connection delivers, and catches up after the
 // connection was away. Every change to a watch's messages goes through it,
@@ -35,16 +43,20 @@ type Render func([]client.Message) string
 type Syncer struct {
 	store   *Store
 	threads ThreadReader
-	render  Render
+	render  Renderers
 	now     func() time.Time
 	logf    Logf
 
-	// mu guards state and the catch-up bookkeeping. Alive runs on the
-	// connection's ping goroutine, Connected and Event on its read loop.
-	mu    sync.Mutex
-	state Listener
-	// catchingUp is set while a catch-up runs; events that arrive meanwhile
-	// are kept in during, and applied again to each thread it rereads.
+	// stateMu guards state, the listener's published liveness. Alive takes
+	// only this lock, so it never waits on the store.
+	stateMu sync.Mutex
+	state   Listener
+
+	// mu serializes changes to watches between the read loop and a
+	// catch-up, and guards catchingUp and during. While a catch-up runs,
+	// events are also kept in during and applied again to each thread it
+	// rereads.
+	mu         sync.Mutex
 	catchingUp bool
 	during     []json.RawMessage
 	ctx        context.Context
@@ -52,7 +64,7 @@ type Syncer struct {
 }
 
 // NewSyncer returns a syncer for the process pid. ctx bounds catch-ups.
-func NewSyncer(ctx context.Context, store *Store, threads ThreadReader, render Render, now func() time.Time, pid int, logf Logf) *Syncer {
+func NewSyncer(ctx context.Context, store *Store, threads ThreadReader, render Renderers, now func() time.Time, pid int, logf Logf) *Syncer {
 	return &Syncer{store: store, threads: threads, render: render, now: now, logf: logf, state: Listener{PID: pid}, ctx: ctx}
 }
 
@@ -98,7 +110,7 @@ func (s *Syncer) refresh(w *Watch) error {
 		return fmt.Errorf("no message %s", w.Ref())
 	}
 	w.SetMessages(msgs)
-	w.Activity = s.render(w.Messages)
+	w.Activity = s.render.Render(w.Messages)
 	return nil
 }
 
@@ -106,13 +118,16 @@ func (s *Syncer) refresh(w *Watch) error {
 // enough to miss events, rereads every watched thread in the background so
 // the connection keeps reading meanwhile.
 func (s *Syncer) Connected() {
-	s.mu.Lock()
+	s.stateMu.Lock()
 	now := s.now()
 	gap := s.state.LastOK.IsZero() || now.Sub(s.state.LastOK) > CatchUpAfter
 	if s.state.ConnectedSince.IsZero() || gap {
 		s.state.ConnectedSince = now
 	}
 	s.saveState(now)
+	s.stateMu.Unlock()
+
+	s.mu.Lock()
 	start := gap && !s.catchingUp
 	if start {
 		s.catchingUp = true
@@ -167,7 +182,7 @@ func (s *Syncer) catchUp() {
 			for _, ev := range s.during {
 				cur.Apply(ev)
 			}
-			cur.Activity = s.render(cur.Messages)
+			cur.Activity = s.render.Cached(cur.Messages)
 			return cur.Activity != before
 		})
 		s.mu.Unlock()
@@ -180,8 +195,17 @@ func (s *Syncer) catchUp() {
 	s.logf("caught up on %d watches", len(watches))
 }
 
-// Event applies one event to every watch it touches.
+// Event applies one event to every watch it touches. Names in the changed
+// threads are resolved before the store is locked, so the locked step only
+// reads and writes files.
 func (s *Syncer) Event(ev json.RawMessage) {
+	if watches, err := s.store.List(); err == nil {
+		for _, w := range watches {
+			if w.Apply(ev) {
+				s.render.Render(w.Messages)
+			}
+		}
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.catchingUp {
@@ -191,7 +215,7 @@ func (s *Syncer) Event(ev json.RawMessage) {
 		if !w.Apply(ev) {
 			return false
 		}
-		w.Activity = s.render(w.Messages)
+		w.Activity = s.render.Cached(w.Messages)
 		return true
 	})
 	if err != nil {
@@ -204,11 +228,12 @@ func (s *Syncer) Event(ev json.RawMessage) {
 
 // Alive records that the connection answered a ping.
 func (s *Syncer) Alive() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.stateMu.Lock()
+	defer s.stateMu.Unlock()
 	s.saveState(s.now())
 }
 
+// saveState publishes state; the caller holds stateMu.
 func (s *Syncer) saveState(now time.Time) {
 	s.state.LastOK = now
 	if err := s.store.SaveListener(s.state); err != nil {
@@ -220,8 +245,8 @@ func (s *Syncer) saveState(now time.Time) {
 // stopped, so status and wait fail at once instead of after LiveWithin.
 func (s *Syncer) Close() {
 	s.wg.Wait()
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.stateMu.Lock()
+	defer s.stateMu.Unlock()
 	s.state.LastOK = time.Time{}
 	_ = s.store.SaveListener(s.state)
 }

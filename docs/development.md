@@ -121,12 +121,14 @@ Local convenience copy, if present: `../.github`
 `slck watch` keeps one file per watched message, and the listener's
 `listener.json`, under `watches/` in slck's data directory. Only the listener
 (through `watch.Syncer`) changes a watch's messages, so a file's `activity`
-always matches them; writers across processes serialize on a `.lock` file in
-that directory. `status` and `wait` read the files and never call Slack. They
-trust them only while the listener confirmed its connection within
-`LiveWithin` (75s; it pings every `PingEvery`, 20s) and fail otherwise. After
-a gap longer than `CatchUpAfter` the listener rereads every watched thread
-off the read loop and applies again the events that arrived meanwhile.
+always matches them; writers across processes serialize on an OS file lock
+(flock, LockFileEx) on `.lock` in that directory, held only for file reads and
+writes (names are resolved before it is taken). `status` and `wait` read the
+files and never call Slack. They trust them only while the listener confirmed
+its connection within `LiveWithin` (75s; it pings every `PingEvery`, 20s) and
+fail otherwise. After a gap longer than `CatchUpAfter` the listener rereads
+every watched thread off the read loop and applies again the events that
+arrived meanwhile.
 
 ## Dependencies
 

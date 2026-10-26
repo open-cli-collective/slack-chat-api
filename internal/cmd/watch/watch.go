@@ -112,10 +112,14 @@ func runAdd(input string, days int, store *watch.Store, c *client.Client, now ti
 }
 
 // renderer renders a watch's messages as `messages read` prints them,
-// resolving names with c.
-func renderer(c *client.Client) watch.Render {
+// resolving names with c, or from names already resolved.
+func renderer(c *client.Client) watch.Renderers {
 	resolver := client.NewUserResolver(c)
-	return func(msgs []client.Message) string { return render.MessageList(msgs, resolver) }
+	cached := resolver.CacheOnly()
+	return watch.Renderers{
+		Render: func(msgs []client.Message) string { return render.MessageList(msgs, resolver) },
+		Cached: func(msgs []client.Message) string { return render.MessageList(msgs, cached) },
+	}
 }
 
 func newListCmd() *cobra.Command {

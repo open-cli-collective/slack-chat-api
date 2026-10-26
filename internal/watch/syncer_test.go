@@ -68,7 +68,7 @@ func newSyncer(t *testing.T, f *threads) (*Syncer, *Store, *clock) {
 	store, err := OpenDir(t.TempDir())
 	require.NoError(t, err)
 	c := &clock{t: time.Unix(1790000000, 0)}
-	return NewSyncer(context.Background(), store, f, renderTexts, c.now, 42, func(string, ...any) {}), store, c
+	return NewSyncer(context.Background(), store, f, Renderers{Render: renderTexts, Cached: renderTexts}, c.now, 42, func(string, ...any) {}), store, c
 }
 
 func parentThread(texts ...string) []client.Message {
@@ -181,4 +181,67 @@ func TestSyncer_CallbacksFromBothGoroutinesAreSafe(t *testing.T) {
 	wg.Wait()
 	s.wg.Wait()
 	assert.NotContains(t, activity(t, store), ":white_check_mark:")
+}
+
+func TestSyncer_AliveDoesNotWaitOnTheStore(t *testing.T) {
+	f := &threads{byTS: map[string][]client.Message{parentTS: parentThread()}}
+	s, store, _ := newSyncer(t, f)
+	held := make(chan struct{})
+	release := make(chan struct{})
+	go func() {
+		_ = store.withLock(func() error {
+			close(held)
+			<-release
+			return nil
+		})
+	}()
+	<-held
+	defer close(release)
+	done := make(chan struct{})
+	go func() { s.Alive(); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("Alive waited on the store lock")
+	}
+}
+
+func TestSyncer_ResolvesNamesBeforeLockingTheStore(t *testing.T) {
+	f := &threads{byTS: map[string][]client.Message{parentTS: parentThread()}}
+	store, err := OpenDir(t.TempDir())
+	require.NoError(t, err)
+	c := &clock{t: time.Unix(1790000000, 0)}
+	slow := make(chan struct{})
+	var blocking sync.Once
+	entered := make(chan struct{})
+	renderers := Renderers{
+		// The network render: the first call after Add blocks, as a slow
+		// users.info would.
+		Render: func(msgs []client.Message) string { return renderTexts(msgs) },
+		Cached: renderTexts,
+	}
+	s := NewSyncer(context.Background(), store, f, renderers, c.now, 42, func(string, ...any) {})
+	_, err = s.Add(parentRef, 14)
+	require.NoError(t, err)
+	s.render.Render = func(msgs []client.Message) string {
+		blocking.Do(func() { close(entered); <-slow })
+		return renderTexts(msgs)
+	}
+
+	evented := make(chan struct{})
+	go func() { s.Event(fixture(t, "reaction-added.json")); close(evented) }()
+	<-entered
+	saved := make(chan error, 1)
+	go func() {
+		saved <- store.Save(&Watch{Channel: "C0123ABCD", TS: "1790000900.000100", ThreadTS: "1790000900.000100"})
+	}()
+	select {
+	case err := <-saved:
+		require.NoError(t, err, "the store is free while names are resolved")
+	case <-time.After(time.Second):
+		t.Fatal("a slow name lookup held the store lock")
+	}
+	close(slow)
+	<-evented
+	assert.Contains(t, activity(t, store), ":white_check_mark:")
 }

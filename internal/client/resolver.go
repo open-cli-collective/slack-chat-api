@@ -8,18 +8,28 @@ import (
 // UserResolver resolves Slack user IDs to display names with caching.
 type UserResolver struct {
 	client *Client
-	cache  map[string]string
-	mu     sync.Mutex
+	names  *nameCache
+}
+
+type nameCache struct {
+	mu sync.Mutex
+	m  map[string]string
 }
 
 var mentionRegex = regexp.MustCompile(`<@(U[A-Z0-9]+)>`)
 
 // NewUserResolver creates a resolver backed by the given client.
 func NewUserResolver(c *Client) *UserResolver {
-	return &UserResolver{
-		client: c,
-		cache:  make(map[string]string),
+	return &UserResolver{client: c, names: &nameCache{m: make(map[string]string)}}
+}
+
+// CacheOnly returns a resolver that shares r's cache but never calls Slack:
+// an ID r has not resolved yet stays an ID.
+func (r *UserResolver) CacheOnly() *UserResolver {
+	if r == nil {
+		return nil
 	}
+	return &UserResolver{names: r.names}
 }
 
 // Resolve returns a display name for the given user ID.
@@ -28,16 +38,19 @@ func (r *UserResolver) Resolve(userID string) string {
 	if userID == "" {
 		return userID
 	}
-	if r == nil || r.client == nil {
+	if r == nil || r.names == nil {
 		return userID
 	}
 
-	r.mu.Lock()
-	if name, ok := r.cache[userID]; ok {
-		r.mu.Unlock()
+	r.names.mu.Lock()
+	if name, ok := r.names.m[userID]; ok {
+		r.names.mu.Unlock()
 		return name
 	}
-	r.mu.Unlock()
+	r.names.mu.Unlock()
+	if r.client == nil {
+		return userID
+	}
 
 	user, err := r.client.GetUserInfo(userID)
 	if err != nil {
@@ -55,9 +68,9 @@ func (r *UserResolver) Resolve(userID string) string {
 		name = userID
 	}
 
-	r.mu.Lock()
-	r.cache[userID] = name
-	r.mu.Unlock()
+	r.names.mu.Lock()
+	r.names.m[userID] = name
+	r.names.mu.Unlock()
 
 	return name
 }

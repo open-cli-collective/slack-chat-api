@@ -212,38 +212,18 @@ func (s *Store) write(w *Watch) error {
 	return writeJSON(s.path(w.Ref()), w)
 }
 
-const (
-	lockFile = ".lock"
-	// A lock older than this was left by a process that died holding it;
-	// every holder finishes in well under a second.
-	staleLock = 10 * time.Second
-	lockWait  = 15 * time.Second
-)
+const storeLock = ".lock"
 
 // withLock runs fn holding the store's lock file, which serializes writers
-// across processes: the listener, and add and remove from the CLI.
+// across processes: the listener, and add and remove from the CLI. Holders
+// only read and write files; nothing that waits on the network runs under
+// it.
 func (s *Store) withLock(fn func() error) error {
-	path := filepath.Join(s.dir, lockFile)
-	deadline := time.Now().Add(lockWait)
-	for {
-		f, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
-		if err == nil {
-			_ = f.Close()
-			break
-		}
-		if !errors.Is(err, os.ErrExist) {
-			return err
-		}
-		if info, err := os.Stat(path); err == nil && time.Since(info.ModTime()) > staleLock {
-			_ = os.Remove(path)
-			continue
-		}
-		if time.Now().After(deadline) {
-			return fmt.Errorf("the watch store is locked (%s)", path)
-		}
-		time.Sleep(5 * time.Millisecond)
+	unlock, err := lockFile(filepath.Join(s.dir, storeLock))
+	if err != nil {
+		return fmt.Errorf("locking the watch store: %w", err)
 	}
-	defer func() { _ = os.Remove(path) }()
+	defer unlock()
 	return fn()
 }
 

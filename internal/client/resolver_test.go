@@ -122,3 +122,23 @@ func TestUserResolver_ResolveMentions(t *testing.T) {
 		})
 	}
 }
+
+func TestUserResolver_CacheOnlySharesTheCacheAndNeverCalls(t *testing.T) {
+	var callCount atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		callCount.Add(1)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"ok":   true,
+			"user": map[string]interface{}{"id": "U001", "name": "alice"},
+		})
+	}))
+	defer server.Close()
+
+	r := NewUserResolver(NewWithConfig(server.URL, "test-token", nil))
+	cached := r.CacheOnly()
+	assert.Equal(t, "U001", cached.Resolve("U001"), "not resolved yet")
+	assert.Equal(t, int32(0), callCount.Load())
+	assert.Equal(t, "alice", r.Resolve("U001"))
+	assert.Equal(t, "alice", cached.Resolve("U001"), "sees what r resolved")
+	assert.Equal(t, int32(1), callCount.Load())
+}
