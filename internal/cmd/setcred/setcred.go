@@ -49,7 +49,7 @@ commands use, as the JSON object
 		},
 	}
 	cmd.Flags().StringVar(&opts.ref, "ref", "", "Credential ref (default: config.yml credential_ref)")
-	cmd.Flags().StringVar(&opts.key, "key", "", "Key to set: bot_token, user_token or app_config_token")
+	cmd.Flags().StringVar(&opts.key, "key", "", "Key to set: bot_token, user_token, app_config_token or app_token")
 	cmd.Flags().BoolVar(&opts.stdin, "stdin", false, "Read the secret value from stdin")
 	cmd.Flags().StringVar(&opts.fromEnv, "from-env", "", "Read the secret value from this env var")
 	return cmd
@@ -57,7 +57,7 @@ commands use, as the JSON object
 
 func run(opts *options) error {
 	if opts.key == "" {
-		return fmt.Errorf("--key is required (bot_token, user_token or app_config_token)")
+		return fmt.Errorf("--key is required (bot_token, user_token, app_config_token or app_token)")
 	}
 	if opts.stdin == (opts.fromEnv != "") {
 		return fmt.Errorf("exactly one of --stdin or --from-env is required")
@@ -91,9 +91,14 @@ func run(opts *options) error {
 			return err
 		}
 		err = st.SetAppConfigToken(value)
+	case keychain.KeyAppToken:
+		if !strings.HasPrefix(value, "xapp-") {
+			return fmt.Errorf("app_token must be an app-level token (xapp-...)")
+		}
+		err = st.SetAppToken(value)
 	default:
-		return fmt.Errorf("key %q not allowed (allowed: %s, %s, %s)",
-			opts.key, keychain.KeyBotToken, keychain.KeyUserToken, keychain.KeyAppConfigToken)
+		return fmt.Errorf("key %q not allowed (allowed: %s, %s, %s, %s)",
+			opts.key, keychain.KeyBotToken, keychain.KeyUserToken, keychain.KeyAppConfigToken, keychain.KeyAppToken)
 	}
 	if err != nil {
 		return err

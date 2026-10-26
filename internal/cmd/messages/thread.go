@@ -1,6 +1,7 @@
 package messages
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -65,11 +66,17 @@ func runThread(channel, threadTS string, opts *threadOptions, c *client.Client) 
 	return nil
 }
 
-// renderMessageList prints "[ts] user: body" lines for each message, with
-// continuation indentation for multi-line bodies, edited markers, and file
-// attachment and reaction lines. Shared between `messages thread` and
-// `messages read`.
+// renderMessageList prints FormatMessageList's output.
 func renderMessageList(messages []client.Message, resolver *client.UserResolver) {
+	output.Printf("%s", FormatMessageList(messages, resolver))
+}
+
+// FormatMessageList renders "[ts] user: body" lines for each message, with
+// continuation indentation for multi-line bodies, edited markers, and file
+// attachment and reaction lines. Shared by `messages thread`, `messages read`
+// and the watch state `slck watch` keeps.
+func FormatMessageList(messages []client.Message, resolver *client.UserResolver) string {
+	var b strings.Builder
 	for _, m := range messages {
 		ts := formatTimestamp(m.TS)
 		body, preserveNewlines := messageBody(m, resolver)
@@ -90,12 +97,9 @@ func renderMessageList(messages []client.Message, resolver *client.UserResolver)
 				edited = ""
 			}
 		}
-		output.Printf("[%s] %s: %s%s\n", ts, name, text, edited)
-		if files := renderFiles(m.Files); files != "" {
-			output.Printf("%s", files)
-		}
-		if reactions := renderReactions(m.Reactions, resolver); reactions != "" {
-			output.Printf("%s", reactions)
-		}
+		fmt.Fprintf(&b, "[%s] %s: %s%s\n", ts, name, text, edited)
+		b.WriteString(renderFiles(m.Files))
+		b.WriteString(renderReactions(m.Reactions, resolver))
 	}
+	return b.String()
 }

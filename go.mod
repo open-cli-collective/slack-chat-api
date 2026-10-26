@@ -6,6 +6,7 @@ toolchain go1.26.10
 
 require (
 	github.com/byteness/keyring v1.11.0
+	github.com/coder/websocket v1.8.14
 	github.com/open-cli-collective/cli-common v0.4.1
 	github.com/spf13/cobra v1.8.0
 	github.com/stretchr/testify v1.11.1
