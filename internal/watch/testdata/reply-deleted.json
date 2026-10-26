@@ -1,0 +1,1 @@
+{"type":"message","subtype":"message_deleted","channel":"C0123ABCD","hidden":true,"deleted_ts":"1790000100.000200","ts":"1790000700.000800","event_ts":"1790000700.000800","previous_message":{"type":"message","user":"U0222BBBB","text":"looks good to me, ship it","ts":"1790000100.000200","thread_ts":"1790000000.000100"}}

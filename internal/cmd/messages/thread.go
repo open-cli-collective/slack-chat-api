@@ -1,12 +1,11 @@
 package messages
 
 import (
-	"strings"
-
 	"github.com/spf13/cobra"
 
 	"github.com/open-cli-collective/slack-chat-api/internal/client"
 	"github.com/open-cli-collective/slack-chat-api/internal/output"
+	"github.com/open-cli-collective/slack-chat-api/internal/render"
 	"github.com/open-cli-collective/slack-chat-api/internal/validate"
 )
 
@@ -65,37 +64,7 @@ func runThread(channel, threadTS string, opts *threadOptions, c *client.Client) 
 	return nil
 }
 
-// renderMessageList prints "[ts] user: body" lines for each message, with
-// continuation indentation for multi-line bodies, edited markers, and file
-// attachment and reaction lines. Shared between `messages thread` and
-// `messages read`.
+// renderMessageList prints the messages as render.MessageList formats them.
 func renderMessageList(messages []client.Message, resolver *client.UserResolver) {
-	for _, m := range messages {
-		ts := formatTimestamp(m.TS)
-		body, preserveNewlines := messageBody(m, resolver)
-		var text string
-		if preserveNewlines {
-			text = indentContinuation(body)
-		} else {
-			text = flatten(body)
-		}
-		name := messageAuthor(m, resolver)
-		edited := ""
-		if m.Edited != nil {
-			edited = " [edited]"
-		}
-		if edited != "" {
-			if idx := strings.Index(text, "\n"); idx >= 0 {
-				text = text[:idx] + edited + text[idx:]
-				edited = ""
-			}
-		}
-		output.Printf("[%s] %s: %s%s\n", ts, name, text, edited)
-		if files := renderFiles(m.Files); files != "" {
-			output.Printf("%s", files)
-		}
-		if reactions := renderReactions(m.Reactions, resolver); reactions != "" {
-			output.Printf("%s", reactions)
-		}
-	}
+	output.Printf("%s", render.MessageList(messages, resolver))
 }

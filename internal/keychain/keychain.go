@@ -35,10 +35,13 @@ const (
 	// token, refresh token and expiry) as one JSON value, so a rotation
 	// replaces the pair in a single write. See internal/apptoken.
 	KeyAppConfigToken = "app_config_token"
+	// KeyAppToken holds the app-level token (xapp-) that opens a Socket
+	// Mode connection for `slck watch listen`.
+	KeyAppToken = "app_token"
 )
 
 // allowedKeys is slck's §1.5.2 allowlist.
-var allowedKeys = []string{KeyBotToken, KeyUserToken, KeyAppConfigToken}
+var allowedKeys = []string{KeyBotToken, KeyUserToken, KeyAppConfigToken, KeyAppToken}
 
 // Store is an open handle to slck's credential bundle. Construct with Open,
 // always Close. It carries the resolved ref so callers can report it in
@@ -162,6 +165,9 @@ func (s *Store) AppConfigToken() (string, error) {
 	return s.get(KeyAppConfigToken, ErrMissingAppConfigToken)
 }
 
+// AppToken returns the app-level token used for Socket Mode.
+func (s *Store) AppToken() (string, error) { return s.get(KeyAppToken, ErrMissingAppToken) }
+
 func (s *Store) get(key string, missing error) (string, error) {
 	v, err := s.cs.Get(s.profile, key)
 	if errors.Is(err, credstore.ErrNotFound) || (err == nil && v == "") {
@@ -182,6 +188,9 @@ func (s *Store) SetUserToken(v string) error { return s.set(KeyUserToken, v) }
 // SetAppConfigToken stores the app configuration token pair. It is written
 // by set-credential and again after every rotation.
 func (s *Store) SetAppConfigToken(v string) error { return s.set(KeyAppConfigToken, v) }
+
+// SetAppToken stores the app-level token used for Socket Mode.
+func (s *Store) SetAppToken(v string) error { return s.set(KeyAppToken, v) }
 
 func (s *Store) set(key, v string) error {
 	if err := s.cs.Set(s.profile, key, v, credstore.WithOverwrite()); err != nil {
@@ -216,6 +225,9 @@ func (s *Store) HasUserToken() bool { return s.has(KeyUserToken) }
 // HasAppConfigToken reports whether an app configuration token pair is stored.
 func (s *Store) HasAppConfigToken() bool { return s.has(KeyAppConfigToken) }
 
+// HasAppToken reports whether an app-level token is stored.
+func (s *Store) HasAppToken() bool { return s.has(KeyAppToken) }
+
 func (s *Store) has(key string) bool {
 	ok, err := s.cs.Exists(s.profile, key)
 	return err == nil && ok
@@ -235,6 +247,9 @@ var (
 	// ErrMissingAppConfigToken is returned by the apps commands when no
 	// app configuration token pair is stored.
 	ErrMissingAppConfigToken = errors.New("slck: no app configuration token in keyring; generate one at api.slack.com/apps and pipe {\"token\", \"refresh_token\", \"exp\"} JSON to `slck set-credential --key app_config_token --stdin`")
+	// ErrMissingAppToken is returned by `slck watch listen` when no
+	// app-level token is stored.
+	ErrMissingAppToken = errors.New("slck: no app-level token in keyring; generate one with the connections:write scope under the app's Basic Information at api.slack.com/apps and pipe it to `slck set-credential --key app_token --stdin`")
 )
 
 // DetectTokenType returns "bot" for xoxb-*, "user" for xoxp-*, else

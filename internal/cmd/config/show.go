@@ -49,6 +49,7 @@ type showStatus struct {
 	BotToken         bool   `json:"bot_token_present"`
 	UserToken        bool   `json:"user_token_present"`
 	AppConfigToken   bool   `json:"app_config_token_present"`
+	AppToken         bool   `json:"app_token_present"`
 	// AppConfigExpires is the access token's expiry (RFC 3339); slck rotates
 	// the pair when it is used near or after this time.
 	AppConfigExpires string `json:"app_config_token_expires,omitempty"`
@@ -80,6 +81,7 @@ func runShow(opts *showOptions) error {
 		BotToken:       st.HasBotToken(),
 		UserToken:      st.HasUserToken(),
 		AppConfigToken: st.HasAppConfigToken(),
+		AppToken:       st.HasAppToken(),
 	}
 	if status.AppConfigToken {
 		if raw, err := st.AppConfigToken(); err == nil {
@@ -119,7 +121,8 @@ func runShow(opts *showOptions) error {
 		appConfig += ", team " + status.AppConfigTeamID
 	}
 	output.Printf("app_config_token: %s\n", appConfig)
-	if !status.BotToken && !status.UserToken && !status.AppConfigToken {
+	output.Printf("app_token:      %s\n", presence(status.AppToken))
+	if !status.BotToken && !status.UserToken && !status.AppConfigToken && !status.AppToken {
 		output.Println()
 		output.Println("No credentials configured. Run 'slck init' or")
 		output.Println("'slck set-credential --key bot_token --stdin'.")

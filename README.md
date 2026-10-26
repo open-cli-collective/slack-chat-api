@@ -906,6 +906,36 @@ The apps commands authenticate with the app configuration token, not the bot or 
 
 Installing an app to a workspace and reading its bot token need a person in a browser; these commands do neither.
 
+### Watch
+
+Follow messages for replies and reactions as Slack pushes them, instead of polling. One listener holds a Socket Mode connection and keeps each watched thread in a local file; `status` and `wait` read those files and never call Slack.
+
+```bash
+# Follow a message (a ref or a permalink): replies in its thread, reactions, edits
+slck watch add C02DF3BEUGN/1777469221.721439
+
+# Block until it changes, then print the thread and exit 0 (run it in the background)
+slck watch wait C02DF3BEUGN/1777469221.721439
+
+# Print the thread as the listener last saw it; output changes only when the thread does
+slck watch status C02DF3BEUGN/1777469221.721439
+
+slck watch list
+slck watch remove C02DF3BEUGN/1777469221.721439
+
+# The listener; keep it running as a launchd agent or systemd user service
+slck watch listen
+```
+
+`status` and `wait` fail when the listener is not connected, so nothing waits on a connection that is gone. Each time the listener connects after being away it reads each watched thread once to catch up. Watches expire after 14 days (`add --days`).
+
+Setup, once per app (the app the user token belongs to):
+
+1. In the app's manifest set `settings.socket_mode_enabled: true` and `settings.event_subscriptions.user_events` to `message.channels`, `message.groups`, `message.im`, `message.mpim`, `reaction_added` and `reaction_removed`, and add the user scopes `channels:history`, `groups:history`, `im:history`, `mpim:history` and `reactions:read`. Apply it with `slck apps update` and reinstall the app.
+2. Generate an app-level token with the `connections:write` scope on the app's Basic Information page and store it: `<command that prints the token> | slck set-credential --key app_token --stdin`.
+
+Slack then sends the listener every message and reaction in the conversations the user is in; it keeps the ones on watched threads and drops the rest.
+
 ### Identity
 
 ```bash

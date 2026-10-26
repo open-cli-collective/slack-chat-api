@@ -24,6 +24,7 @@ import (
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/setcred"
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/unreads"
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/users"
+	"github.com/open-cli-collective/slack-chat-api/internal/cmd/watch"
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/workspace"
 	"github.com/open-cli-collective/slack-chat-api/internal/keychain"
 	"github.com/open-cli-collective/slack-chat-api/internal/output"
@@ -172,4 +173,5 @@ func init() {
 	rootCmd.AddCommand(files.NewCmd())
 	rootCmd.AddCommand(initcmd.NewCmd())
 	rootCmd.AddCommand(setcred.NewCmd())
+	rootCmd.AddCommand(watch.NewCmd())
 }
