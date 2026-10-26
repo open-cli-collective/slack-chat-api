@@ -111,11 +111,19 @@ func TestListener_LiveOnlyWhileItConfirmsTheConnection(t *testing.T) {
 type recorder struct {
 	mu        sync.Mutex
 	connected int
-	events    []json.RawMessage
+	alive     int
+	// aliveBeforeConnected records Alive calls seen when Connected ran.
+	aliveBeforeConnected int
+	events               []json.RawMessage
 }
 
-func (r *recorder) Connected() { r.mu.Lock(); r.connected++; r.mu.Unlock() }
-func (r *recorder) Alive()     {}
+func (r *recorder) Connected() {
+	r.mu.Lock()
+	r.connected++
+	r.aliveBeforeConnected = r.alive
+	r.mu.Unlock()
+}
+func (r *recorder) Alive() { r.mu.Lock(); r.alive++; r.mu.Unlock() }
 func (r *recorder) Event(ev json.RawMessage) {
 	r.mu.Lock()
 	r.events = append(r.events, ev)
@@ -199,6 +207,7 @@ func TestListen_AcknowledgesEnvelopesDeliversEventsAndReconnectsWhenAsked(t *tes
 	rec.mu.Lock()
 	defer rec.mu.Unlock()
 	assert.Equal(t, 1, rec.connected)
+	assert.Zero(t, rec.aliveBeforeConnected, "Connected must see how long the listener was away")
 	require.Len(t, rec.events, 1)
 	assert.Contains(t, string(rec.events[0]), `"reaction":"eyes"`)
 }

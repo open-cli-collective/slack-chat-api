@@ -21,7 +21,8 @@ const (
 
 // Handler receives what a Socket Mode connection delivers.
 type Handler interface {
-	// Connected is called when Slack says hello on a new connection.
+	// Connected is called when Slack says hello on a new connection, before
+	// any Alive on it, so the handler can tell how long it was away.
 	Connected()
 	// Event is called with the inner event of each Events API envelope.
 	Event(event json.RawMessage)
@@ -122,7 +123,6 @@ func session(ctx context.Context, open OpenFunc, h Handler, logf Logf) (helloed 
 		switch env.Type {
 		case "hello":
 			helloed = true
-			h.Alive()
 			h.Connected()
 		case "disconnect":
 			logf("Slack asked for a new connection (%s)", env.Reason)
