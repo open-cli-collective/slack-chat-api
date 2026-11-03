@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/open-cli-collective/slack-chat-api/internal/client"
+	"github.com/open-cli-collective/slack-chat-api/internal/cmd/cmdutil"
 	"github.com/open-cli-collective/slack-chat-api/internal/output"
 	"github.com/open-cli-collective/slack-chat-api/internal/render"
 )
@@ -28,7 +29,7 @@ pins:read scope.`,
   slck pins list general --as-user`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			quiet(cmd)
+			cmdutil.Quiet(cmd)
 			return runList(args[0], nil)
 		},
 	}

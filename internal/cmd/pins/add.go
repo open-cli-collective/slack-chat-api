@@ -4,6 +4,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/open-cli-collective/slack-chat-api/internal/client"
+	"github.com/open-cli-collective/slack-chat-api/internal/cmd/cmdutil"
 	"github.com/open-cli-collective/slack-chat-api/internal/output"
 	"github.com/open-cli-collective/slack-chat-api/internal/validate"
 )
@@ -21,7 +22,7 @@ succeeds and says so. Requires the pins:write scope.`,
   slck pins add general 1234567890.123456 --as-user`,
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			quiet(cmd)
+			cmdutil.Quiet(cmd)
 			return runAdd(args[0], args[1], nil)
 		},
 	}

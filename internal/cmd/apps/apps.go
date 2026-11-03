@@ -16,6 +16,7 @@ import (
 	"golang.org/x/term"
 
 	"github.com/open-cli-collective/slack-chat-api/internal/client"
+	"github.com/open-cli-collective/slack-chat-api/internal/cmd/cmdutil"
 	"github.com/open-cli-collective/slack-chat-api/internal/output"
 )
 
@@ -66,14 +67,6 @@ func wrap(operation string, err error) error {
 	return fmt.Errorf("%s: %w", operation, err)
 }
 
-// quiet stops cobra from printing a runtime error and the usage text: once
-// the arguments parsed, the root command prints the error alone, and a
-// silent exitError (diff's "differs") prints nothing more.
-func quiet(cmd *cobra.Command) {
-	cmd.SilenceUsage = true
-	cmd.SilenceErrors = true
-}
-
 // NewCmd builds `slck apps`.
 func NewCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -111,7 +104,7 @@ it is printed as JSON whatever --output says.`,
   slck apps get A0123456789 --to-file app-manifest.json`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			quiet(cmd)
+			cmdutil.Quiet(cmd)
 			return runGet(newSession(), args[0], toFile)
 		},
 	}
@@ -155,7 +148,7 @@ and non-zero, listing each problem, when it is not.`,
   slck apps validate --file app-manifest.yaml --app A0123456789`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			quiet(cmd)
+			cmdutil.Quiet(cmd)
 			return runValidate(newSession(), file, appID)
 		},
 	}
@@ -193,7 +186,7 @@ could not be made.`,
 			return cannotCompare(cobra.ExactArgs(1)(cmd, args))
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			quiet(cmd)
+			cmdutil.Quiet(cmd)
 			return runDiff(newSession(), args[0], file)
 		},
 	}
@@ -244,7 +237,7 @@ Basic Information page of the app still shows them.`,
 		Example: `  slck apps create --file app-manifest.json --credentials-file app-credentials.json`,
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			quiet(cmd)
+			cmdutil.Quiet(cmd)
 			return runCreate(newSession(), file, credentialsFile)
 		},
 	}
@@ -312,7 +305,7 @@ is reinstalled to the workspace, and the command says so.`,
   slck apps update A0123456789 --file app-manifest.json`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			quiet(cmd)
+			cmdutil.Quiet(cmd)
 			return runUpdate(newSession(), args[0], file)
 		},
 	}
@@ -358,7 +351,7 @@ when stdin is not a terminal.`,
 		Example: `  slck apps delete A0123456789`,
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			quiet(cmd)
+			cmdutil.Quiet(cmd)
 			opts.stdin = os.Stdin
 			opts.terminal = term.IsTerminal(int(os.Stdin.Fd()))
 			return runDelete(newSession(), args[0], opts)

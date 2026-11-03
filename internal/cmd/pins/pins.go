@@ -28,11 +28,3 @@ token, or on the user token with --as-user.`,
 
 	return cmd
 }
-
-// quiet stops cobra from printing the usage text and its own copy of a
-// runtime error once the arguments parsed, so the root command prints the
-// error and its hint alone.
-func quiet(cmd *cobra.Command) {
-	cmd.SilenceUsage = true
-	cmd.SilenceErrors = true
-}

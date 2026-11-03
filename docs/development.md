@@ -44,6 +44,8 @@ slack-chat-api/
 - New commands live under the appropriate `internal/cmd/<resource>/` package.
 - Register new commands from the resource root command.
 - Add tests around the command runner with a mock or injectable client.
+- Call `cmdutil.Quiet(cmd)` first in `RunE`, so a runtime error prints once,
+  with its hint and without the usage text. Argument errors still print usage.
 
 ## Output Contract
 
