@@ -6,8 +6,8 @@ Collective standards and automation remain canonical in their own repositories.
 ## Project Overview
 
 slack-chat-api builds the `slck` command-line interface for Slack. It supports
-channel management, user lookup, messaging, reactions, message history, and
-workspace information.
+channel management, user lookup, messaging, reactions, pins, message history,
+and workspace information.
 
 ## Quick Commands
 

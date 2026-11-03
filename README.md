@@ -304,6 +304,7 @@ or `op read ... | slck set-credential --key bot_token --stdin`.
            "mpim:read",
            "mpim:write",
            "pins:read",
+           "pins:write",
            "reactions:read",
            "reactions:write",
            "reminders:read",
@@ -345,6 +346,7 @@ or `op read ... | slck set-credential --key bot_token --stdin`.
            "mpim:read",
            "mpim:write",
            "pins:read",
+           "pins:write",
            "reactions:read",
            "reactions:write",
            "reminders:read",
@@ -452,7 +454,8 @@ The **extended manifest** (see the collapsible section above) adds these capabil
 | `usergroups:read` | Resolve `@subteam` / user-group mentions |
 | `app_mentions:read` | Receive @-mention events (needed for event subscriptions) |
 | `reactions:read` | List reactions on a message |
-| Other `*:read` scopes (`bookmarks`, `pins`, `reminders`, `links`, `lists`, `calls`, `dnd`, `metadata.message`, `remote_files`) | Read-only access to those domains; mostly forward-compat for commands that may use them |
+| `pins:read` / `pins:write` | List, add and remove pinned messages: `slck pins list/add/remove` |
+| Other `*:read` scopes (`bookmarks`, `reminders`, `links`, `lists`, `calls`, `dnd`, `metadata.message`, `remote_files`) | Read-only access to those domains; mostly forward-compat for commands that may use them |
 
 ### Token Types
 
@@ -705,6 +708,36 @@ slck messages unreact C1234567890 1234567890.123456 thumbsup
 [2025-01-15 09:30] alice: Ready to ship?
 	reactions: :+1: 2 (alice, bob), :eyes: 1 (carol)
 ```
+
+### Pins
+
+```bash
+# Pin a message (the timestamp can also be p-prefixed or the message's Slack URL)
+slck pins add C1234567890 1234567890.123456
+
+# List what is pinned in a channel, most recently pinned first
+slck pins list C1234567890
+
+# Unpin a message
+slck pins remove C1234567890 1234567890.123456
+```
+
+`add` and `remove` need the `pins:write` scope and `list` needs `pins:read`, on the bot token, or on the user token with `--as-user`. Neither scope is in the default manifest; the extended manifest has both. Adding a pin that exists, or removing one that does not, succeeds and says so.
+
+`list` prints one row per pin; `remove` takes the `TS` value. A pinned file has `-` for `TS` and `AUTHOR`.
+
+```text
+TS | PINNED | PINNED_BY | AUTHOR | TEXT
+1699999000.000200 | 2023-11-14 22:16 | bob | alice | On call this week: @bob
+```
+
+#### Pins Command Reference
+
+| Command | Flags | Description |
+|---------|-------|-------------|
+| `add <channel> <ts>` | | Pin a message (idempotent) |
+| `remove <channel> <ts>` | | Unpin a message (idempotent) |
+| `list <channel>` | | List pinned items |
 
 ### Search
 
@@ -1022,6 +1055,7 @@ Commands have convenient aliases:
 | `channels` | `ch` |
 | `users` | `u` |
 | `messages` | `msg`, `m` |
+| `pins` | `pin` |
 | `search` | `s` |
 | `emoji` | `e` |
 | `workspace` | `ws`, `team` |

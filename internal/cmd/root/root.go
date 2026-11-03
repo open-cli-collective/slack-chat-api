@@ -20,6 +20,7 @@ import (
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/initcmd"
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/me"
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/messages"
+	"github.com/open-cli-collective/slack-chat-api/internal/cmd/pins"
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/search"
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/setcred"
 	"github.com/open-cli-collective/slack-chat-api/internal/cmd/unreads"
@@ -165,6 +166,7 @@ func init() {
 	rootCmd.AddCommand(users.NewCmd())
 	rootCmd.AddCommand(unreads.NewCmd())
 	rootCmd.AddCommand(messages.NewCmd())
+	rootCmd.AddCommand(pins.NewCmd())
 	rootCmd.AddCommand(search.NewCmd())
 	rootCmd.AddCommand(workspace.NewCmd())
 	rootCmd.AddCommand(me.NewCmd())
