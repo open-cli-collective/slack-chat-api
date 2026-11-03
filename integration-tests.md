@@ -36,6 +36,8 @@ In **OAuth & Permissions**, add these **Bot Token Scopes**:
 | `team:read` | Get workspace info | Part 2 |
 | `chat:write` | Send, update, delete messages | Part 3 |
 | `reactions:write` | Add/remove reactions | Part 3 |
+| `pins:read` | List pinned messages | Part 3 |
+| `pins:write` | Pin and unpin messages | Part 3 |
 | `channels:manage` | Create, archive, set topic/purpose, invite | Parts 4 & 5 |
 | `groups:write` | Topic/purpose/invite for private channels | Part 4 |
 | `emoji:read` | List custom workspace emoji | Part 7 |
@@ -164,7 +166,7 @@ These tests don't modify anything. Safe to run anytime.
 
 ## Part 3: Messaging Tests
 
-**Scopes required:** `chat:write`, `reactions:write`
+**Scopes required:** `chat:write`, `reactions:write`, `pins:read`, `pins:write`
 
 These tests create messages, then clean them up at the end.
 
@@ -196,6 +198,18 @@ Using **TS₁** from step 3.1:
 | 4 | `slck messages history $TEST_CHANNEL_ID --limit 5` | TS₁ line is followed by an indented `reactions: :+1: 1 (<you>), :heart: 1 (<you>)` line (Slack reports thumbsup as `+1`) |
 | 5 | `slck messages unreact $TEST_CHANNEL_ID <TS₁> thumbsup` | "Removed :thumbsup: reaction" |
 | 6 | `slck messages unreact $TEST_CHANNEL_ID <TS₁> heart` | "Removed :heart: reaction" |
+
+### 3.3a Pins
+
+Using **TS₁** from step 3.1:
+
+| Step | Command | Expected |
+|------|---------|----------|
+| 1 | `slck pins add $TEST_CHANNEL_ID <TS₁>` | "Pinned message <TS₁> in $TEST_CHANNEL_ID" |
+| 2 | `slck pins add $TEST_CHANNEL_ID <TS₁>` | "Message <TS₁> is already pinned in $TEST_CHANNEL_ID" (idempotent, exit 0) |
+| 3 | `slck pins list $TEST_CHANNEL_ID` | `TS \| PINNED \| PINNED_BY \| AUTHOR \| TEXT` header, then a row whose TS is TS₁ |
+| 4 | `slck pins remove $TEST_CHANNEL_ID <TS₁>` | "Unpinned message <TS₁> in $TEST_CHANNEL_ID" |
+| 5 | `slck pins remove $TEST_CHANNEL_ID <TS₁>` | "Message <TS₁> is not pinned in $TEST_CHANNEL_ID" (idempotent, exit 0) |
 
 ### 3.4 Threading
 

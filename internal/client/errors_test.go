@@ -190,3 +190,18 @@ func TestWrapError_OperationContext(t *testing.T) {
 	assert.Contains(t, errStr, "archive channel C123")
 	assert.Contains(t, errStr, "already_archived")
 }
+
+func TestWrapScopeError(t *testing.T) {
+	assert.NoError(t, WrapScopeError("pin message", "pins:write", nil))
+
+	err := WrapScopeError("pin message", "pins:write", fmt.Errorf("slack API error: missing_scope"))
+	require.Error(t, err)
+	assert.Equal(t, "pin message: slack API error: missing_scope\n"+
+		"Hint: The token is missing the pins:write scope. Add pins:write to the app's Bot Token Scopes "+
+		"(or User Token Scopes for --as-user) at api.slack.com/apps, then reinstall the app to the workspace.", err.Error())
+
+	err = WrapScopeError("pin message", "pins:write", fmt.Errorf("slack API error: channel_not_found"))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "Verify the channel ID is correct")
+	assert.NotContains(t, err.Error(), "pins:write")
+}

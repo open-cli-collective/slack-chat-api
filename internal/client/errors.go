@@ -57,3 +57,15 @@ func WrapError(operation string, err error) error {
 
 	return fmt.Errorf("%s: %w", operation, err)
 }
+
+// WrapScopeError is WrapError for a call that needs one known OAuth scope:
+// a missing_scope error names that scope and where to grant it.
+func WrapScopeError(operation, scope string, err error) error {
+	if !IsSlackError(err, "missing_scope") {
+		return WrapError(operation, err)
+	}
+	hint := fmt.Sprintf("The token is missing the %s scope. Add %s to the app's Bot Token Scopes "+
+		"(or User Token Scopes for --as-user) at api.slack.com/apps, then reinstall the app to the workspace.",
+		scope, scope)
+	return fmt.Errorf("%s: %w\nHint: %s", operation, err, hint)
+}
