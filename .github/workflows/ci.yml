@@ -52,7 +52,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: open-cli-collective/.github/actions/go-lint@v1
+      - uses: open-cli-collective/.github/actions/go-lint@b816e09a862eec83f6ff334f94d6b96894f405ad
         with:
           go-version-file: go.mod
 
@@ -67,7 +67,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
           go-version-file: go.mod
       - name: Static release build guard
